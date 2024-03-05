@@ -1,6 +1,6 @@
 #include "logger.h"
 
-//#include "platform/platform.h"
+#include "platform.h"
 #include "asserts.h"
 #include "meminc.h"
 // needed for string formatting and variadic args
@@ -66,9 +66,9 @@ void Log(log_level level, const char* message, ...)
 	fprintf(file, final_message);
 
 	// Actually printing to console and platform specific console
-	//PlatformLogString(level, final_message);TODO: this once platform file is here
+	PlatformLogString(level, final_message);
 	printf(final_message);
 
-	//if (result >= MAX_USER_LOG_CHARS || result < 0)
-		//PlatformLogString(LOG_LEVEL_FATAL, "\nLogging failed, too many characters or formatting error");
+	if (result >= MAX_USER_LOG_CHARS || result < 0)
+		PlatformLogString(LOG_LEVEL_FATAL, "\nLogging failed, too many characters or formatting error");
 }
