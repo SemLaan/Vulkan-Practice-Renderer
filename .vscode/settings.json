@@ -3,6 +3,7 @@
         "stdarg.h": "c",
         "defines.h": "c",
         "stdbool.h": "c",
-        "system_error": "c"
+        "system_error": "c",
+        "meminc.h": "c"
     }
 }
