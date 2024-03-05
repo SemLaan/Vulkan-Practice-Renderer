@@ -1,0 +1,22 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "build static game exe",
+            "windows": {
+                "command": "${workspaceFolder}/build_game_static.bat"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/bin/Debug"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+        },
+    ],
+    "version": "2.0.0"
+}

@@ -1,0 +1,17 @@
+# Exclude visual studio
+/.vs
+**.sln
+**.vcxproj
+**.vcxproj.user
+**.vcxproj.filters
+**.hint
+
+# Exclude build
+/build
+/bin/Debug/**
+
+# Excluding compiled shaders
+**.spv
+
+# Exclude logging files
+**.log
