@@ -3,13 +3,13 @@
 #ifdef __win__
 // Both of these headers are implemented here
 #include "platform.h"
-//#include "renderer/gr_vulkan/vulkan_platform.h" 
+#include "renderer/vulkan_renderer/vulkan_platform.h" 
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <windowsx.h>
-//#include <vulkan/vulkan_win32.h>
+#include <vulkan/vulkan_win32.h>
 #include "core/logger.h"
 #include "core/asserts.h"
 #include "core/meminc.h"
@@ -342,7 +342,7 @@ void GetPlatformExtensions(u32* pExtensionNameCount, const char** extensionNames
 	extensionNames[*pExtensionNameCount] = "VK_KHR_win32_surface";
 	*pExtensionNameCount += 1;
 }
-/*
+
 bool PlatformCreateSurface(VkInstance instance, VkAllocationCallbacks* allocator, VkSurfaceKHR* out_surface)
 {
 	VkWin32SurfaceCreateInfoKHR createInfo = {};
@@ -359,6 +359,6 @@ bool PlatformCreateSurface(VkInstance instance, VkAllocationCallbacks* allocator
 	}
 
 	return true;
-}*/
+}
 
 #endif

@@ -5,6 +5,10 @@
         "stdbool.h": "c",
         "system_error": "c",
         "meminc.h": "c",
-        "vulkan_win32.h": "c"
+        "vulkan_win32.h": "c",
+        "functional": "c",
+        "vulkan_types.h": "c",
+        "vulkan_buffer.h": "c",
+        "game.h": "c"
     }
 }

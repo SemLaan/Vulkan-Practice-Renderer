@@ -6,9 +6,15 @@
 #include "core/event.h"
 #include "core/input.h"
 #include "core/platform.h"
+#include "renderer/renderer.h"
+#include "game/game.h"
 
 static bool appRunning;
 static bool appSuspended;
+
+// Forward declarations
+static bool OnQuit(EventCode type, EventData data);
+static bool OnResize(EventCode type, EventData data);
 
 int main()
 {
@@ -18,12 +24,15 @@ int main()
     InitializeEvent();
     InitializeInput();
     InitializePlatform("Beef", 200, 100);
+    InitializeRenderer();
 
     appRunning = true;
     appSuspended = false;
 
     RegisterEventListener(EVCODE_QUIT, OnQuit);
     RegisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
+
+    GameInit();
 
     // ============================================ Run ============================================
     _INFO("Testing beef: %i", 34);
@@ -37,8 +46,8 @@ int main()
         // TODO: sleep platform every loop if app suspended to not waste pc resources
 		if (!appSuspended)
 		{
-            // TODO: game update and render
-			//RenderFrame();
+            GameUpdateAndRender();
+
 			if (GetKeyDown(KEY_ESCAPE))
             {
                 EventData evdata;
@@ -52,6 +61,7 @@ int main()
     UnregisterEventListener(EVCODE_QUIT, OnQuit);
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
 
+    ShutdownRenderer();
     ShutdownPlatform();
     ShutdownInput();
     ShutdownEvent();
@@ -74,12 +84,12 @@ static bool OnResize(EventCode type, EventData data)
 	if (data.u32[0] == 0 || data.u32[1] == 0)
 	{
 		appSuspended = true;
-		GRINFO("App suspended");
+		_INFO("App suspended");
 	}
 	else if (appSuspended)
 	{
 		appSuspended = false;
-		GRINFO("App unsuspended");
+		_INFO("App unsuspended");
 	}
 	return false;
 }

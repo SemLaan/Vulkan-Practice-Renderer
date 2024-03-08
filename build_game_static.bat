@@ -13,8 +13,8 @@ rem -g is a debbuging flag
 
 if not exist "%~DP0/bin/Debug" mkdir "%~DP0/bin/Debug"
 
-rem echo compiling shaders...
-rem call %~DP0/Goril/src/renderer/shaders/compile_shaders.bat
+echo compiling shaders...
+call %~DP0/src/renderer/shaders/compile_shaders.bat
 
 rem profiling: -pg
 rem optimization: -O2
