@@ -546,13 +546,7 @@ void ShutdownRenderer()
 
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
-    // Idling before shutting down the 2d renderer
-    if (vk_state->device)
-        vkDeviceWaitIdle(vk_state->device);
-
-    Shutdown2DRenderer();
-
-    // Idling again before destroying resources, because shutting down the 2d renderer might queue resources to be destroyed again
+    // Idling before destroying resources
     if (vk_state->device)
         vkDeviceWaitIdle(vk_state->device);
 
@@ -673,7 +667,7 @@ void RecreateSwapchain()
     _INFO("Vulkan Swapchain resized");
 }
 
-bool RenderFrame()
+bool BeginRendering()
 {
     // Destroy temporary resources that the GPU has finished with (e.g. staging buffers, etc.)
     TryDestroyResourcesPendingDestruction();
@@ -714,9 +708,6 @@ bool RenderFrame()
         _WARN("Failed to acquire next swapchain image");
         return false;
     }
-
-    // =================================== Preprocess user scene data before recording actual commands ===========================================
-    Preprocess2DSceneData();
 
     // ===================================== Begin command buffer recording =========================================
     ResetAndBeginCommandBuffer(vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex]);
@@ -811,8 +802,12 @@ bool RenderFrame()
     scissor.extent = vk_state->swapchainExtent;
     vkCmdSetScissor(currentCommandBuffer, 0, 1, &scissor);
 
-    // =========================================== Render user submitted scene ================================
-    Render2DScene();
+    return true;
+}
+
+void EndRendering()
+{
+    VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
 
     // ==================================== End renderpass =================================================
     vkCmdEndRendering(currentCommandBuffer);
@@ -923,8 +918,20 @@ bool RenderFrame()
 
     vk_state->currentFrameIndex += 1;
     vk_state->currentInFlightFrameIndex = (vk_state->currentInFlightFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+}
 
-    return true;
+void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, PushConstantObject* pushConstantValues)
+{
+    MaterialBind(clientMaterial);
+    VertexBufferBind(clientVertexBuffer);
+    IndexBufferBind(clientIndexBuffer);
+
+    VulkanIndexBuffer* indexBuffer = clientIndexBuffer.internalState;
+
+    VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
+
+    vkCmdPushConstants(currentCommandBuffer, vk_state->boundShader->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(*pushConstantValues), pushConstantValues);
+    vkCmdDrawIndexed(currentCommandBuffer, indexBuffer->indexCount, 1, 0, 0, 0);
 }
 
 static bool OnWindowResize(EventCode type, EventData data)

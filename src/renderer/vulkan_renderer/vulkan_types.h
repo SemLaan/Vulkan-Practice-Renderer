@@ -108,6 +108,7 @@ typedef struct RendererState
 	VkImageView* swapchainImageViews;								// Image views that make up the swapchain (created from swapchain images)
 	bool shouldRecreateSwapchain;									// Checked at the start of each renderloop, is set to true upon window resize
 	VkExtent2D swapchainExtent;										// Extent of the swapchain, used for beginning renderpass
+	VulkanShader* boundShader;										// Currently bound shader (pipeline object)
 
 	// Binary semaphores for synchronizing the swapchain with the screen and the GPU
 	VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image acquisition TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)

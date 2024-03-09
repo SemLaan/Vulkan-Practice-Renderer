@@ -12,6 +12,8 @@ VertexBuffer VertexBufferCreate(void* vertices, size_t size);
 void VertexBufferUpdate(VertexBuffer clientBuffer, void* vertices, u64 size);
 // Destroys the vertex buffer of the associated handle
 void VertexBufferDestroy(VertexBuffer clientBuffer);
+// Binds a vertex buffer to be rendered
+void VertexBufferBind(VertexBuffer clientBuffer);
 
 /// <summary>
 /// Creates an index buffer
@@ -21,3 +23,5 @@ void VertexBufferDestroy(VertexBuffer clientBuffer);
 /// <returns></returns>
 IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount);
 void IndexBufferDestroy(IndexBuffer clientBuffer);
+// Binds an index buffer to be rendered
+void IndexBufferBind(IndexBuffer clientBuffer);

@@ -113,4 +113,6 @@ void MaterialBind(Material clientMaterial)
     // TODO: check which shader is bound first and dont change if the shader is already bound
     vkCmdBindPipeline(currentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material->shader->pipelineObject);
     vkCmdBindDescriptorSets(currentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material->shader->pipelineLayout, 0, 1, &material->descriptorSetArray[vk_state->currentInFlightFrameIndex], 0, nullptr);
+
+    vk_state->boundShader = material->shader;
 }

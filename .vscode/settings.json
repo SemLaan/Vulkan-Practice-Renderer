@@ -9,6 +9,7 @@
         "functional": "c",
         "vulkan_types.h": "c",
         "vulkan_buffer.h": "c",
-        "game.h": "c"
+        "game.h": "c",
+        "renderer.h": "c"
     }
 }

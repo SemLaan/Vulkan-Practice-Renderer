@@ -335,6 +335,16 @@ void VertexBufferDestroy(VertexBuffer clientBuffer)
     vk_state->graphicsQueue.resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(vk_state->graphicsQueue.resourcesPendingDestructionDarray, &vertexBufferDestructionInfo);
 }
 
+void VertexBufferBind(VertexBuffer clientBuffer)
+{
+    VulkanVertexBuffer* vertexBuffer = clientBuffer.internalState;
+
+    VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
+
+    VkDeviceSize offsets[1] = {0};
+    vkCmdBindVertexBuffers(currentCommandBuffer, 0, 1, &vertexBuffer->handle, offsets);
+}
+
 IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount)
 {
     IndexBuffer clientBuffer;
@@ -462,4 +472,13 @@ void IndexBufferDestroy(IndexBuffer clientBuffer)
     indexBufferDestructionInfo.signalValue = vk_state->graphicsQueue.semaphore.submitValue;
 
     vk_state->graphicsQueue.resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(vk_state->graphicsQueue.resourcesPendingDestructionDarray, &indexBufferDestructionInfo);
+}
+
+void IndexBufferBind(IndexBuffer clientBuffer)
+{
+    VulkanIndexBuffer* indexBuffer = clientBuffer.internalState;
+
+    VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
+
+    vkCmdBindIndexBuffer(currentCommandBuffer, indexBuffer->handle, 0, VK_INDEX_TYPE_UINT32);
 }

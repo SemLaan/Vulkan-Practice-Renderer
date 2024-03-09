@@ -46,6 +46,9 @@ int main()
         // TODO: sleep platform every loop if app suspended to not waste pc resources
 		if (!appSuspended)
 		{
+            if (GetKeyDown(KEY_F11) && !GetKeyDownPrevious(KEY_F11))
+                ToggleFullscreen();
+
             GameUpdateAndRender();
 
 			if (GetKeyDown(KEY_ESCAPE))

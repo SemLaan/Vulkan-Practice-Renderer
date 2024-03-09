@@ -1,6 +1,8 @@
 #pragma once
 #include "defines.h"
 #include "buffer.h"
+#include "material.h"
+#include "shader.h"
 
 
 // ============================================= Engine functions ====================================================
@@ -9,8 +11,10 @@ void ShutdownRenderer();
 
 void RecreateSwapchain();
 
-bool RenderFrame();
+bool BeginRendering();
+void EndRendering();
 
-// ============================================= Game code functions ====================================================
+void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, PushConstantObject* pushConstantValues);
+
 
 
