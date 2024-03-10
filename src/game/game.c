@@ -7,6 +7,7 @@
 #include "renderer/material.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
+#include "renderer/obj_loader.h"
 #include "math/lin_alg.h"
 
 typedef struct GameState
@@ -43,24 +44,9 @@ void GameInit()
     // Initializing rendering state
     gameState->shader = ShaderCreate();
     gameState->material = MaterialCreate(gameState->shader);
+    
+    LoadObj("models/sphere.obj", &gameState->vertexBuffer, &gameState->indexBuffer, true);
 
-    Vertex quadVertices[QUAD_VERT_COUNT] =
-        {
-            {{0.0, 0.0, 0}, {0, 0, 0}, {0, 1}},
-            {{1.0, 0.0, 0}, {0, 0, 0}, {1, 1}},
-            {{0.0, 1.0, 0}, {0, 0, 0}, {0, 0}},
-            {{1.0, 1.0, 0}, {0, 0, 0}, {1, 0}},
-        };
-
-    gameState->vertexBuffer = VertexBufferCreate(quadVertices, sizeof(quadVertices));
-
-    u32 quadIndices[QUAD_INDEX_COUNT] =
-        {
-            0, 1, 2,
-            2, 1, 3,
-        };
-
-    gameState->indexBuffer = IndexBufferCreate(quadIndices, QUAD_INDEX_COUNT);
     // Initializing camera
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
