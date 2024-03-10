@@ -10,7 +10,7 @@ Material MaterialCreate(Shader clientShader)
 
     // Allocating a material struct
     Material clientMaterial;
-    clientMaterial.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanMaterial), MEM_TAG_RENDERER_SUBSYS);
+    clientMaterial.internalState = Alloc(vk_state->rendererAllocator, sizeof(*clientMaterial.internalState), MEM_TAG_RENDERER_SUBSYS);
     VulkanMaterial* material = clientMaterial.internalState;
     material->shader = shader;
 
@@ -101,7 +101,7 @@ void MaterialUpdateProperties(Material clientMaterial, GlobalUniformObject* prop
 {
     VulkanMaterial* material = clientMaterial.internalState;
 
-    MemoryCopy(&material->uniformBufferMappedArray[vk_state->currentInFlightFrameIndex], properties, sizeof(*properties));
+    MemoryCopy(material->uniformBufferMappedArray[vk_state->currentInFlightFrameIndex], properties, sizeof(*properties));
 }
 
 void MaterialBind(Material clientMaterial)

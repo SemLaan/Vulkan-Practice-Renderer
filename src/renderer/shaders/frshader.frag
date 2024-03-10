@@ -9,5 +9,5 @@ layout(location = 2) in flat uint textureIndex;
 //layout(set = 0, binding = 1) uniform sampler2D textures[100];
 
 void main() {
-    outColor = vec4(1,1,1,1);//texture(textures[textureIndex], texCoord);
+    outColor = vec4(texCoord.x, texCoord.y, 1, 1);//texture(textures[textureIndex], texCoord);
 }

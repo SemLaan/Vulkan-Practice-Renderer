@@ -61,6 +61,9 @@ int main()
     
 
     // ============================================ Shutdown ============================================
+    WaitForGPUIdle();
+    GameShutdown();
+
     UnregisterEventListener(EVCODE_QUIT, OnQuit);
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
 

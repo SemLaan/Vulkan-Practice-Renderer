@@ -9,6 +9,8 @@
 bool InitializeRenderer();
 void ShutdownRenderer();
 
+void WaitForGPUIdle();
+
 void RecreateSwapchain();
 
 bool BeginRendering();

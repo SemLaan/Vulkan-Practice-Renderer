@@ -10,6 +10,8 @@
         "vulkan_types.h": "c",
         "vulkan_buffer.h": "c",
         "game.h": "c",
-        "renderer.h": "c"
+        "renderer.h": "c",
+        "lin_alg.h": "c",
+        "event.h": "c"
     }
 }

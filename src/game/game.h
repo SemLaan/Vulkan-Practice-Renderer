@@ -5,3 +5,5 @@
 void GameInit();
 
 void GameUpdateAndRender();
+
+void GameShutdown();

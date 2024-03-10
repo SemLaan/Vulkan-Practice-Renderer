@@ -7,7 +7,6 @@
 #include "core/meminc.h"
 
 #include "renderer/texture.h"
-#include "vulkan_2D_renderer.h"
 #include "vulkan_command_buffer.h"
 #include "vulkan_debug_tools.h"
 #include "vulkan_platform.h"
@@ -530,6 +529,11 @@ bool InitializeRenderer()
     }
 
     return true;
+}
+
+void WaitForGPUIdle()
+{
+    vkDeviceWaitIdle(vk_state->device);
 }
 
 void ShutdownRenderer()

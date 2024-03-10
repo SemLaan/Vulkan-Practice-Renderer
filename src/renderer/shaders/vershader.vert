@@ -13,11 +13,15 @@ layout(set = 0, binding = 0) uniform UniformBufferObject
 	mat4 projView;
 } ubo;
 
+layout(push_constant) uniform PushConstants
+{
+	mat4 model;
+} pc;
+
 
 void main() {
 	fragColor = v_color;
 	texCoord = v_texCoord;
 	textureIndex = 0;
-	//gl_Position = ubo.projView * v_model * vec4(v_position, 1.0);
-	gl_Position = vec4(v_position, 1);
+	gl_Position = ubo.projView * pc.model * vec4(v_position, 1);
 }
