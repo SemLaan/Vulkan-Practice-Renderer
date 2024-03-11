@@ -15,18 +15,24 @@ Shader ShaderCreate()
     // ============================================================================================================================================================
     // ======================== Creating descriptor set layout ==========================================================================
     // ============================================================================================================================================================
-    VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[1] = {};
+    VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[2] = {};
     descriptorSetLayoutBindings[0].binding = 0;
     descriptorSetLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorSetLayoutBindings[0].descriptorCount = 1;
     descriptorSetLayoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     descriptorSetLayoutBindings[0].pImmutableSamplers = nullptr;
 
+    descriptorSetLayoutBindings[1].binding = 1;
+    descriptorSetLayoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorSetLayoutBindings[1].descriptorCount = 1;
+    descriptorSetLayoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    descriptorSetLayoutBindings[1].pImmutableSamplers = nullptr;
+
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
     descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descriptorSetLayoutCreateInfo.pNext = nullptr;
     descriptorSetLayoutCreateInfo.flags = 0;
-    descriptorSetLayoutCreateInfo.bindingCount = 1;
+    descriptorSetLayoutCreateInfo.bindingCount = 2;
     descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings;
 
     if (VK_SUCCESS != vkCreateDescriptorSetLayout(vk_state->device, &descriptorSetLayoutCreateInfo, vk_state->vkAllocator, &shader->descriptorSetLayout))
@@ -65,8 +71,8 @@ Shader ShaderCreate()
     // Loading shaders
     VkShaderModule vertShaderModule;
     VkShaderModule fragShaderModule;
-    CreateShaderModule("vershader.spv", vk_state, &vertShaderModule);
-    CreateShaderModule("frshader.spv", vk_state, &fragShaderModule);
+    CreateShaderModule("shaders/vershader.vert.spv", vk_state, &vertShaderModule);
+    CreateShaderModule("shaders/frshader.frag.spv", vk_state, &fragShaderModule);
 
     // Shader stages
     VkPipelineShaderStageCreateInfo shaderStagesCreateInfo[2] = {};

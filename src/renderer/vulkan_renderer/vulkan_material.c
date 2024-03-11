@@ -1,8 +1,8 @@
 #include "../material.h"
 
 #include "core/asserts.h"
-#include "vulkan_types.h"
 #include "vulkan_buffer.h"
+#include "vulkan_types.h"
 
 Material MaterialCreate(Shader clientShader)
 {
@@ -62,7 +62,7 @@ Material MaterialCreate(Shader clientShader)
         descriptorBufferInfo.offset = 0;
         descriptorBufferInfo.range = sizeof(GlobalUniformObject);
 
-        VkWriteDescriptorSet descriptorWrites[1] = {};
+        VkWriteDescriptorSet descriptorWrites[2] = {};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].pNext = nullptr;
         descriptorWrites[0].dstSet = material->descriptorSetArray[i];
@@ -74,7 +74,25 @@ Material MaterialCreate(Shader clientShader)
         descriptorWrites[0].pBufferInfo = &descriptorBufferInfo;
         descriptorWrites[0].pTexelBufferView = nullptr;
 
-        vkUpdateDescriptorSets(vk_state->device, 1, descriptorWrites, 0, nullptr);
+        VulkanImage* defaultTexture = vk_state->defaultTexture.internalState;
+
+        VkDescriptorImageInfo descriptorImageInfo = {};
+        descriptorImageInfo.sampler = defaultTexture->sampler;
+        descriptorImageInfo.imageView = defaultTexture->view;
+        descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].pNext = nullptr;
+        descriptorWrites[1].dstSet = material->descriptorSetArray[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].pImageInfo = &descriptorImageInfo;
+        descriptorWrites[1].pBufferInfo = nullptr;
+        descriptorWrites[1].pTexelBufferView = nullptr;
+
+        vkUpdateDescriptorSets(vk_state->device, 2, descriptorWrites, 0, nullptr);
     }
 
     return clientMaterial;

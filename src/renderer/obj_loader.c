@@ -41,8 +41,6 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
     fread(text, sizeof(*text), fileSize, file);
     fclose(file);
 
-    printf(text);
-
     // ====================================== Creating index arrays of the starting indices of all the v, vn, vt, and f lines =============================================
     u32* positionIndices = DarrayCreate(sizeof(*positionIndices), DARRAY_START_CAPACITY, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
     u32* normalIndices = DarrayCreate(sizeof(*normalIndices), DARRAY_START_CAPACITY, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
