@@ -13,6 +13,7 @@
 #include "vulkan_swapchain.h"
 #include "vulkan_types.h"
 #include "vulkan_utils.h"
+#include "vulkan_buffer.h"
 
 RendererState* vk_state = nullptr;
 
@@ -25,7 +26,7 @@ bool InitializeRenderer()
 
     vk_state = AlignedAlloc(GetGlobalAllocator(), sizeof(RendererState), 64 /*cache line*/, MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(vk_state, sizeof(*vk_state));
-    CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), MiB, &vk_state->rendererAllocator);
+    CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), MiB * 5, &vk_state->rendererAllocator);
     CreateBumpAllocator("renderer bump allocator", vk_state->rendererAllocator, KiB * 5, &vk_state->rendererBumpAllocator);
     CreatePoolAllocator("renderer resource destructor pool", vk_state->rendererAllocator, RENDER_POOL_BLOCK_SIZE_32, 30, &vk_state->poolAllocator32B);
     CreatePoolAllocator("Renderer resource acquisition pool", vk_state->rendererAllocator, QUEUE_ACQUISITION_POOL_BLOCK_SIZE, 30, &vk_state->resourceAcquisitionPool);
@@ -494,6 +495,86 @@ bool InitializeRenderer()
     }
 
     // ============================================================================================================================================================
+    // ======================== Creating GlobalUBO descriptor set and buffer ============================================================================================================
+    // ============================================================================================================================================================
+    // Descriptor set layout
+    VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[1] = {};
+    descriptorSetLayoutBindings[0].binding = 0;
+    descriptorSetLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorSetLayoutBindings[0].descriptorCount = 1;
+    descriptorSetLayoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    descriptorSetLayoutBindings[0].pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
+    descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptorSetLayoutCreateInfo.pNext = nullptr;
+    descriptorSetLayoutCreateInfo.flags = 0;
+    descriptorSetLayoutCreateInfo.bindingCount = 1;
+    descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings;
+
+    if (VK_SUCCESS != vkCreateDescriptorSetLayout(vk_state->device, &descriptorSetLayoutCreateInfo, vk_state->vkAllocator, &vk_state->globalDescriptorSetLayout))
+    {
+        GRASSERT_MSG(false, "Vulkan descriptor set layout creation failed");
+    }
+
+
+    // Creating backing buffer and memory and mapping the memory
+    VkDeviceSize uniformBufferSize = sizeof(GlobalUniformObject);
+
+    vk_state->globalUniformBufferArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformBufferArray), MEM_TAG_RENDERER_SUBSYS);
+    vk_state->globalUniformMemoryArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformMemoryArray), MEM_TAG_RENDERER_SUBSYS);
+    vk_state->globalUniformBufferMappedArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformBufferMappedArray), MEM_TAG_RENDERER_SUBSYS);
+    for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        CreateBuffer(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vk_state->globalUniformBufferArray[i], &vk_state->globalUniformMemoryArray[i]);
+        vkMapMemory(vk_state->device, vk_state->globalUniformMemoryArray[i], 0, uniformBufferSize, 0, &vk_state->globalUniformBufferMappedArray[i]);
+    }
+
+    // Allocating descriptor sets
+    VkDescriptorSetLayout descriptorSetLayouts[MAX_FRAMES_IN_FLIGHT];
+    for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        descriptorSetLayouts[i] = vk_state->globalDescriptorSetLayout;
+    }
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocInfo = {};
+    descriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorSetAllocInfo.pNext = nullptr;
+    descriptorSetAllocInfo.descriptorPool = vk_state->descriptorPool;
+    descriptorSetAllocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+    descriptorSetAllocInfo.pSetLayouts = descriptorSetLayouts;
+
+    vk_state->globalDescriptorSetArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalDescriptorSetArray), MEM_TAG_RENDERER_SUBSYS);
+
+    if (VK_SUCCESS != vkAllocateDescriptorSets(vk_state->device, &descriptorSetAllocInfo, vk_state->globalDescriptorSetArray))
+    {
+        GRASSERT_MSG(false, "Vulkan descriptor set allocation failed");
+    }
+
+    // Updating descriptor sets to link them to the backing buffer
+    for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        VkDescriptorBufferInfo descriptorBufferInfo = {};
+        descriptorBufferInfo.buffer = vk_state->globalUniformBufferArray[i];
+        descriptorBufferInfo.offset = 0;
+        descriptorBufferInfo.range = sizeof(GlobalUniformObject);
+
+        VkWriteDescriptorSet descriptorWrites[1] = {};
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].pNext = nullptr;
+        descriptorWrites[0].dstSet = vk_state->globalDescriptorSetArray[i];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].pImageInfo = nullptr;
+        descriptorWrites[0].pBufferInfo = &descriptorBufferInfo;
+        descriptorWrites[0].pTexelBufferView = nullptr;
+
+        vkUpdateDescriptorSets(vk_state->device, 1, descriptorWrites, 0, nullptr);
+    }
+
+    // ============================================================================================================================================================
     // ============================ Creating default texture ======================================================================================================
     // ============================================================================================================================================================
     {
@@ -528,6 +609,12 @@ bool InitializeRenderer()
         vk_state->defaultTexture = TextureCreate(DEFAULT_TEXTURE_SIZE, DEFAULT_TEXTURE_SIZE, defaultTexturePixels);
     }
 
+    // ============================================================================================================================================================
+    // ============================ Creating default shader and material ======================================================================================================
+    // ============================================================================================================================================================
+    vk_state->defaultShader = ShaderCreate();
+    vk_state->defaultMaterial = MaterialCreate(vk_state->defaultShader);
+
     return true;
 }
 
@@ -558,6 +645,12 @@ void ShutdownRenderer()
         DarrayDestroy(vk_state->requestedQueueAcquisitionOperationsDarray);
 
     // ============================================================================================================================================================
+    // ============================ Destroying default shader and material ======================================================================================================
+    // ============================================================================================================================================================
+    ShaderDestroy(vk_state->defaultShader);
+    MaterialDestroy(vk_state->defaultMaterial);
+
+    // ============================================================================================================================================================
     // ============================ Destroying default texture ======================================================================================================
     // ============================================================================================================================================================
     if (vk_state->defaultTexture.internalState)
@@ -565,6 +658,23 @@ void ShutdownRenderer()
 
     if (vk_state->graphicsQueue.resourcesPendingDestructionDarray)
         TryDestroyResourcesPendingDestruction();
+
+    // ============================================================================================================================================================
+    // ============================ Destroying global ubo stuff (arrays, buffers, memory, descriptor set layout, descriptor sets) =================================
+    // ============================================================================================================================================================
+    if (vk_state->globalDescriptorSetLayout)
+        vkDestroyDescriptorSetLayout(vk_state->device, vk_state->globalDescriptorSetLayout, vk_state->vkAllocator);
+
+    for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        vkUnmapMemory(vk_state->device, vk_state->globalUniformMemoryArray[i]);
+        vkDestroyBuffer(vk_state->device, vk_state->globalUniformBufferArray[i], vk_state->vkAllocator);
+        vkFreeMemory(vk_state->device, vk_state->globalUniformMemoryArray[i], vk_state->vkAllocator);
+    }
+
+    Free(vk_state->rendererAllocator, vk_state->globalUniformBufferMappedArray);
+    Free(vk_state->rendererAllocator, vk_state->globalUniformBufferArray);
+    Free(vk_state->rendererAllocator, vk_state->globalUniformMemoryArray);
 
     // ============================================================================================================================================================
     // ====================== Destroying descriptor pool if it was created ==============================================================================================
@@ -806,6 +916,10 @@ bool BeginRendering()
     scissor.extent = vk_state->swapchainExtent;
     vkCmdSetScissor(currentCommandBuffer, 0, 1, &scissor);
 
+    // Binding global ubo
+    VulkanShader* defaultShader = vk_state->defaultShader.internalState;
+    vkCmdBindDescriptorSets(currentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, defaultShader->pipelineLayout, 0, 1, &vk_state->globalDescriptorSetArray[vk_state->currentInFlightFrameIndex], 0, nullptr);
+
     return true;
 }
 
@@ -922,6 +1036,11 @@ void EndRendering()
 
     vk_state->currentFrameIndex += 1;
     vk_state->currentInFlightFrameIndex = (vk_state->currentInFlightFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void UpdateGlobalUniform(GlobalUniformObject* properties)
+{
+    MemoryCopy(vk_state->globalUniformBufferMappedArray[vk_state->currentInFlightFrameIndex], properties, sizeof(*properties));
 }
 
 void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, PushConstantObject* pushConstantValues)

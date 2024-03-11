@@ -14,6 +14,7 @@
         "lin_alg.h": "c",
         "event.h": "c",
         "darray.h": "c",
-        "renderer_types.h": "c"
+        "renderer_types.h": "c",
+        "material.h": "c"
     }
 }

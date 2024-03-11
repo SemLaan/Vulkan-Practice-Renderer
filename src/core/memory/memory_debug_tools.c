@@ -165,15 +165,15 @@ static void PrintAllocatorStatsRecursively(RegisteredAllocatorInfo* root, u32 re
     case ALLOCATOR_TYPE_GLOBAL:
     case ALLOCATOR_TYPE_FREELIST:
         usedAmount = (f32)GetFreelistAllocatorArenaUsage(root->allocator);
-        _INFO("%s%.2f/%.2f%s\t%.2f%%%% used", tabs, usedAmount / (f32)scale, arenaSizeScaled, scaleString, usedAmount / (f32)arenaSize);
+        _INFO("%s%.2f/%.2f%s\t%.2f%%%% used", tabs, usedAmount / (f32)scale, arenaSizeScaled, scaleString, usedAmount / (f32)arenaSize * 100);
         break;
     case ALLOCATOR_TYPE_BUMP:
         usedAmount = (f32)GetBumpAllocatorArenaUsage(root->allocator);
-        _INFO("%s%.2f/%.2f%s\t%.2f%%%% used", tabs, usedAmount / (f32)scale, arenaSizeScaled, scaleString, usedAmount / (f32)arenaSize);
+        _INFO("%s%.2f/%.2f%s\t%.2f%%%% used", tabs, usedAmount / (f32)scale, arenaSizeScaled, scaleString, usedAmount / (f32)arenaSize * 100);
         break;
     case ALLOCATOR_TYPE_POOL:
         usedAmount = (f32)GetPoolAllocatorArenaUsage(root->allocator);
-        _INFO("%s%.2f/%.2f%s\t%.2f%%%% used", tabs, usedAmount / (f32)scale, arenaSizeScaled, scaleString, usedAmount / (f32)arenaSize);
+        _INFO("%s%.2f/%.2f%s\t%.2f%%%% used", tabs, usedAmount / (f32)scale, arenaSizeScaled, scaleString, usedAmount / (f32)arenaSize * 100);
         break;
     default:
         _ERROR("Unknown allocator type");

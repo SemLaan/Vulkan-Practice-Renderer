@@ -49,13 +49,17 @@ Shader ShaderCreate()
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(PushConstantObject);
 
+    VkDescriptorSetLayout descriptorSetLayouts[2];
+    descriptorSetLayouts[0] = vk_state->globalDescriptorSetLayout;
+    descriptorSetLayouts[1] = shader->descriptorSetLayout;
+
     // Pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutCreateInfo.pNext = nullptr;
     pipelineLayoutCreateInfo.flags = 0;
-    pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &shader->descriptorSetLayout;
+    pipelineLayoutCreateInfo.setLayoutCount = 2;
+    pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts;
     pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
     pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 

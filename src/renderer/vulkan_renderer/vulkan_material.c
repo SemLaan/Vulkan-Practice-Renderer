@@ -3,6 +3,7 @@
 #include "core/asserts.h"
 #include "vulkan_buffer.h"
 #include "vulkan_types.h"
+#include "core/meminc.h"
 
 Material MaterialCreate(Shader clientShader)
 {
@@ -10,7 +11,7 @@ Material MaterialCreate(Shader clientShader)
 
     // Allocating a material struct
     Material clientMaterial;
-    clientMaterial.internalState = Alloc(vk_state->rendererAllocator, sizeof(*clientMaterial.internalState), MEM_TAG_RENDERER_SUBSYS);
+    clientMaterial.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanMaterial), MEM_TAG_RENDERER_SUBSYS);
     VulkanMaterial* material = clientMaterial.internalState;
     material->shader = shader;
 
@@ -22,6 +23,8 @@ Material MaterialCreate(Shader clientShader)
     material->uniformBufferArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferArray), MEM_TAG_RENDERER_SUBSYS);
     material->uniformBufferMemoryArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferMemoryArray), MEM_TAG_RENDERER_SUBSYS);
     material->uniformBufferMappedArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferMappedArray), MEM_TAG_RENDERER_SUBSYS);
+
+    material->uniformBufferMemoryArray[0] = NULL;
 
     for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
@@ -130,7 +133,7 @@ void MaterialBind(Material clientMaterial)
 
     // TODO: check which shader is bound first and dont change if the shader is already bound
     vkCmdBindPipeline(currentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material->shader->pipelineObject);
-    vkCmdBindDescriptorSets(currentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material->shader->pipelineLayout, 0, 1, &material->descriptorSetArray[vk_state->currentInFlightFrameIndex], 0, nullptr);
+    vkCmdBindDescriptorSets(currentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material->shader->pipelineLayout, 1, 1, &material->descriptorSetArray[vk_state->currentInFlightFrameIndex], 0, nullptr);
 
     vk_state->boundShader = material->shader;
 }

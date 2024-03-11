@@ -109,6 +109,8 @@ typedef struct RendererState
 	bool shouldRecreateSwapchain;									// Checked at the start of each renderloop, is set to true upon window resize
 	VkExtent2D swapchainExtent;										// Extent of the swapchain, used for beginning renderpass
 	VulkanShader* boundShader;										// Currently bound shader (pipeline object)
+	void** globalUniformBufferMappedArray;							// Global uniform mapped memory for updating global ubo data
+	VkDescriptorSet* globalDescriptorSetArray;						// Global descriptor set array, one per possible in flight frame
 
 	// Binary semaphores for synchronizing the swapchain with the screen and the GPU
 	VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image acquisition TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)
@@ -132,6 +134,8 @@ typedef struct RendererState
 	VkDependencyInfo** requestedQueueAcquisitionOperationsDarray;	// For transfering queue ownership from transfer to graphics after a resource has been uploaded
 	VkAllocationCallbacks* vkAllocator;								// Vulkan API allocator, only for reading vulkan allocations not for taking over allocation from vulkan //TODO: this is currently just nullptr
 	VkDescriptorPool descriptorPool;								// Pool used to allocate descriptor sets for all materials
+	Shader defaultShader;											// Fallback shader that is very simple, this shaders pipeline layout is used to bind the global ubo
+	Material defaultMaterial;										// Material based on default shader
 
 	// Data that is only used on startup/shutdown
 	VkInstance instance;											// Vulkan instance handle
@@ -142,6 +146,9 @@ typedef struct RendererState
 	VkFormat swapchainFormat;										// Format of the swapchain
 	u32 swapchainImageCount;										// Amount of images in the swapchain
 	Texture defaultTexture;											// Default texture
+	VkDescriptorSetLayout globalDescriptorSetLayout;				// Descriptor set layout of the global ubo
+	VkBuffer* globalUniformBufferArray;								// Global uniform buffer object
+	VkDeviceMemory* globalUniformMemoryArray;						// Global uniform memory
 #ifndef GR_DIST
 	VkDebugUtilsMessengerEXT debugMessenger;						// Debug messenger, only exists in debug mode
 #endif // !GR_DIST

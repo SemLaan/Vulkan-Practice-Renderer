@@ -6,6 +6,7 @@
 #define TEXTURE_CHANNELS 4
 
 
+// TODO: try not to use this for anything new because this will probably get removed
 typedef struct Vertex
 {
 	vec3 position;
@@ -53,14 +54,3 @@ typedef struct PushConstantObject
 	mat4 model;
 } PushConstantObject;
 
-typedef struct SpriteRenderInfo
-{
-	mat4 model;
-	Texture texture;
-} SpriteRenderInfo;
-
-typedef struct SceneRenderData2D
-{
-	SpriteRenderInfo* spriteRenderInfoDarray;
-	mat4 camera;
-} SceneRenderData2D;

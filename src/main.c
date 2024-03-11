@@ -20,7 +20,7 @@ int main()
 {
     // ============================================ Startup ============================================
 	START_MEMORY_DEBUG_SUBSYS();
-    InitializeMemory(4 * MiB);
+    InitializeMemory(10 * MiB);
     InitializeEvent();
     InitializeInput();
     InitializePlatform("Beef", 200, 100);
