@@ -9,6 +9,6 @@ Material MaterialCreate(Shader clientShader);
 void MaterialDestroy(Material clientMaterial);
 
 // Updates the uniform values of the given material
-void MaterialUpdateProperties(Material clientMaterial, GlobalUniformObject* properties);
+void MaterialUpdateProperty(Material clientMaterial, const char* name, void* value);
 // Binds the material for rendering
 void MaterialBind(Material clientMaterial);

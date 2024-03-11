@@ -15,7 +15,6 @@ layout(set = 0, binding = 0) uniform GlobalUniformBufferObject
 layout(set = 1, binding = 0) uniform UniformBufferObject
 {
 	mat4 projView;
-	vec2 test;
 } ubo;
 
 layout(push_constant) uniform PushConstants
@@ -27,5 +26,5 @@ layout(push_constant) uniform PushConstants
 void main() {
 	normal = v_normal;
 	texCoord = v_texCoord;
-	gl_Position = globalubo.projView * pc.model * vec4(v_position, 1);
+	gl_Position = ubo.projView * pc.model * vec4(v_position, 1);
 }

@@ -121,10 +121,11 @@ void GameUpdateAndRender()
     }
 
     // ============================ Rendering ===================================
-    GlobalUniformObject globalUniformObject = {};
-    globalUniformObject.projView = mat4_mul_mat4(gameState->proj, gameState->view);
-    MaterialUpdateProperties(gameState->material, &globalUniformObject);
+    mat4 projView = mat4_mul_mat4(gameState->proj, gameState->view);
+    MaterialUpdateProperty(gameState->material, "projView", &projView);
 
+    GlobalUniformObject globalUniformObject = {};
+    globalUniformObject.projView = projView;
     UpdateGlobalUniform(&globalUniformObject);
 
     if (!BeginRendering())

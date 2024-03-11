@@ -47,7 +47,8 @@ typedef struct VulkanShader
 	VkPipeline pipelineObject;
 	u32 propertyCount;									// Amount of properties
 	u32 uniformBufferSize;								// Amount of bytes the uniforms take up
-	char* propertyStrings;								// Array of property names, PROPERTY_MAX_NAME_LENGTH chars per property
+	char* propertyStringsMemory;						// Backing memory for the propertyNameArray, PROPERTY_MAX_NAME_LENGTH chars per property
+	char** propertyNameArray;							// Array of property names
 	u32* propertyOffsets;								// Array of property memory offsets
 	u32* propertySizes;									// Array of property sizes
 } VulkanShader;

@@ -103,9 +103,15 @@ Shader ShaderCreate(const char* shaderName)
             uniformStartCopy++;
         }
 
-        shader->propertyStrings = Alloc(vk_state->rendererAllocator, PROPERTY_MAX_NAME_LENGTH * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+        shader->propertyStringsMemory = Alloc(vk_state->rendererAllocator, PROPERTY_MAX_NAME_LENGTH * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+        shader->propertyNameArray = Alloc(vk_state->rendererAllocator, sizeof(*shader->propertyNameArray) *shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
         shader->propertyOffsets = Alloc(vk_state->rendererAllocator, sizeof(*shader->propertyOffsets) * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
         shader->propertySizes = Alloc(vk_state->rendererAllocator, sizeof(*shader->propertySizes) * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+
+        for (int i = 0; i < shader->propertyCount; i++)
+        {
+            shader->propertyNameArray[i] = shader->propertyStringsMemory + PROPERTY_MAX_NAME_LENGTH * i;
+        }
 
         // Getting all the relevent data about each property
         u32 currentProperty = 0;
@@ -152,11 +158,10 @@ Shader ShaderCreate(const char* shaderName)
                 uniformStart++;
             }
 
-            char* currentStringStart = shader->propertyStrings + PROPERTY_MAX_NAME_LENGTH * currentProperty;
-            MemoryCopy(currentStringStart, uniformStartCopy, nameLength);
-            currentStringStart[nameLength] = '\0';
+            MemoryCopy(shader->propertyNameArray[currentProperty], uniformStartCopy, nameLength);
+            shader->propertyNameArray[currentProperty][nameLength] = '\0';
 
-            //_DEBUG("CurrentProperty: %i, Name: %s, Size: %i, Offset: %i", currentProperty, shader->propertyStrings + PROPERTY_MAX_NAME_LENGTH * currentProperty, shader->propertySizes[currentProperty], shader->propertyOffsets[currentProperty]);
+            //_DEBUG("CurrentProperty: %i, Name: %s, Size: %i, Offset: %i", currentProperty, shader->propertyNameArray[currentProperty], shader->propertySizes[currentProperty], shader->propertyOffsets[currentProperty]);
 
             // Preparing for the next property
             currentProperty++;
@@ -417,7 +422,8 @@ void ShaderDestroy(Shader clientShader)
 {
     VulkanShader* shader = clientShader.internalState;
 
-    Free(vk_state->rendererAllocator, shader->propertyStrings);
+    Free(vk_state->rendererAllocator, shader->propertyNameArray);
+    Free(vk_state->rendererAllocator, shader->propertyStringsMemory);
     Free(vk_state->rendererAllocator, shader->propertyOffsets);
     Free(vk_state->rendererAllocator, shader->propertySizes);
 

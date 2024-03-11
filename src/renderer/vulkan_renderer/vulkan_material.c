@@ -4,6 +4,7 @@
 #include "vulkan_buffer.h"
 #include "vulkan_types.h"
 #include "core/meminc.h"
+#include <string.h>
 
 Material MaterialCreate(Shader clientShader)
 {
@@ -18,18 +19,14 @@ Material MaterialCreate(Shader clientShader)
     // ============================================================================================================================================================
     // ======================== Creating uniform buffers ============================================================================
     // ============================================================================================================================================================
-    VkDeviceSize uniformBufferSize = sizeof(GlobalUniformObject);
-
     material->uniformBufferArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferArray), MEM_TAG_RENDERER_SUBSYS);
     material->uniformBufferMemoryArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferMemoryArray), MEM_TAG_RENDERER_SUBSYS);
     material->uniformBufferMappedArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferMappedArray), MEM_TAG_RENDERER_SUBSYS);
 
-    material->uniformBufferMemoryArray[0] = NULL;
-
     for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        CreateBuffer(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBufferArray[i], &material->uniformBufferMemoryArray[i]);
-        vkMapMemory(vk_state->device, material->uniformBufferMemoryArray[i], 0, uniformBufferSize, 0, &material->uniformBufferMappedArray[i]);
+        CreateBuffer(shader->uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBufferArray[i], &material->uniformBufferMemoryArray[i]);
+        vkMapMemory(vk_state->device, material->uniformBufferMemoryArray[i], 0, shader->uniformBufferSize, 0, &material->uniformBufferMappedArray[i]);
     }
 
     // ============================================================================================================================================================
@@ -63,7 +60,7 @@ Material MaterialCreate(Shader clientShader)
         VkDescriptorBufferInfo descriptorBufferInfo = {};
         descriptorBufferInfo.buffer = material->uniformBufferArray[i];
         descriptorBufferInfo.offset = 0;
-        descriptorBufferInfo.range = sizeof(GlobalUniformObject);
+        descriptorBufferInfo.range = shader->uniformBufferSize;
 
         VkWriteDescriptorSet descriptorWrites[2] = {};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -118,11 +115,21 @@ void MaterialDestroy(Material clientMaterial)
     Free(vk_state->rendererAllocator, material);
 }
 
-void MaterialUpdateProperties(Material clientMaterial, GlobalUniformObject* properties)
+void MaterialUpdateProperty(Material clientMaterial, const char* name, void* value)
 {
     VulkanMaterial* material = clientMaterial.internalState;
+    VulkanShader* shader = material->shader;
 
-    MemoryCopy(material->uniformBufferMappedArray[vk_state->currentInFlightFrameIndex], properties, sizeof(*properties));
+    u32 nameLength = strlen(name);
+
+    for (int i = 0; i < shader->propertyCount; i++)
+    {
+        if (MemoryCompare(name, shader->propertyNameArray[i], nameLength))
+        {
+            MemoryCopy((u8*)material->uniformBufferMappedArray[vk_state->currentInFlightFrameIndex] + shader->propertyOffsets[i], value, shader->propertySizes[i]);
+            break;
+        }
+    }
 }
 
 void MaterialBind(Material clientMaterial)

@@ -12,4 +12,4 @@ void MemoryZero(void* block, u64 size);
 void MemorySet(void* block, i32 value, u64 size);
 
 // Compares the bits of two blocks of memory
-bool MemoryCompare(void* a, void* b, u64 size);
+bool MemoryCompare(const void* a, const void* b, u64 size);
