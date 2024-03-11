@@ -1,16 +1,175 @@
 #include "../shader.h"
 
 #include "core/asserts.h"
-#include "vulkan_types.h"
 #include "vulkan_buffer.h"
 #include "vulkan_shader_loader.h"
+#include "vulkan_types.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
+#define MAX_FILEPATH_SIZE 100
+#define VEC2_SIZE 8
+#define VEC2_ALIGNMENT 8
+#define VEC4_SIZE 16
+#define VEC4_ALIGNMENT 16
+#define MAT4_SIZE 64
+#define MAT4_ALIGNMENT 16
 
-Shader ShaderCreate()
+Shader ShaderCreate(const char* shaderName)
 {
     Shader clientShader;
     clientShader.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanShader), MEM_TAG_RENDERER_SUBSYS);
     VulkanShader* shader = (VulkanShader*)clientShader.internalState;
+    MemoryZero(shader, sizeof(*shader));
+
+    // Preparing filename strings
+    char* compiledVertFilename = Alloc(vk_state->rendererAllocator, 4 * MAX_FILEPATH_SIZE, MEM_TAG_RENDERER_SUBSYS);
+    char* compiledFragFilename = compiledVertFilename + MAX_FILEPATH_SIZE;
+    char* rawVertFilename = compiledFragFilename + MAX_FILEPATH_SIZE;
+    char* rawFragFilename = rawVertFilename + MAX_FILEPATH_SIZE;
+
+    u32 shaderNameLength = strlen(shaderName);
+
+#define SHADERS_PREFIX_LENGTH 8
+    const char* shaderFolderPrefix = "shaders/";
+
+    // Adding shader folder prefix
+    MemoryCopy(compiledVertFilename, shaderFolderPrefix, SHADERS_PREFIX_LENGTH);
+    MemoryCopy(compiledFragFilename, shaderFolderPrefix, SHADERS_PREFIX_LENGTH);
+    MemoryCopy(rawVertFilename, shaderFolderPrefix, SHADERS_PREFIX_LENGTH);
+    MemoryCopy(rawFragFilename, shaderFolderPrefix, SHADERS_PREFIX_LENGTH);
+
+    // Adding filename
+    MemoryCopy(compiledVertFilename + SHADERS_PREFIX_LENGTH, shaderName, shaderNameLength);
+    MemoryCopy(compiledFragFilename + SHADERS_PREFIX_LENGTH, shaderName, shaderNameLength);
+    MemoryCopy(rawVertFilename + SHADERS_PREFIX_LENGTH, shaderName, shaderNameLength);
+    MemoryCopy(rawFragFilename + SHADERS_PREFIX_LENGTH, shaderName, shaderNameLength);
+
+    // Adding different postfixes
+    const char* vertPostfix = ".vert.spv";
+    const char* fragPostfix = ".frag.spv";
+    const char* rawVertPostfix = ".vert";
+    const char* rawFragPostfix = ".frag";
+    MemoryCopy(compiledVertFilename + SHADERS_PREFIX_LENGTH + shaderNameLength, vertPostfix, 10);
+    MemoryCopy(compiledFragFilename + SHADERS_PREFIX_LENGTH + shaderNameLength, fragPostfix, 10);
+    MemoryCopy(rawVertFilename + SHADERS_PREFIX_LENGTH + shaderNameLength, rawVertPostfix, 6);
+    MemoryCopy(rawFragFilename + SHADERS_PREFIX_LENGTH + shaderNameLength, rawFragPostfix, 6);
+
+    // ============================================================================================================================================================
+    // ======================== Getting the properties/uniforms from the raw shader ==========================================================================
+    // ============================================================================================================================================================
+    {
+        // Reading in the text file
+        FILE* file = fopen(rawVertFilename, "r");
+
+        if (file == NULL)
+            GRASSERT_MSG(false, "Failed to open raw vertex shader file.");
+
+        fseek(file, 0L, SEEK_END);
+
+        u64 fileSize = ftell(file);
+        char* text = AlignedAlloc(vk_state->rendererAllocator, fileSize, 64, MEM_TAG_RENDERER_SUBSYS);
+
+        rewind(file);
+        fread(text, sizeof(*text), fileSize, file);
+        fclose(file);
+
+        // Parsing the text
+        char* uniformStart;
+
+        // Finding the uniform block
+        for (u32 i = 0; i < fileSize - 100 /*minus one hundred to not check past the end of the file after finding an enter in the last line*/; i++)
+        {
+            if (text[i] == '\n')
+            {
+                if (MemoryCompare(text + i, "\nlayout(set = 1, binding = 0) uniform", 37))
+                {
+                    // Setting uniform start to the actual start of the first white spaces before the actual uniform data
+                    uniformStart = text + i + 37;
+                    while (*uniformStart != '{')
+                        uniformStart++;
+                    uniformStart++;
+                }
+            }
+        }
+
+        // Counting the properties
+        char* uniformStartCopy = uniformStart;
+        while (*uniformStartCopy != '}') // The closing bracket would indicate the end of the uniform block
+        {
+            if (*uniformStartCopy == ';') // Every semicolon indicates a line that contains a property
+                shader->propertyCount++;
+            uniformStartCopy++;
+        }
+
+        shader->propertyStrings = Alloc(vk_state->rendererAllocator, PROPERTY_MAX_NAME_LENGTH * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+        shader->propertyOffsets = Alloc(vk_state->rendererAllocator, sizeof(*shader->propertyOffsets) * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+        shader->propertySizes = Alloc(vk_state->rendererAllocator, sizeof(*shader->propertySizes) * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+
+        // Getting all the relevent data about each property
+        u32 currentProperty = 0;
+        while (*uniformStart != '}')
+        {
+            while (*uniformStart == ' ' || *uniformStart == '\t' || *uniformStart == '\n')
+                uniformStart++;
+
+            if (MemoryCompare(uniformStart, "mat4", 4))
+            {
+                // Putting uniformStart past the type and at the start of the property name
+                uniformStart += 5;
+
+                // ===== Saving information about the property
+                // Making sure the matrix is properly aligned
+                u32 alignmentPadding = (MAT4_ALIGNMENT - (shader->uniformBufferSize % MAT4_ALIGNMENT)) % MAT4_ALIGNMENT;
+                shader->uniformBufferSize += alignmentPadding;
+
+                shader->propertyOffsets[currentProperty] = shader->uniformBufferSize;
+                shader->propertySizes[currentProperty] = MAT4_SIZE;
+                shader->uniformBufferSize += MAT4_SIZE;
+            }
+
+            if (MemoryCompare(uniformStart, "vec2", 4))
+            {
+                // Putting uniformStart past the type and at the start of the property name
+                uniformStart += 5;
+
+                // Making sure the vector is properly aligned
+                u32 alignmentPadding = (VEC2_ALIGNMENT - (shader->uniformBufferSize % VEC2_ALIGNMENT)) % VEC2_ALIGNMENT;
+                shader->uniformBufferSize += alignmentPadding;
+
+                shader->propertyOffsets[currentProperty] = shader->uniformBufferSize;
+                shader->propertySizes[currentProperty] = VEC2_SIZE;
+                shader->uniformBufferSize += VEC2_SIZE;
+            }
+
+            // ===== Getting the property name
+            uniformStartCopy = uniformStart;
+            u32 nameLength = 0;
+            while (*uniformStart != ';')
+            {
+                nameLength++;
+                uniformStart++;
+            }
+
+            char* currentStringStart = shader->propertyStrings + PROPERTY_MAX_NAME_LENGTH * currentProperty;
+            MemoryCopy(currentStringStart, uniformStartCopy, nameLength);
+            currentStringStart[nameLength] = '\0';
+
+            //_DEBUG("CurrentProperty: %i, Name: %s, Size: %i, Offset: %i", currentProperty, shader->propertyStrings + PROPERTY_MAX_NAME_LENGTH * currentProperty, shader->propertySizes[currentProperty], shader->propertyOffsets[currentProperty]);
+
+            // Preparing for the next property
+            currentProperty++;
+
+            while (*uniformStart != '\n')
+                uniformStart++;
+            uniformStart++;
+        }
+
+        //_DEBUG("Properties: %i, Uniform size: %i", shader->propertyCount, shader->uniformBufferSize);
+
+        Free(vk_state->rendererAllocator, text);
+    }
 
     // ============================================================================================================================================================
     // ======================== Creating descriptor set layout ==========================================================================
@@ -75,8 +234,8 @@ Shader ShaderCreate()
     // Loading shaders
     VkShaderModule vertShaderModule;
     VkShaderModule fragShaderModule;
-    CreateShaderModule("shaders/vershader.vert.spv", vk_state, &vertShaderModule);
-    CreateShaderModule("shaders/frshader.frag.spv", vk_state, &fragShaderModule);
+    CreateShaderModule(compiledVertFilename, vk_state, &vertShaderModule);
+    CreateShaderModule(compiledFragFilename, vk_state, &fragShaderModule);
 
     // Shader stages
     VkPipelineShaderStageCreateInfo shaderStagesCreateInfo[2] = {};
@@ -247,6 +406,8 @@ Shader ShaderCreate()
     vkDestroyShaderModule(vk_state->device, vertShaderModule, vk_state->vkAllocator);
     vkDestroyShaderModule(vk_state->device, fragShaderModule, vk_state->vkAllocator);
 
+    Free(vk_state->rendererAllocator, compiledVertFilename);
+
     _DEBUG("Shader created successfully");
 
     return clientShader;
@@ -255,6 +416,10 @@ Shader ShaderCreate()
 void ShaderDestroy(Shader clientShader)
 {
     VulkanShader* shader = clientShader.internalState;
+
+    Free(vk_state->rendererAllocator, shader->propertyStrings);
+    Free(vk_state->rendererAllocator, shader->propertyOffsets);
+    Free(vk_state->rendererAllocator, shader->propertySizes);
 
     if (shader->pipelineObject)
         vkDestroyPipeline(vk_state->device, shader->pipelineObject, vk_state->vkAllocator);

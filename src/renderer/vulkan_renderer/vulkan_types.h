@@ -38,20 +38,27 @@ typedef struct VulkanImage
 	VkDeviceMemory memory;
 } VulkanImage;
 
+#define PROPERTY_MAX_NAME_LENGTH 20
+
 typedef struct VulkanShader
 {
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipelineObject;
+	u32 propertyCount;									// Amount of properties
+	u32 uniformBufferSize;								// Amount of bytes the uniforms take up
+	char* propertyStrings;								// Array of property names, PROPERTY_MAX_NAME_LENGTH chars per property
+	u32* propertyOffsets;								// Array of property memory offsets
+	u32* propertySizes;									// Array of property sizes
 } VulkanShader;
 
 typedef struct VulkanMaterial
 {
-	VulkanShader* shader;
-	VkBuffer* uniformBufferArray;
-	VkDeviceMemory* uniformBufferMemoryArray;
-	void** uniformBufferMappedArray;
-	VkDescriptorSet* descriptorSetArray;
+	VulkanShader* shader;								// Handle to the shader this material is an instance of
+	VkBuffer* uniformBufferArray;						// VkBuffers that back this materials uniforms
+	VkDeviceMemory* uniformBufferMemoryArray;			// VkDeviceMemory's that back this materials uniforms
+	void** uniformBufferMappedArray;					// Pointers to where the uniform buffers are mapped
+	VkDescriptorSet* descriptorSetArray;				// Descriptor sets
 } VulkanMaterial;
 
 typedef struct VulkanSemaphore

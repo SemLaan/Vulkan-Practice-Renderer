@@ -42,7 +42,7 @@ void GameInit()
     gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
 
     // Initializing rendering state
-    gameState->shader = ShaderCreate();
+    gameState->shader = ShaderCreate("simple_shader");
     gameState->material = MaterialCreate(gameState->shader);
     
     LoadObj("models/sphere.obj", &gameState->vertexBuffer, &gameState->indexBuffer, true);

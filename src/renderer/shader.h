@@ -4,6 +4,6 @@
 
 
 // Creates a shader object and returns a handle to that shader
-Shader ShaderCreate();
+Shader ShaderCreate(const char* shaderName);
 // Destroys a shader object
 void ShaderDestroy(Shader clientShader);

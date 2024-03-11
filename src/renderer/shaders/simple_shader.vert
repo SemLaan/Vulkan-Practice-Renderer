@@ -15,6 +15,7 @@ layout(set = 0, binding = 0) uniform GlobalUniformBufferObject
 layout(set = 1, binding = 0) uniform UniformBufferObject
 {
 	mat4 projView;
+	vec2 test;
 } ubo;
 
 layout(push_constant) uniform PushConstants
