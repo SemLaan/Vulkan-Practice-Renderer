@@ -12,10 +12,12 @@ layout(set = 0, binding = 0) uniform GlobalUniformBufferObject
 	mat4 projView;
 } globalubo;
 
-layout(set = 1, binding = 0) uniform UniformBufferObject
+layout(set = 1, binding = 1) uniform UniformBufferObject
 {
 	mat4 projView;
 } ubo;
+
+layout(set = 1, binding = 3) uniform sampler2D heightMap;
 
 layout(push_constant) uniform PushConstants
 {
@@ -26,5 +28,6 @@ layout(push_constant) uniform PushConstants
 void main() {
 	normal = v_normal;
 	texCoord = v_texCoord;
-	gl_Position = ubo.projView * pc.model * vec4(v_position, 1);
+	vec3 displacedPosition = v_position + v_normal * texture(heightMap, v_texCoord).r;
+	gl_Position = ubo.projView * pc.model * vec4(displacedPosition, 1);
 }

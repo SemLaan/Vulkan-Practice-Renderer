@@ -15,14 +15,14 @@
 #define MAT4_SIZE 64
 #define MAT4_ALIGNMENT 16
 
-
 static bool BracketBeforeSemicolon(const char* text)
 {
-    while (*text != '{' && *text != ';') text++;
+    while (*text != '{' && *text != ';')
+        text++;
     return *text == '{';
 }
 
-void GetPropertyDataFromShader(const char* filename, UniformPropertiesData* out_propertyData)
+void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_propertyData, UniformTexturesData* ref_textureData)
 {
     // Reading in the text file
     FILE* file = fopen(filename, "r");
@@ -39,146 +39,200 @@ void GetPropertyDataFromShader(const char* filename, UniformPropertiesData* out_
     fread(text, sizeof(*text), fileSize, file);
     fclose(file);
 
-    // Parsing the text
-    char* uniformStart = nullptr;
-
-    // Finding the uniform block
-    for (u32 i = 0; i < fileSize - 100 /*minus one hundred to not check past the end of the file after finding an enter in the last line*/; i++)
+    // ============================================== Getting uniform property data ============================================================
     {
-        if (text[i] == '\n')
-        {
-            if (MemoryCompare(text + i, "\nlayout(set = 1, binding = ", 27) && MemoryCompare(text + i + 28, ") uniform", 9) && BracketBeforeSemicolon(text + i + 28))
-            {
-                out_propertyData->bindingIndex = *(text + i + 27) - 48;
+        // Parsing the text
+        char* uniformStart = nullptr;
 
-                // Setting uniform start to the actual start of the first white spaces before the actual uniform data
-                uniformStart = text + i + 37;
-                while (*uniformStart != '{')
+        // Finding the uniform block
+        for (u32 i = 0; i < fileSize - 100 /*minus one hundred to not check past the end of the file after finding an enter in the last line*/; i++)
+        {
+            if (text[i] == '\n')
+            {
+                if (MemoryCompare(text + i, "\nlayout(set = 1, binding = ", 27) && MemoryCompare(text + i + 28, ") uniform", 9) && BracketBeforeSemicolon(text + i + 28))
+                {
+                    ref_propertyData->bindingIndex = *(text + i + 27) - 48;
+
+                    // Setting uniform start to the actual start of the first white spaces before the actual uniform data
+                    uniformStart = text + i + 37;
+                    while (*uniformStart != '{')
+                        uniformStart++;
+                    uniformStart++;
+                }
+            }
+        }
+
+        // If this shader has no uniform buffer
+        if (uniformStart == nullptr)
+        {
+            ref_propertyData->propertyCount = 0;
+            ref_propertyData->uniformBufferSize = 0;
+        }
+        else // If this shader does have a uniform buffer
+        {
+            // Counting the properties
+            char* uniformStartCopy = uniformStart;
+            while (*uniformStartCopy != '}') // The closing bracket would indicate the end of the uniform block
+            {
+                if (*uniformStartCopy == ';') // Every semicolon indicates a line that contains a property
+                    ref_propertyData->propertyCount++;
+                uniformStartCopy++;
+            }
+
+            ref_propertyData->propertyStringsMemory = Alloc(vk_state->rendererAllocator, PROPERTY_MAX_NAME_LENGTH * ref_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+            ref_propertyData->propertyNameArray = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertyNameArray) * ref_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+            ref_propertyData->propertyOffsets = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertyOffsets) * ref_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+            ref_propertyData->propertySizes = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertySizes) * ref_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+
+            for (int i = 0; i < ref_propertyData->propertyCount; i++)
+            {
+                ref_propertyData->propertyNameArray[i] = ref_propertyData->propertyStringsMemory + PROPERTY_MAX_NAME_LENGTH * i;
+            }
+
+            // Getting all the relevent data about each property
+            u32 currentProperty = 0;
+            while (*uniformStart != '}')
+            {
+                while (*uniformStart == ' ' || *uniformStart == '\t' || *uniformStart == '\n')
+                    uniformStart++;
+
+                if (MemoryCompare(uniformStart, "mat4", 4))
+                {
+                    // Putting uniformStart past the type and at the start of the property name
+                    uniformStart += 5;
+
+                    // ===== Saving information about the property
+                    // Making sure the matrix is properly aligned
+                    u32 alignmentPadding = (MAT4_ALIGNMENT - (ref_propertyData->uniformBufferSize % MAT4_ALIGNMENT)) % MAT4_ALIGNMENT;
+                    ref_propertyData->uniformBufferSize += alignmentPadding;
+
+                    ref_propertyData->propertyOffsets[currentProperty] = ref_propertyData->uniformBufferSize;
+                    ref_propertyData->propertySizes[currentProperty] = MAT4_SIZE;
+                    ref_propertyData->uniformBufferSize += MAT4_SIZE;
+                }
+
+                if (MemoryCompare(uniformStart, "vec4", 4))
+                {
+                    // Putting uniformStart past the type and at the start of the property name
+                    uniformStart += 5;
+
+                    // Making sure the vector is properly aligned
+                    u32 alignmentPadding = (VEC4_ALIGNMENT - (ref_propertyData->uniformBufferSize % VEC4_ALIGNMENT)) % VEC4_ALIGNMENT;
+                    ref_propertyData->uniformBufferSize += alignmentPadding;
+
+                    ref_propertyData->propertyOffsets[currentProperty] = ref_propertyData->uniformBufferSize;
+                    ref_propertyData->propertySizes[currentProperty] = VEC4_SIZE;
+                    ref_propertyData->uniformBufferSize += VEC4_SIZE;
+                }
+
+                if (MemoryCompare(uniformStart, "vec3", 4))
+                {
+                    // Putting uniformStart past the type and at the start of the property name
+                    uniformStart += 5;
+
+                    // Making sure the vector is properly aligned
+                    u32 alignmentPadding = (VEC3_ALIGNMENT - (ref_propertyData->uniformBufferSize % VEC3_ALIGNMENT)) % VEC3_ALIGNMENT;
+                    ref_propertyData->uniformBufferSize += alignmentPadding;
+
+                    ref_propertyData->propertyOffsets[currentProperty] = ref_propertyData->uniformBufferSize;
+                    ref_propertyData->propertySizes[currentProperty] = VEC3_SIZE;
+                    ref_propertyData->uniformBufferSize += VEC3_SIZE;
+                }
+
+                if (MemoryCompare(uniformStart, "vec2", 4))
+                {
+                    // Putting uniformStart past the type and at the start of the property name
+                    uniformStart += 5;
+
+                    // Making sure the vector is properly aligned
+                    u32 alignmentPadding = (VEC2_ALIGNMENT - (ref_propertyData->uniformBufferSize % VEC2_ALIGNMENT)) % VEC2_ALIGNMENT;
+                    ref_propertyData->uniformBufferSize += alignmentPadding;
+
+                    ref_propertyData->propertyOffsets[currentProperty] = ref_propertyData->uniformBufferSize;
+                    ref_propertyData->propertySizes[currentProperty] = VEC2_SIZE;
+                    ref_propertyData->uniformBufferSize += VEC2_SIZE;
+                }
+
+                // ===== Getting the property name
+                uniformStartCopy = uniformStart;
+                u32 nameLength = 0;
+                while (*uniformStart != ';')
+                {
+                    nameLength++;
+                    uniformStart++;
+                }
+
+                MemoryCopy(ref_propertyData->propertyNameArray[currentProperty], uniformStartCopy, nameLength);
+                ref_propertyData->propertyNameArray[currentProperty][nameLength] = '\0';
+
+                //_DEBUG("CurrentProperty: %i, Name: %s, Size: %i, Offset: %i", currentProperty, shader->propertyNameArray[currentProperty], shader->propertySizes[currentProperty], shader->propertyOffsets[currentProperty]);
+
+                // Preparing for the next property
+                currentProperty++;
+
+                while (*uniformStart != '\n')
                     uniformStart++;
                 uniformStart++;
             }
         }
+        //_DEBUG("Properties: %i, Uniform size: %i", shader->propertyCount, shader->uniformBufferSize);
     }
 
-    // Exiting out if there is no uniform buffer
-    if (uniformStart == nullptr)
+    // ============================================== Getting uniform texture data ============================================================
     {
-        out_propertyData->propertyCount = 0;
-        out_propertyData->uniformBufferSize = 0;
-        return;
+        // Finding the uniform blocks
+        ref_textureData->textureCount = 0;
+        u32 bindingIndices[10];
+        char nameStrings[10 * PROPERTY_MAX_NAME_LENGTH];
+        for (u32 i = 0; i < fileSize - 100 /*minus one hundred to not check past the end of the file after finding an enter in the last line*/; i++)
+        {
+            GRASSERT_DEBUG(ref_textureData->textureCount < 8); // TODO: make the texture count limit higher if necessary, this needs to be coordinated with vulkan_shader and vulkan_material
+            if (text[i] == '\n')
+            {
+                if (MemoryCompare(text + i, "\nlayout(set = 1, binding = ", 27) && MemoryCompare(text + i + 28, ") uniform sampler2D", 19) && !BracketBeforeSemicolon(text + i + 28))
+                {
+                    bindingIndices[ref_textureData->textureCount] = *(text + i + 27) - 48;
+
+                    // ===== Getting the property name
+                    char* namePtr = text + i + 48;
+                    u32 nameLength = 0;
+                    while (*namePtr != ';')
+                    {
+                        namePtr++;
+                        nameLength++;
+                    }
+
+                    MemoryCopy(nameStrings + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH, text + i + 48, nameLength);
+                    nameStrings[nameLength + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH] = '\0';
+
+                    //_DEBUG("TexName: %s", nameStrings + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH);
+
+                    ref_textureData->textureCount++;
+                }
+            }
+        }
+        //_DEBUG("Textures: %i", ref_textureData->textureCount);
+
+        if (ref_textureData->textureCount > 0)
+        {
+            ref_textureData->bindingIndices = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * sizeof(*ref_textureData->bindingIndices), MEM_TAG_RENDERER_SUBSYS);
+            ref_textureData->textureStringsMemory = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH, MEM_TAG_RENDERER_SUBSYS);
+            ref_textureData->textureNameArray = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * sizeof(*ref_textureData->textureNameArray), MEM_TAG_RENDERER_SUBSYS);
+
+            MemoryCopy(ref_textureData->bindingIndices, bindingIndices, ref_textureData->textureCount * sizeof(*ref_textureData->bindingIndices));
+            MemoryCopy(ref_textureData->textureStringsMemory, nameStrings, ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH);
+
+            for (int i = 0; i < ref_textureData->textureCount; i++)
+            {
+                ref_textureData->textureNameArray[i] = ref_textureData->textureStringsMemory + PROPERTY_MAX_NAME_LENGTH * i;
+            }
+        }
     }
-
-    // Counting the properties
-    char* uniformStartCopy = uniformStart;
-    while (*uniformStartCopy != '}') // The closing bracket would indicate the end of the uniform block
-    {
-        if (*uniformStartCopy == ';') // Every semicolon indicates a line that contains a property
-            out_propertyData->propertyCount++;
-        uniformStartCopy++;
-    }
-
-    out_propertyData->propertyStringsMemory = Alloc(vk_state->rendererAllocator, PROPERTY_MAX_NAME_LENGTH * out_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-    out_propertyData->propertyNameArray = Alloc(vk_state->rendererAllocator, sizeof(*out_propertyData->propertyNameArray) * out_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-    out_propertyData->propertyOffsets = Alloc(vk_state->rendererAllocator, sizeof(*out_propertyData->propertyOffsets) * out_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-    out_propertyData->propertySizes = Alloc(vk_state->rendererAllocator, sizeof(*out_propertyData->propertySizes) * out_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-
-    for (int i = 0; i < out_propertyData->propertyCount; i++)
-    {
-        out_propertyData->propertyNameArray[i] = out_propertyData->propertyStringsMemory + PROPERTY_MAX_NAME_LENGTH * i;
-    }
-
-    // Getting all the relevent data about each property
-    u32 currentProperty = 0;
-    while (*uniformStart != '}')
-    {
-        while (*uniformStart == ' ' || *uniformStart == '\t' || *uniformStart == '\n')
-            uniformStart++;
-
-        if (MemoryCompare(uniformStart, "mat4", 4))
-        {
-            // Putting uniformStart past the type and at the start of the property name
-            uniformStart += 5;
-
-            // ===== Saving information about the property
-            // Making sure the matrix is properly aligned
-            u32 alignmentPadding = (MAT4_ALIGNMENT - (out_propertyData->uniformBufferSize % MAT4_ALIGNMENT)) % MAT4_ALIGNMENT;
-            out_propertyData->uniformBufferSize += alignmentPadding;
-
-            out_propertyData->propertyOffsets[currentProperty] = out_propertyData->uniformBufferSize;
-            out_propertyData->propertySizes[currentProperty] = MAT4_SIZE;
-            out_propertyData->uniformBufferSize += MAT4_SIZE;
-        }
-
-        if (MemoryCompare(uniformStart, "vec4", 4))
-        {
-            // Putting uniformStart past the type and at the start of the property name
-            uniformStart += 5;
-
-            // Making sure the vector is properly aligned
-            u32 alignmentPadding = (VEC4_ALIGNMENT - (out_propertyData->uniformBufferSize % VEC4_ALIGNMENT)) % VEC4_ALIGNMENT;
-            out_propertyData->uniformBufferSize += alignmentPadding;
-
-            out_propertyData->propertyOffsets[currentProperty] = out_propertyData->uniformBufferSize;
-            out_propertyData->propertySizes[currentProperty] = VEC4_SIZE;
-            out_propertyData->uniformBufferSize += VEC4_SIZE;
-        }
-
-        if (MemoryCompare(uniformStart, "vec3", 4))
-        {
-            // Putting uniformStart past the type and at the start of the property name
-            uniformStart += 5;
-
-            // Making sure the vector is properly aligned
-            u32 alignmentPadding = (VEC3_ALIGNMENT - (out_propertyData->uniformBufferSize % VEC3_ALIGNMENT)) % VEC3_ALIGNMENT;
-            out_propertyData->uniformBufferSize += alignmentPadding;
-
-            out_propertyData->propertyOffsets[currentProperty] = out_propertyData->uniformBufferSize;
-            out_propertyData->propertySizes[currentProperty] = VEC3_SIZE;
-            out_propertyData->uniformBufferSize += VEC3_SIZE;
-        }
-
-        if (MemoryCompare(uniformStart, "vec2", 4))
-        {
-            // Putting uniformStart past the type and at the start of the property name
-            uniformStart += 5;
-
-            // Making sure the vector is properly aligned
-            u32 alignmentPadding = (VEC2_ALIGNMENT - (out_propertyData->uniformBufferSize % VEC2_ALIGNMENT)) % VEC2_ALIGNMENT;
-            out_propertyData->uniformBufferSize += alignmentPadding;
-
-            out_propertyData->propertyOffsets[currentProperty] = out_propertyData->uniformBufferSize;
-            out_propertyData->propertySizes[currentProperty] = VEC2_SIZE;
-            out_propertyData->uniformBufferSize += VEC2_SIZE;
-        }
-
-        // ===== Getting the property name
-        uniformStartCopy = uniformStart;
-        u32 nameLength = 0;
-        while (*uniformStart != ';')
-        {
-            nameLength++;
-            uniformStart++;
-        }
-
-        MemoryCopy(out_propertyData->propertyNameArray[currentProperty], uniformStartCopy, nameLength);
-        out_propertyData->propertyNameArray[currentProperty][nameLength] = '\0';
-
-        //_DEBUG("CurrentProperty: %i, Name: %s, Size: %i, Offset: %i", currentProperty, shader->propertyNameArray[currentProperty], shader->propertySizes[currentProperty], shader->propertyOffsets[currentProperty]);
-
-        // Preparing for the next property
-        currentProperty++;
-
-        while (*uniformStart != '\n')
-            uniformStart++;
-        uniformStart++;
-    }
-
-    //_DEBUG("Properties: %i, Uniform size: %i", shader->propertyCount, shader->uniformBufferSize);
 
     Free(vk_state->rendererAllocator, text);
 }
 
-void FreePropertyData(UniformPropertiesData* propertyData)
+void FreeUniformData(UniformPropertiesData* propertyData, UniformTexturesData* textureData)
 {
     if (propertyData->propertyCount > 0)
     {
@@ -186,6 +240,13 @@ void FreePropertyData(UniformPropertiesData* propertyData)
         Free(vk_state->rendererAllocator, propertyData->propertyStringsMemory);
         Free(vk_state->rendererAllocator, propertyData->propertyOffsets);
         Free(vk_state->rendererAllocator, propertyData->propertySizes);
+    }
+
+    if (textureData->textureCount > 0)
+    {
+        Free(vk_state->rendererAllocator, textureData->bindingIndices);
+        Free(vk_state->rendererAllocator, textureData->textureNameArray);
+        Free(vk_state->rendererAllocator, textureData->textureStringsMemory);
     }
 }
 

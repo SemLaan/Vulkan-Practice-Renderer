@@ -8,6 +8,7 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/obj_loader.h"
+#include "renderer/texture.h"
 #include "math/lin_alg.h"
 
 typedef struct GameState
@@ -16,6 +17,7 @@ typedef struct GameState
     IndexBuffer indexBuffer;
     Shader shader;
     Material material;
+    Texture texture;
     vec3 camPosition;
 	vec3 camRotation;
 	mat4 view;
@@ -44,6 +46,21 @@ void GameInit()
     // Initializing rendering state
     gameState->shader = ShaderCreate("simple_shader");
     gameState->material = MaterialCreate(gameState->shader);
+
+    u8 pixels[TEXTURE_CHANNELS * 2];
+    pixels[0] = 255;
+    pixels[1] = 0;
+    pixels[2] = 255;
+    pixels[3] = 255;
+    pixels[4] = 125;
+    pixels[5] = 255;
+    pixels[6] = 255;
+    pixels[7] = 255;
+
+    gameState->texture = TextureCreate(2, 1, pixels);
+
+    MaterialUpdateTexture(gameState->material, "albedo", gameState->texture);
+    MaterialUpdateTexture(gameState->material, "heightMap", gameState->texture);
     
     LoadObj("models/sphere.obj", &gameState->vertexBuffer, &gameState->indexBuffer, true);
 
@@ -69,6 +86,7 @@ void GameShutdown()
     VertexBufferDestroy(gameState->vertexBuffer);
     MaterialDestroy(gameState->material);
     ShaderDestroy(gameState->shader);
+    TextureDestroy(gameState->texture);
 
     Free(GetGlobalAllocator(), gameState);
 }

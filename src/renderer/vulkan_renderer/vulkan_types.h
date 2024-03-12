@@ -51,6 +51,14 @@ typedef struct UniformPropertiesData
 	u32 bindingIndex;									// Binding of this uniform buffer
 } UniformPropertiesData;
 
+typedef struct UniformTexturesData
+{
+	u32 textureCount;									// Amount of textures
+	char* textureStringsMemory;							// Backing memory for the propertyNameArray, PROPERTY_MAX_NAME_LENGTH chars per property
+	char** textureNameArray;							// Array of property names
+	u32* bindingIndices;								// Binding indices of the textures
+} UniformTexturesData;
+
 typedef struct VulkanShader
 {
 	VkDescriptorSetLayout descriptorSetLayout;
@@ -58,6 +66,8 @@ typedef struct VulkanShader
 	VkPipeline pipelineObject;
 	UniformPropertiesData vertUniformPropertiesData;
 	UniformPropertiesData fragUniformPropertiesData;
+	UniformTexturesData vertUniformTexturesData;
+	UniformTexturesData fragUniformTexturesData;
 	u32 totalUniformDataSize;
 	u32 fragmentUniformBufferOffset;
 } VulkanShader;
@@ -118,7 +128,7 @@ typedef struct RendererState
 	VkSwapchainKHR swapchain;										// Swapchain handle
 	VkQueue presentQueue;											// Present queue handle
 	CommandBuffer graphicsCommandBuffers[MAX_FRAMES_IN_FLIGHT]; 	// Command buffers for recording entire frames to the graphics queue
-	u32 currentFrameIndex;											// Current frame
+	u64 currentFrameIndex;											// Current frame
 	u32 currentInFlightFrameIndex;									// Current frame % MAX_FRAMES_IN_FLIGHT
 	u32 currentSwapchainImageIndex;									// Current swapchain image index (current frame % swapchain image count)
 	VkImage* swapchainImages;										// Images that make up the swapchain (retrieved from the swapchain)

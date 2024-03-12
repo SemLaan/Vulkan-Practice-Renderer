@@ -53,8 +53,8 @@ Shader ShaderCreate(const char* shaderName)
     // ============================================================================================================================================================
     // ======================== Getting the properties/uniforms from the raw shader ==========================================================================
     // ============================================================================================================================================================
-    GetPropertyDataFromShader(rawVertFilename, &shader->vertUniformPropertiesData);
-    GetPropertyDataFromShader(rawFragFilename, &shader->fragUniformPropertiesData);
+    GetUniformDataFromShader(rawVertFilename, &shader->vertUniformPropertiesData, &shader->vertUniformTexturesData);
+    GetUniformDataFromShader(rawFragFilename, &shader->fragUniformPropertiesData, &shader->fragUniformTexturesData);
 
     VkDeviceSize uniformBufferAlignmentRequirement = vk_state->deviceProperties.limits.minUniformBufferOffsetAlignment;
 
@@ -95,30 +95,43 @@ Shader ShaderCreate(const char* shaderName)
     u32 bindingCount = 0;
     if (shader->vertUniformPropertiesData.propertyCount > 0)
     {
+        descriptorSetLayoutBindings[bindingCount].binding = shader->vertUniformPropertiesData.bindingIndex;
+        descriptorSetLayoutBindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorSetLayoutBindings[bindingCount].descriptorCount = 1;
+        descriptorSetLayoutBindings[bindingCount].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        descriptorSetLayoutBindings[bindingCount].pImmutableSamplers = nullptr;
         bindingCount++;
-        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].binding = shader->vertUniformPropertiesData.bindingIndex;
-        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].descriptorCount = 1;
-        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].pImmutableSamplers = nullptr;
     }
 
     if (shader->fragUniformPropertiesData.propertyCount > 0)
     {
+        descriptorSetLayoutBindings[bindingCount].binding = shader->fragUniformPropertiesData.bindingIndex;
+        descriptorSetLayoutBindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorSetLayoutBindings[bindingCount].descriptorCount = 1;
+        descriptorSetLayoutBindings[bindingCount].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        descriptorSetLayoutBindings[bindingCount].pImmutableSamplers = nullptr;
         bindingCount++;
-        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].binding = shader->fragUniformPropertiesData.bindingIndex;
-        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].descriptorCount = 1;
-        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].pImmutableSamplers = nullptr;
     }
 
-    descriptorSetLayoutBindings[bindingCount].binding = bindingCount;
-    descriptorSetLayoutBindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorSetLayoutBindings[bindingCount].descriptorCount = 1;
-    descriptorSetLayoutBindings[bindingCount].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    descriptorSetLayoutBindings[bindingCount].pImmutableSamplers = nullptr;
-    bindingCount++;
+    for (int i = 0; i < shader->vertUniformTexturesData.textureCount; i++)
+    {
+        descriptorSetLayoutBindings[bindingCount].binding = shader->vertUniformTexturesData.bindingIndices[i];
+        descriptorSetLayoutBindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorSetLayoutBindings[bindingCount].descriptorCount = 1;
+        descriptorSetLayoutBindings[bindingCount].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        descriptorSetLayoutBindings[bindingCount].pImmutableSamplers = nullptr;
+        bindingCount++;
+    }
+
+    for (int i = 0; i < shader->fragUniformTexturesData.textureCount; i++)
+    {
+        descriptorSetLayoutBindings[bindingCount].binding = shader->fragUniformTexturesData.bindingIndices[i];
+        descriptorSetLayoutBindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorSetLayoutBindings[bindingCount].descriptorCount = 1;
+        descriptorSetLayoutBindings[bindingCount].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        descriptorSetLayoutBindings[bindingCount].pImmutableSamplers = nullptr;
+        bindingCount++;
+    }
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
     descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -350,7 +363,8 @@ void ShaderDestroy(Shader clientShader)
 {
     VulkanShader* shader = clientShader.internalState;
 
-    FreePropertyData(&shader->vertUniformPropertiesData);
+    FreeUniformData(&shader->vertUniformPropertiesData, &shader->vertUniformTexturesData);
+    FreeUniformData(&shader->fragUniformPropertiesData, &shader->fragUniformTexturesData);
 
     if (shader->pipelineObject)
         vkDestroyPipeline(vk_state->device, shader->pipelineObject, vk_state->vkAllocator);

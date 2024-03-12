@@ -218,7 +218,7 @@ Texture TextureCreate(u32 width, u32 height, void* pixels)
 	acquireImageInfo->pNext = nullptr;
 	acquireImageInfo->srcStageMask = 0;  // IGNORED because it is a queue family acquire operation
 	acquireImageInfo->srcAccessMask = 0; // IGNORED because it is a queue family acquire operation
-	acquireImageInfo->dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+	acquireImageInfo->dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
 	acquireImageInfo->dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
 	acquireImageInfo->oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	acquireImageInfo->newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

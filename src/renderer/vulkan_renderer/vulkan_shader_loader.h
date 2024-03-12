@@ -4,8 +4,8 @@
 #include "vulkan_types.h"
 
 
-void GetPropertyDataFromShader(const char* filename, UniformPropertiesData* out_propertyData);
-void FreePropertyData(UniformPropertiesData* propertyData);
+void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_propertyData, UniformTexturesData* ref_textureData);
+void FreeUniformData(UniformPropertiesData* propertyData, UniformTexturesData* textureData);
 
 
 bool ReadFile(const char* filename, MemTag tag, char** out_data, u64* out_fileSize);

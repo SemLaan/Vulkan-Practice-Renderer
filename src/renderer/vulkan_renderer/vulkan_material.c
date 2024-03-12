@@ -103,18 +103,37 @@ Material MaterialCreate(Shader clientShader)
         descriptorImageInfo.imageView = defaultTexture->view;
         descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        descriptorWrites[descriptorWriteIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[descriptorWriteIndex].pNext = nullptr;
-        descriptorWrites[descriptorWriteIndex].dstSet = material->descriptorSetArray[i];
-        descriptorWrites[descriptorWriteIndex].dstBinding = descriptorWriteIndex;
-        descriptorWrites[descriptorWriteIndex].dstArrayElement = 0;
-        descriptorWrites[descriptorWriteIndex].descriptorCount = 1;
-        descriptorWrites[descriptorWriteIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[descriptorWriteIndex].pImageInfo = &descriptorImageInfo;
-        descriptorWrites[descriptorWriteIndex].pBufferInfo = nullptr;
-        descriptorWrites[descriptorWriteIndex].pTexelBufferView = nullptr;
+        for (int j = 0; j < shader->vertUniformTexturesData.textureCount; j++)
+        {
+            descriptorWrites[descriptorWriteIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[descriptorWriteIndex].pNext = nullptr;
+            descriptorWrites[descriptorWriteIndex].dstSet = material->descriptorSetArray[i];
+            descriptorWrites[descriptorWriteIndex].dstBinding = shader->vertUniformTexturesData.bindingIndices[j];
+            descriptorWrites[descriptorWriteIndex].dstArrayElement = 0;
+            descriptorWrites[descriptorWriteIndex].descriptorCount = 1;
+            descriptorWrites[descriptorWriteIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[descriptorWriteIndex].pImageInfo = &descriptorImageInfo;
+            descriptorWrites[descriptorWriteIndex].pBufferInfo = nullptr;
+            descriptorWrites[descriptorWriteIndex].pTexelBufferView = nullptr;
 
-        descriptorWriteIndex++;
+            descriptorWriteIndex++;
+        }
+
+        for (int j = 0; j < shader->fragUniformTexturesData.textureCount; j++)
+        {
+            descriptorWrites[descriptorWriteIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[descriptorWriteIndex].pNext = nullptr;
+            descriptorWrites[descriptorWriteIndex].dstSet = material->descriptorSetArray[i];
+            descriptorWrites[descriptorWriteIndex].dstBinding = shader->fragUniformTexturesData.bindingIndices[j];
+            descriptorWrites[descriptorWriteIndex].dstArrayElement = 0;
+            descriptorWrites[descriptorWriteIndex].descriptorCount = 1;
+            descriptorWrites[descriptorWriteIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[descriptorWriteIndex].pImageInfo = &descriptorImageInfo;
+            descriptorWrites[descriptorWriteIndex].pBufferInfo = nullptr;
+            descriptorWrites[descriptorWriteIndex].pTexelBufferView = nullptr;
+
+            descriptorWriteIndex++;
+        }
 
         vkUpdateDescriptorSets(vk_state->device, descriptorWriteIndex /*interpreted as descriptor write count*/, descriptorWrites, 0, nullptr);
     }
@@ -164,6 +183,78 @@ void MaterialUpdateProperty(Material clientMaterial, const char* name, void* val
 
     _FATAL("Property name: %s, couldn't be found in material", name);
     GRASSERT_MSG(false, "Property name couldn't be found");
+}
+
+void MaterialUpdateTexture(Material clientMaterial, const char* name, Texture clientTexture)
+{
+    VulkanMaterial* material = clientMaterial.internalState;
+    VulkanShader* shader = material->shader;
+
+    u32 nameLength = strlen(name);
+
+    VulkanImage* texture = clientTexture.internalState;
+
+    VkDescriptorImageInfo descriptorImageInfo = {};
+    descriptorImageInfo.sampler = texture->sampler;
+    descriptorImageInfo.imageView = texture->view;
+    descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    // Looping through all vertex shader texture properties trying to find the texture being set
+    for (int i = 0; i < shader->vertUniformTexturesData.textureCount; i++)
+    {
+        if (MemoryCompare(name, shader->vertUniformTexturesData.textureNameArray[i], nameLength))
+        {
+            // Updating the descriptor bindings for the texture being set
+            VkWriteDescriptorSet descriptorWrites[MAX_FRAMES_IN_FLIGHT] = {};
+
+            for (int j = 0; j < MAX_FRAMES_IN_FLIGHT; j++)
+            {
+                descriptorWrites[j].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrites[j].pNext = nullptr;
+                descriptorWrites[j].dstSet = material->descriptorSetArray[j];
+                descriptorWrites[j].dstBinding = shader->vertUniformTexturesData.bindingIndices[i];
+                descriptorWrites[j].dstArrayElement = 0;
+                descriptorWrites[j].descriptorCount = 1;
+                descriptorWrites[j].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                descriptorWrites[j].pImageInfo = &descriptorImageInfo;
+                descriptorWrites[j].pBufferInfo = nullptr;
+                descriptorWrites[j].pTexelBufferView = nullptr;
+            }
+
+            vkUpdateDescriptorSets(vk_state->device, MAX_FRAMES_IN_FLIGHT, descriptorWrites, 0, nullptr);
+            return;
+        }
+    }
+
+    // Looping through all fragment shader texture properties trying to find the texture being set
+    for (int i = 0; i < shader->fragUniformTexturesData.textureCount; i++)
+    {
+        if (MemoryCompare(name, shader->fragUniformTexturesData.textureNameArray[i], nameLength))
+        {
+            // Updating the descriptor bindings for the texture being set
+            VkWriteDescriptorSet descriptorWrites[MAX_FRAMES_IN_FLIGHT] = {};
+
+            for (int j = 0; j < MAX_FRAMES_IN_FLIGHT; j++)
+            {
+                descriptorWrites[j].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrites[j].pNext = nullptr;
+                descriptorWrites[j].dstSet = material->descriptorSetArray[j];
+                descriptorWrites[j].dstBinding = shader->fragUniformTexturesData.bindingIndices[i];
+                descriptorWrites[j].dstArrayElement = 0;
+                descriptorWrites[j].descriptorCount = 1;
+                descriptorWrites[j].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                descriptorWrites[j].pImageInfo = &descriptorImageInfo;
+                descriptorWrites[j].pBufferInfo = nullptr;
+                descriptorWrites[j].pTexelBufferView = nullptr;
+            }
+
+            vkUpdateDescriptorSets(vk_state->device, MAX_FRAMES_IN_FLIGHT, descriptorWrites, 0, nullptr);
+            return;
+        }
+    }
+
+    _FATAL("Texture name: %s, couldn't be found in material", name);
+    GRASSERT_MSG(false, "Texture name couldn't be found");
 }
 
 void MaterialBind(Material clientMaterial)
