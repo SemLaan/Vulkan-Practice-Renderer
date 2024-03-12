@@ -40,17 +40,24 @@ typedef struct VulkanImage
 
 #define PROPERTY_MAX_NAME_LENGTH 20
 
-typedef struct VulkanShader
+typedef struct UniformPropertiesData
 {
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipelineObject;
 	u32 propertyCount;									// Amount of properties
 	u32 uniformBufferSize;								// Amount of bytes the uniforms take up
 	char* propertyStringsMemory;						// Backing memory for the propertyNameArray, PROPERTY_MAX_NAME_LENGTH chars per property
 	char** propertyNameArray;							// Array of property names
 	u32* propertyOffsets;								// Array of property memory offsets
 	u32* propertySizes;									// Array of property sizes
+	u32 bindingIndex;									// Binding of this uniform buffer
+} UniformPropertiesData;
+
+typedef struct VulkanShader
+{
+	VkDescriptorSetLayout descriptorSetLayout;
+	VkPipelineLayout pipelineLayout;
+	VkPipeline pipelineObject;
+	UniformPropertiesData vertUniformPropertiesData;
+	UniformPropertiesData fragUniformPropertiesData;
 } VulkanShader;
 
 typedef struct VulkanMaterial

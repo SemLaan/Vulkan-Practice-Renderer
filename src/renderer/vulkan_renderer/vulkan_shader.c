@@ -9,12 +9,6 @@
 #include <string.h>
 
 #define MAX_FILEPATH_SIZE 100
-#define VEC2_SIZE 8
-#define VEC2_ALIGNMENT 8
-#define VEC4_SIZE 16
-#define VEC4_ALIGNMENT 16
-#define MAT4_SIZE 64
-#define MAT4_ALIGNMENT 16
 
 Shader ShaderCreate(const char* shaderName)
 {
@@ -59,144 +53,49 @@ Shader ShaderCreate(const char* shaderName)
     // ============================================================================================================================================================
     // ======================== Getting the properties/uniforms from the raw shader ==========================================================================
     // ============================================================================================================================================================
-    {
-        // Reading in the text file
-        FILE* file = fopen(rawVertFilename, "r");
-
-        if (file == NULL)
-            GRASSERT_MSG(false, "Failed to open raw vertex shader file.");
-
-        fseek(file, 0L, SEEK_END);
-
-        u64 fileSize = ftell(file);
-        char* text = AlignedAlloc(vk_state->rendererAllocator, fileSize, 64, MEM_TAG_RENDERER_SUBSYS);
-
-        rewind(file);
-        fread(text, sizeof(*text), fileSize, file);
-        fclose(file);
-
-        // Parsing the text
-        char* uniformStart;
-
-        // Finding the uniform block
-        for (u32 i = 0; i < fileSize - 100 /*minus one hundred to not check past the end of the file after finding an enter in the last line*/; i++)
-        {
-            if (text[i] == '\n')
-            {
-                if (MemoryCompare(text + i, "\nlayout(set = 1, binding = 0) uniform", 37))
-                {
-                    // Setting uniform start to the actual start of the first white spaces before the actual uniform data
-                    uniformStart = text + i + 37;
-                    while (*uniformStart != '{')
-                        uniformStart++;
-                    uniformStart++;
-                }
-            }
-        }
-
-        // Counting the properties
-        char* uniformStartCopy = uniformStart;
-        while (*uniformStartCopy != '}') // The closing bracket would indicate the end of the uniform block
-        {
-            if (*uniformStartCopy == ';') // Every semicolon indicates a line that contains a property
-                shader->propertyCount++;
-            uniformStartCopy++;
-        }
-
-        shader->propertyStringsMemory = Alloc(vk_state->rendererAllocator, PROPERTY_MAX_NAME_LENGTH * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-        shader->propertyNameArray = Alloc(vk_state->rendererAllocator, sizeof(*shader->propertyNameArray) *shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-        shader->propertyOffsets = Alloc(vk_state->rendererAllocator, sizeof(*shader->propertyOffsets) * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-        shader->propertySizes = Alloc(vk_state->rendererAllocator, sizeof(*shader->propertySizes) * shader->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-
-        for (int i = 0; i < shader->propertyCount; i++)
-        {
-            shader->propertyNameArray[i] = shader->propertyStringsMemory + PROPERTY_MAX_NAME_LENGTH * i;
-        }
-
-        // Getting all the relevent data about each property
-        u32 currentProperty = 0;
-        while (*uniformStart != '}')
-        {
-            while (*uniformStart == ' ' || *uniformStart == '\t' || *uniformStart == '\n')
-                uniformStart++;
-
-            if (MemoryCompare(uniformStart, "mat4", 4))
-            {
-                // Putting uniformStart past the type and at the start of the property name
-                uniformStart += 5;
-
-                // ===== Saving information about the property
-                // Making sure the matrix is properly aligned
-                u32 alignmentPadding = (MAT4_ALIGNMENT - (shader->uniformBufferSize % MAT4_ALIGNMENT)) % MAT4_ALIGNMENT;
-                shader->uniformBufferSize += alignmentPadding;
-
-                shader->propertyOffsets[currentProperty] = shader->uniformBufferSize;
-                shader->propertySizes[currentProperty] = MAT4_SIZE;
-                shader->uniformBufferSize += MAT4_SIZE;
-            }
-
-            if (MemoryCompare(uniformStart, "vec2", 4))
-            {
-                // Putting uniformStart past the type and at the start of the property name
-                uniformStart += 5;
-
-                // Making sure the vector is properly aligned
-                u32 alignmentPadding = (VEC2_ALIGNMENT - (shader->uniformBufferSize % VEC2_ALIGNMENT)) % VEC2_ALIGNMENT;
-                shader->uniformBufferSize += alignmentPadding;
-
-                shader->propertyOffsets[currentProperty] = shader->uniformBufferSize;
-                shader->propertySizes[currentProperty] = VEC2_SIZE;
-                shader->uniformBufferSize += VEC2_SIZE;
-            }
-
-            // ===== Getting the property name
-            uniformStartCopy = uniformStart;
-            u32 nameLength = 0;
-            while (*uniformStart != ';')
-            {
-                nameLength++;
-                uniformStart++;
-            }
-
-            MemoryCopy(shader->propertyNameArray[currentProperty], uniformStartCopy, nameLength);
-            shader->propertyNameArray[currentProperty][nameLength] = '\0';
-
-            //_DEBUG("CurrentProperty: %i, Name: %s, Size: %i, Offset: %i", currentProperty, shader->propertyNameArray[currentProperty], shader->propertySizes[currentProperty], shader->propertyOffsets[currentProperty]);
-
-            // Preparing for the next property
-            currentProperty++;
-
-            while (*uniformStart != '\n')
-                uniformStart++;
-            uniformStart++;
-        }
-
-        //_DEBUG("Properties: %i, Uniform size: %i", shader->propertyCount, shader->uniformBufferSize);
-
-        Free(vk_state->rendererAllocator, text);
-    }
+    GetPropertyDataFromShader(rawVertFilename, &shader->vertUniformPropertiesData);
+    GetPropertyDataFromShader(rawFragFilename, &shader->fragUniformPropertiesData);
 
     // ============================================================================================================================================================
     // ======================== Creating descriptor set layout ==========================================================================
     // ============================================================================================================================================================
-    VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[2] = {};
-    descriptorSetLayoutBindings[0].binding = 0;
-    descriptorSetLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorSetLayoutBindings[0].descriptorCount = 1;
-    descriptorSetLayoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    descriptorSetLayoutBindings[0].pImmutableSamplers = nullptr;
+    // TODO: check if bindings are consecutive and start with zero
+    VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[10] = {};
 
-    descriptorSetLayoutBindings[1].binding = 1;
+    u32 bindingCount = 0;
+    if (shader->vertUniformPropertiesData.propertyCount > 0)
+    {
+        bindingCount++;
+        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].binding = shader->vertUniformPropertiesData.bindingIndex;
+        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].descriptorCount = 1;
+        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        descriptorSetLayoutBindings[shader->vertUniformPropertiesData.bindingIndex].pImmutableSamplers = nullptr;
+    }
+
+    if (shader->fragUniformPropertiesData.propertyCount > 0)
+    {
+        _DEBUG("test this shouldnt happen");
+        bindingCount++;
+        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].binding = shader->fragUniformPropertiesData.bindingIndex;
+        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].descriptorCount = 1;
+        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].pImmutableSamplers = nullptr;
+    }
+
+    descriptorSetLayoutBindings[1].binding = bindingCount;
     descriptorSetLayoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptorSetLayoutBindings[1].descriptorCount = 1;
     descriptorSetLayoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     descriptorSetLayoutBindings[1].pImmutableSamplers = nullptr;
+    bindingCount++;
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
     descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descriptorSetLayoutCreateInfo.pNext = nullptr;
     descriptorSetLayoutCreateInfo.flags = 0;
-    descriptorSetLayoutCreateInfo.bindingCount = 2;
+    descriptorSetLayoutCreateInfo.bindingCount = bindingCount;
     descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings;
 
     if (VK_SUCCESS != vkCreateDescriptorSetLayout(vk_state->device, &descriptorSetLayoutCreateInfo, vk_state->vkAllocator, &shader->descriptorSetLayout))
@@ -422,10 +321,7 @@ void ShaderDestroy(Shader clientShader)
 {
     VulkanShader* shader = clientShader.internalState;
 
-    Free(vk_state->rendererAllocator, shader->propertyNameArray);
-    Free(vk_state->rendererAllocator, shader->propertyStringsMemory);
-    Free(vk_state->rendererAllocator, shader->propertyOffsets);
-    Free(vk_state->rendererAllocator, shader->propertySizes);
+    FreePropertyData(&shader->vertUniformPropertiesData);
 
     if (shader->pipelineObject)
         vkDestroyPipeline(vk_state->device, shader->pipelineObject, vk_state->vkAllocator);

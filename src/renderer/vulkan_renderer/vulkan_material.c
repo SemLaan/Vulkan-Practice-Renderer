@@ -25,8 +25,8 @@ Material MaterialCreate(Shader clientShader)
 
     for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        CreateBuffer(shader->uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBufferArray[i], &material->uniformBufferMemoryArray[i]);
-        vkMapMemory(vk_state->device, material->uniformBufferMemoryArray[i], 0, shader->uniformBufferSize, 0, &material->uniformBufferMappedArray[i]);
+        CreateBuffer(shader->vertUniformPropertiesData.uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBufferArray[i], &material->uniformBufferMemoryArray[i]);
+        vkMapMemory(vk_state->device, material->uniformBufferMemoryArray[i], 0, shader->vertUniformPropertiesData.uniformBufferSize, 0, &material->uniformBufferMappedArray[i]);
     }
 
     // ============================================================================================================================================================
@@ -60,7 +60,7 @@ Material MaterialCreate(Shader clientShader)
         VkDescriptorBufferInfo descriptorBufferInfo = {};
         descriptorBufferInfo.buffer = material->uniformBufferArray[i];
         descriptorBufferInfo.offset = 0;
-        descriptorBufferInfo.range = shader->uniformBufferSize;
+        descriptorBufferInfo.range = shader->vertUniformPropertiesData.uniformBufferSize;
 
         VkWriteDescriptorSet descriptorWrites[2] = {};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -122,14 +122,17 @@ void MaterialUpdateProperty(Material clientMaterial, const char* name, void* val
 
     u32 nameLength = strlen(name);
 
-    for (int i = 0; i < shader->propertyCount; i++)
+    for (int i = 0; i < shader->vertUniformPropertiesData.propertyCount; i++)
     {
-        if (MemoryCompare(name, shader->propertyNameArray[i], nameLength))
+        if (MemoryCompare(name, shader->vertUniformPropertiesData.propertyNameArray[i], nameLength))
         {
-            MemoryCopy((u8*)material->uniformBufferMappedArray[vk_state->currentInFlightFrameIndex] + shader->propertyOffsets[i], value, shader->propertySizes[i]);
-            break;
+            MemoryCopy((u8*)material->uniformBufferMappedArray[vk_state->currentInFlightFrameIndex] + shader->vertUniformPropertiesData.propertyOffsets[i], value, shader->vertUniformPropertiesData.propertySizes[i]);
+            return;
         }
     }
+
+    _FATAL("Property name: %s, couldn't be found in material", name);
+    GRASSERT_MSG(false, "Property name couldn't be found");
 }
 
 void MaterialBind(Material clientMaterial)
