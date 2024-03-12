@@ -56,6 +56,36 @@ Shader ShaderCreate(const char* shaderName)
     GetPropertyDataFromShader(rawVertFilename, &shader->vertUniformPropertiesData);
     GetPropertyDataFromShader(rawFragFilename, &shader->fragUniformPropertiesData);
 
+    VkDeviceSize uniformBufferAlignmentRequirement = vk_state->deviceProperties.limits.minUniformBufferOffsetAlignment;
+
+    // TODO: debug safety check if there are no properties in the vert and frag shader with the same name
+
+    // Calculating the total required uniform buffer size (per frame not for all in flight frames that happens in vulkan_material.c)
+    // If both the vertex and index buffer have a uniform buffer
+    if (shader->vertUniformPropertiesData.propertyCount > 0 && shader->fragUniformPropertiesData.propertyCount > 0)
+    {
+        // Calculating the offset for the fragment uniform buffer
+        shader->fragmentUniformBufferOffset = shader->vertUniformPropertiesData.uniformBufferSize;
+        u32 alignmentPadding = (uniformBufferAlignmentRequirement - (shader->fragmentUniformBufferOffset % uniformBufferAlignmentRequirement)) % uniformBufferAlignmentRequirement;
+        shader->fragmentUniformBufferOffset += alignmentPadding;
+
+        // Adding the fragment uniform offset to all the fragment properties local offsets
+        for (int i = 0; i < shader->fragUniformPropertiesData.propertyCount; i++)
+        {
+            shader->fragUniformPropertiesData.propertyOffsets[i] += shader->fragmentUniformBufferOffset;
+        }
+
+        shader->totalUniformDataSize = shader->fragmentUniformBufferOffset + shader->fragUniformPropertiesData.uniformBufferSize;
+    }
+    else // If only one or none of the vert and frag shader have a uniform buffer
+    {
+        // We know that at least one of vert's and frag's uniform buffer size is zero so we can add them without having to worry about offsets between them
+        shader->totalUniformDataSize = shader->vertUniformPropertiesData.uniformBufferSize + shader->fragUniformPropertiesData.uniformBufferSize;
+    }
+
+    // Making sure that if multiple uniform buffers are stored in one buffer the offset between them is correct
+    shader->totalUniformDataSize += (uniformBufferAlignmentRequirement - (shader->totalUniformDataSize % uniformBufferAlignmentRequirement)) % uniformBufferAlignmentRequirement;
+
     // ============================================================================================================================================================
     // ======================== Creating descriptor set layout ==========================================================================
     // ============================================================================================================================================================
@@ -75,7 +105,6 @@ Shader ShaderCreate(const char* shaderName)
 
     if (shader->fragUniformPropertiesData.propertyCount > 0)
     {
-        _DEBUG("test this shouldnt happen");
         bindingCount++;
         descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].binding = shader->fragUniformPropertiesData.bindingIndex;
         descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -84,11 +113,11 @@ Shader ShaderCreate(const char* shaderName)
         descriptorSetLayoutBindings[shader->fragUniformPropertiesData.bindingIndex].pImmutableSamplers = nullptr;
     }
 
-    descriptorSetLayoutBindings[1].binding = bindingCount;
-    descriptorSetLayoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorSetLayoutBindings[1].descriptorCount = 1;
-    descriptorSetLayoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    descriptorSetLayoutBindings[1].pImmutableSamplers = nullptr;
+    descriptorSetLayoutBindings[bindingCount].binding = bindingCount;
+    descriptorSetLayoutBindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorSetLayoutBindings[bindingCount].descriptorCount = 1;
+    descriptorSetLayoutBindings[bindingCount].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    descriptorSetLayoutBindings[bindingCount].pImmutableSamplers = nullptr;
     bindingCount++;
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};

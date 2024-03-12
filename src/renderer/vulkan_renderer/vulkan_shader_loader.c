@@ -64,6 +64,7 @@ void GetPropertyDataFromShader(const char* filename, UniformPropertiesData* out_
     if (uniformStart == nullptr)
     {
         out_propertyData->propertyCount = 0;
+        out_propertyData->uniformBufferSize = 0;
         return;
     }
 
@@ -106,6 +107,34 @@ void GetPropertyDataFromShader(const char* filename, UniformPropertiesData* out_
             out_propertyData->propertyOffsets[currentProperty] = out_propertyData->uniformBufferSize;
             out_propertyData->propertySizes[currentProperty] = MAT4_SIZE;
             out_propertyData->uniformBufferSize += MAT4_SIZE;
+        }
+
+        if (MemoryCompare(uniformStart, "vec4", 4))
+        {
+            // Putting uniformStart past the type and at the start of the property name
+            uniformStart += 5;
+
+            // Making sure the vector is properly aligned
+            u32 alignmentPadding = (VEC4_ALIGNMENT - (out_propertyData->uniformBufferSize % VEC4_ALIGNMENT)) % VEC4_ALIGNMENT;
+            out_propertyData->uniformBufferSize += alignmentPadding;
+
+            out_propertyData->propertyOffsets[currentProperty] = out_propertyData->uniformBufferSize;
+            out_propertyData->propertySizes[currentProperty] = VEC4_SIZE;
+            out_propertyData->uniformBufferSize += VEC4_SIZE;
+        }
+
+        if (MemoryCompare(uniformStart, "vec3", 4))
+        {
+            // Putting uniformStart past the type and at the start of the property name
+            uniformStart += 5;
+
+            // Making sure the vector is properly aligned
+            u32 alignmentPadding = (VEC3_ALIGNMENT - (out_propertyData->uniformBufferSize % VEC3_ALIGNMENT)) % VEC3_ALIGNMENT;
+            out_propertyData->uniformBufferSize += alignmentPadding;
+
+            out_propertyData->propertyOffsets[currentProperty] = out_propertyData->uniformBufferSize;
+            out_propertyData->propertySizes[currentProperty] = VEC3_SIZE;
+            out_propertyData->uniformBufferSize += VEC3_SIZE;
         }
 
         if (MemoryCompare(uniformStart, "vec2", 4))

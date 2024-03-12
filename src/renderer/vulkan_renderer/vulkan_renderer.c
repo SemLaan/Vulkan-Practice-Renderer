@@ -203,6 +203,7 @@ bool InitializeRenderer()
                 {
                     vk_state->physicalDevice = availableDevices[i];
                     vk_state->swapchainSupport = swapchainSupport;
+                    vk_state->deviceProperties = properties;
                     break;
                 }
                 Free(vk_state->rendererAllocator, swapchainSupport.formats);

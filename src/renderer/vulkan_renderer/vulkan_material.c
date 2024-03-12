@@ -1,9 +1,9 @@
 #include "../material.h"
 
 #include "core/asserts.h"
+#include "core/meminc.h"
 #include "vulkan_buffer.h"
 #include "vulkan_types.h"
-#include "core/meminc.h"
 #include <string.h>
 
 Material MaterialCreate(Shader clientShader)
@@ -19,15 +19,8 @@ Material MaterialCreate(Shader clientShader)
     // ============================================================================================================================================================
     // ======================== Creating uniform buffers ============================================================================
     // ============================================================================================================================================================
-    material->uniformBufferArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferArray), MEM_TAG_RENDERER_SUBSYS);
-    material->uniformBufferMemoryArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferMemoryArray), MEM_TAG_RENDERER_SUBSYS);
-    material->uniformBufferMappedArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->uniformBufferMappedArray), MEM_TAG_RENDERER_SUBSYS);
-
-    for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-    {
-        CreateBuffer(shader->vertUniformPropertiesData.uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBufferArray[i], &material->uniformBufferMemoryArray[i]);
-        vkMapMemory(vk_state->device, material->uniformBufferMemoryArray[i], 0, shader->vertUniformPropertiesData.uniformBufferSize, 0, &material->uniformBufferMappedArray[i]);
-    }
+    CreateBuffer(shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBuffer, &material->uniformBufferMemory);
+    vkMapMemory(vk_state->device, material->uniformBufferMemory, 0, shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, 0, &material->uniformBufferMapped);
 
     // ============================================================================================================================================================
     // ======================== Allocating descriptor sets ============================================================================
@@ -57,22 +50,51 @@ Material MaterialCreate(Shader clientShader)
     // ============================================================================================================================================================
     for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        VkDescriptorBufferInfo descriptorBufferInfo = {};
-        descriptorBufferInfo.buffer = material->uniformBufferArray[i];
-        descriptorBufferInfo.offset = 0;
-        descriptorBufferInfo.range = shader->vertUniformPropertiesData.uniformBufferSize;
+        VkWriteDescriptorSet descriptorWrites[10] = {};
 
-        VkWriteDescriptorSet descriptorWrites[2] = {};
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].pNext = nullptr;
-        descriptorWrites[0].dstSet = material->descriptorSetArray[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].pImageInfo = nullptr;
-        descriptorWrites[0].pBufferInfo = &descriptorBufferInfo;
-        descriptorWrites[0].pTexelBufferView = nullptr;
+        u32 descriptorWriteIndex = 0;
+
+        if (shader->vertUniformPropertiesData.propertyCount > 0)
+        {
+            VkDescriptorBufferInfo descriptorBufferInfo = {};
+            descriptorBufferInfo.buffer = material->uniformBuffer;
+            descriptorBufferInfo.offset = i * shader->totalUniformDataSize;
+            descriptorBufferInfo.range = shader->vertUniformPropertiesData.uniformBufferSize;
+
+            descriptorWrites[descriptorWriteIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[descriptorWriteIndex].pNext = nullptr;
+            descriptorWrites[descriptorWriteIndex].dstSet = material->descriptorSetArray[i];
+            descriptorWrites[descriptorWriteIndex].dstBinding = shader->vertUniformPropertiesData.bindingIndex;
+            descriptorWrites[descriptorWriteIndex].dstArrayElement = 0;
+            descriptorWrites[descriptorWriteIndex].descriptorCount = 1;
+            descriptorWrites[descriptorWriteIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[descriptorWriteIndex].pImageInfo = nullptr;
+            descriptorWrites[descriptorWriteIndex].pBufferInfo = &descriptorBufferInfo;
+            descriptorWrites[descriptorWriteIndex].pTexelBufferView = nullptr;
+
+            descriptorWriteIndex++;
+        }
+
+        if (shader->fragUniformPropertiesData.propertyCount > 0)
+        {
+            VkDescriptorBufferInfo descriptorBufferInfo = {};
+            descriptorBufferInfo.buffer = material->uniformBuffer;
+            descriptorBufferInfo.offset = (i * shader->totalUniformDataSize) + shader->fragmentUniformBufferOffset;
+            descriptorBufferInfo.range = shader->fragUniformPropertiesData.uniformBufferSize;
+
+            descriptorWrites[descriptorWriteIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[descriptorWriteIndex].pNext = nullptr;
+            descriptorWrites[descriptorWriteIndex].dstSet = material->descriptorSetArray[i];
+            descriptorWrites[descriptorWriteIndex].dstBinding = shader->fragUniformPropertiesData.bindingIndex;
+            descriptorWrites[descriptorWriteIndex].dstArrayElement = 0;
+            descriptorWrites[descriptorWriteIndex].descriptorCount = 1;
+            descriptorWrites[descriptorWriteIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[descriptorWriteIndex].pImageInfo = nullptr;
+            descriptorWrites[descriptorWriteIndex].pBufferInfo = &descriptorBufferInfo;
+            descriptorWrites[descriptorWriteIndex].pTexelBufferView = nullptr;
+
+            descriptorWriteIndex++;
+        }
 
         VulkanImage* defaultTexture = vk_state->defaultTexture.internalState;
 
@@ -81,18 +103,20 @@ Material MaterialCreate(Shader clientShader)
         descriptorImageInfo.imageView = defaultTexture->view;
         descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].pNext = nullptr;
-        descriptorWrites[1].dstSet = material->descriptorSetArray[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].pImageInfo = &descriptorImageInfo;
-        descriptorWrites[1].pBufferInfo = nullptr;
-        descriptorWrites[1].pTexelBufferView = nullptr;
+        descriptorWrites[descriptorWriteIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[descriptorWriteIndex].pNext = nullptr;
+        descriptorWrites[descriptorWriteIndex].dstSet = material->descriptorSetArray[i];
+        descriptorWrites[descriptorWriteIndex].dstBinding = descriptorWriteIndex;
+        descriptorWrites[descriptorWriteIndex].dstArrayElement = 0;
+        descriptorWrites[descriptorWriteIndex].descriptorCount = 1;
+        descriptorWrites[descriptorWriteIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[descriptorWriteIndex].pImageInfo = &descriptorImageInfo;
+        descriptorWrites[descriptorWriteIndex].pBufferInfo = nullptr;
+        descriptorWrites[descriptorWriteIndex].pTexelBufferView = nullptr;
 
-        vkUpdateDescriptorSets(vk_state->device, 2, descriptorWrites, 0, nullptr);
+        descriptorWriteIndex++;
+
+        vkUpdateDescriptorSets(vk_state->device, descriptorWriteIndex /*interpreted as descriptor write count*/, descriptorWrites, 0, nullptr);
     }
 
     return clientMaterial;
@@ -102,16 +126,10 @@ void MaterialDestroy(Material clientMaterial)
 {
     VulkanMaterial* material = clientMaterial.internalState;
 
-    for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-    {
-        vkUnmapMemory(vk_state->device, material->uniformBufferMemoryArray[i]);
-        vkDestroyBuffer(vk_state->device, material->uniformBufferArray[i], vk_state->vkAllocator);
-        vkFreeMemory(vk_state->device, material->uniformBufferMemoryArray[i], vk_state->vkAllocator);
-    }
+    vkUnmapMemory(vk_state->device, material->uniformBufferMemory);
+    vkDestroyBuffer(vk_state->device, material->uniformBuffer, vk_state->vkAllocator);
+    vkFreeMemory(vk_state->device, material->uniformBufferMemory, vk_state->vkAllocator);
 
-    Free(vk_state->rendererAllocator, material->uniformBufferMappedArray);
-    Free(vk_state->rendererAllocator, material->uniformBufferArray);
-    Free(vk_state->rendererAllocator, material->uniformBufferMemoryArray);
     Free(vk_state->rendererAllocator, material);
 }
 
@@ -126,7 +144,20 @@ void MaterialUpdateProperty(Material clientMaterial, const char* name, void* val
     {
         if (MemoryCompare(name, shader->vertUniformPropertiesData.propertyNameArray[i], nameLength))
         {
-            MemoryCopy((u8*)material->uniformBufferMappedArray[vk_state->currentInFlightFrameIndex] + shader->vertUniformPropertiesData.propertyOffsets[i], value, shader->vertUniformPropertiesData.propertySizes[i]);
+            // Taking the mapped buffer, then offsetting into the current frame, then offsetting into the current property
+            u8* uniformPropertyLocation = ((u8*)material->uniformBufferMapped) + vk_state->currentInFlightFrameIndex * shader->totalUniformDataSize + shader->vertUniformPropertiesData.propertyOffsets[i];
+            MemoryCopy(uniformPropertyLocation, value, shader->vertUniformPropertiesData.propertySizes[i]);
+            return;
+        }
+    }
+
+    for (int i = 0; i < shader->fragUniformPropertiesData.propertyCount; i++)
+    {
+        if (MemoryCompare(name, shader->fragUniformPropertiesData.propertyNameArray[i], nameLength))
+        {
+            // Taking the mapped buffer, then offsetting into the current frame, then offsetting into the current property
+            u8* uniformPropertyLocation = ((u8*)material->uniformBufferMapped) + vk_state->currentInFlightFrameIndex * shader->totalUniformDataSize + shader->fragUniformPropertiesData.propertyOffsets[i];
+            MemoryCopy(uniformPropertyLocation, value, shader->fragUniformPropertiesData.propertySizes[i]);
             return;
         }
     }

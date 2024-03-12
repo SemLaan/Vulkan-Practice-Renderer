@@ -58,14 +58,16 @@ typedef struct VulkanShader
 	VkPipeline pipelineObject;
 	UniformPropertiesData vertUniformPropertiesData;
 	UniformPropertiesData fragUniformPropertiesData;
+	u32 totalUniformDataSize;
+	u32 fragmentUniformBufferOffset;
 } VulkanShader;
 
 typedef struct VulkanMaterial
 {
 	VulkanShader* shader;								// Handle to the shader this material is an instance of
-	VkBuffer* uniformBufferArray;						// VkBuffers that back this materials uniforms
-	VkDeviceMemory* uniformBufferMemoryArray;			// VkDeviceMemory's that back this materials uniforms
-	void** uniformBufferMappedArray;					// Pointers to where the uniform buffers are mapped
+	VkBuffer uniformBuffer;								// VkBuffer that backs this materials uniforms
+	VkDeviceMemory uniformBufferMemory;					// VkDeviceMemory that backs this materials uniforms
+	void* uniformBufferMapped;							// Pointer to where the uniform buffers are mapped
 	VkDescriptorSet* descriptorSetArray;				// Descriptor sets
 } VulkanMaterial;
 
@@ -164,6 +166,7 @@ typedef struct RendererState
 	VkDescriptorSetLayout globalDescriptorSetLayout;				// Descriptor set layout of the global ubo
 	VkBuffer* globalUniformBufferArray;								// Global uniform buffer object
 	VkDeviceMemory* globalUniformMemoryArray;						// Global uniform memory
+	VkPhysicalDeviceProperties deviceProperties;					// Properties of the physical device
 #ifndef GR_DIST
 	VkDebugUtilsMessengerEXT debugMessenger;						// Debug messenger, only exists in debug mode
 #endif // !GR_DIST

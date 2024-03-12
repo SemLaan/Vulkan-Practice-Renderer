@@ -123,6 +123,8 @@ void GameUpdateAndRender()
     // ============================ Rendering ===================================
     mat4 projView = mat4_mul_mat4(gameState->proj, gameState->view);
     MaterialUpdateProperty(gameState->material, "projView", &projView);
+    vec4 testColor = vec4_create(1, 0, 0, 1);
+    MaterialUpdateProperty(gameState->material, "color", &testColor);
 
     GlobalUniformObject globalUniformObject = {};
     globalUniformObject.projView = projView;
