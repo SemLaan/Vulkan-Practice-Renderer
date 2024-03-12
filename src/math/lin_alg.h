@@ -269,7 +269,7 @@ static mat4 mat4_perspective(f32 verticalFovDegrees, f32 aspectRatio, f32 near, 
 	f32 focalLength = 1.0f / (f32)tan(verticalFovRadians / 2.0f);
 
 	f32 x = focalLength / aspectRatio;
-	f32 y = -focalLength;
+	f32 y = focalLength;
 	f32 A = near / (far - near);
 	f32 B = far * A;
 

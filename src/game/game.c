@@ -62,14 +62,14 @@ void GameInit()
     MaterialUpdateTexture(gameState->material, "albedo", gameState->texture);
     MaterialUpdateTexture(gameState->material, "heightMap", gameState->texture);
     
-    LoadObj("models/sphere.obj", &gameState->vertexBuffer, &gameState->indexBuffer, true);
+    LoadObj("models/beefy_gun.obj", &gameState->vertexBuffer, &gameState->indexBuffer, false);
 
     // Initializing camera
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
     gameState->proj = mat4_perspective(45.0f, windowAspectRatio, 0.1f, 1000.0f);
     gameState->view = mat4_identity();
-    gameState->camPosition = (vec3){0, -3, 0};
+    gameState->camPosition = (vec3){0, 0, -10};
     gameState->camRotation = (vec3){0, 0, 0};
 
     gameState->mouseEnabled = false;
@@ -99,7 +99,7 @@ void GameUpdateAndRender()
     if (gameState->mouseEnabled)
     {
         gameState->camRotation.y -= GetMouseDistanceFromCenter().x / mouseMoveSpeed;
-        gameState->camRotation.x += GetMouseDistanceFromCenter().y / mouseMoveSpeed;
+        gameState->camRotation.x -= GetMouseDistanceFromCenter().y / mouseMoveSpeed;
     }
     if (gameState->camRotation.x > 1.5f)
         gameState->camRotation.x = 1.5f;
@@ -123,9 +123,9 @@ void GameUpdateAndRender()
     if (GetKeyDown(KEY_W))
         frameMovement = vec3_min_vec3(frameMovement, forwardVector);
     if (GetKeyDown(KEY_SHIFT))
-        frameMovement.y -= 1;
-    if (GetKeyDown(KEY_SPACE))
         frameMovement.y += 1;
+    if (GetKeyDown(KEY_SPACE))
+        frameMovement.y -= 1;
     gameState->camPosition = vec3_add_vec3(gameState->camPosition, vec3_div_float(frameMovement, 300.f));
 
     mat4 translate = mat4_3Dtranslate(gameState->camPosition);
@@ -141,7 +141,7 @@ void GameUpdateAndRender()
     // ============================ Rendering ===================================
     mat4 projView = mat4_mul_mat4(gameState->proj, gameState->view);
     MaterialUpdateProperty(gameState->material, "projView", &projView);
-    vec4 testColor = vec4_create(1, 0, 0, 1);
+    vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
     MaterialUpdateProperty(gameState->material, "color", &testColor);
 
     GlobalUniformObject globalUniformObject = {};

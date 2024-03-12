@@ -26,8 +26,8 @@ layout(push_constant) uniform PushConstants
 
 
 void main() {
-	normal = v_normal;
+	normal = (pc.model * vec4(v_normal, 0)).xyz;
 	texCoord = v_texCoord;
-	vec3 displacedPosition = v_position + v_normal * texture(heightMap, v_texCoord).r;
-	gl_Position = ubo.projView * pc.model * vec4(displacedPosition, 1);
+	//vec3 displacedPosition = v_position + v_normal * texture(heightMap, v_texCoord).r;
+	gl_Position = ubo.projView * pc.model * vec4(v_position, 1);
 }

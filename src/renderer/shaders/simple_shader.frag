@@ -16,5 +16,7 @@ void main() {
 
     float light = clamp(dot(normalize(normal), vec3(1, 0, 0)), 0, 1);   // directional light
     light += 0.1;                                                       // Ambient light
-    outColor = ubo.color * texture(albedo, texCoord) * light;
+    outColor = ubo.color * vec4(light, light, light, 1);
+    //outColor = ubo.color * texture(albedo, texCoord) * light;
+    //outColor = vec4(1, 1, 1, 1);
 }
