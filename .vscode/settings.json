@@ -15,6 +15,7 @@
         "event.h": "c",
         "darray.h": "c",
         "renderer_types.h": "c",
-        "material.h": "c"
+        "material.h": "c",
+        "vulkan_command_buffer.h": "c"
     }
 }

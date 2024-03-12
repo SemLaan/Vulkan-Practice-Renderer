@@ -7,13 +7,14 @@
 #include "core/meminc.h"
 
 #include "renderer/texture.h"
+#include "vulkan_buffer.h"
 #include "vulkan_command_buffer.h"
 #include "vulkan_debug_tools.h"
+#include "vulkan_image.h"
 #include "vulkan_platform.h"
 #include "vulkan_swapchain.h"
 #include "vulkan_types.h"
 #include "vulkan_utils.h"
-#include "vulkan_buffer.h"
 
 RendererState* vk_state = nullptr;
 
@@ -518,7 +519,6 @@ bool InitializeRenderer()
         GRASSERT_MSG(false, "Vulkan descriptor set layout creation failed");
     }
 
-
     // Creating backing buffer and memory and mapping the memory
     VkDeviceSize uniformBufferSize = sizeof(GlobalUniformObject);
 
@@ -885,6 +885,18 @@ bool BeginRendering()
     renderingAttachmentInfo.clearValue.color.float32[2] = 0;
     renderingAttachmentInfo.clearValue.color.float32[3] = 1.0f;
 
+    VkRenderingAttachmentInfo depthAttachmentInfo = {};
+    depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depthAttachmentInfo.pNext = nullptr;
+    depthAttachmentInfo.imageView = vk_state->depthStencilImage.view;
+    depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachmentInfo.resolveMode = 0;
+    depthAttachmentInfo.resolveImageView = nullptr;
+    depthAttachmentInfo.resolveImageLayout = 0;
+    depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachmentInfo.clearValue.depthStencil.depth = 1.0f;
+
     VkRenderingInfo renderingInfo = {};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.pNext = nullptr;
@@ -896,7 +908,7 @@ bool BeginRendering()
     renderingInfo.viewMask = 0;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &renderingAttachmentInfo;
-    renderingInfo.pDepthAttachment = nullptr;
+    renderingInfo.pDepthAttachment = &depthAttachmentInfo;
     renderingInfo.pStencilAttachment = nullptr;
 
     vkCmdBeginRendering(currentCommandBuffer, &renderingInfo);

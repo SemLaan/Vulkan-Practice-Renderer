@@ -10,18 +10,11 @@
 
 
 
-typedef struct VulkanCreateImageParameters
-{
-	u32						width;
-	u32						height;
-	VkFormat				format;
-	VkImageTiling			tiling;
-	VkImageUsageFlags		usage;
-	VkMemoryPropertyFlags	properties;
-} VulkanCreateImageParameters;
 
-static bool CreateImage(VulkanCreateImageParameters* pCreateParameters, VkImage* pImage, VkDeviceMemory* pMemory)
+bool CreateImage(VulkanCreateImageParameters* pCreateParameters, VulkanImage* vulkanImage)
 {
+	vulkanImage->format = pCreateParameters->format;
+
 	VkImageCreateInfo imageCreateInfo = {};
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCreateInfo.pNext = nullptr;
@@ -41,14 +34,14 @@ static bool CreateImage(VulkanCreateImageParameters* pCreateParameters, VkImage*
 	imageCreateInfo.pQueueFamilyIndices = nullptr;
 	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-	if (VK_SUCCESS != vkCreateImage(vk_state->device, &imageCreateInfo, vk_state->vkAllocator, pImage))
+	if (VK_SUCCESS != vkCreateImage(vk_state->device, &imageCreateInfo, vk_state->vkAllocator, &vulkanImage->handle))
 	{
 		_FATAL("Vulkan image (texture) creation failed");
 		return false;
 	}
 
 	VkMemoryRequirements memoryRequirements;
-	vkGetImageMemoryRequirements(vk_state->device, *pImage, &memoryRequirements);
+	vkGetImageMemoryRequirements(vk_state->device, vulkanImage->handle, &memoryRequirements);
 
 	VkMemoryAllocateInfo allocateInfo = {};
 	allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -56,13 +49,41 @@ static bool CreateImage(VulkanCreateImageParameters* pCreateParameters, VkImage*
 	allocateInfo.allocationSize = memoryRequirements.size;
 	allocateInfo.memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits, pCreateParameters->properties);
 
-	if (VK_SUCCESS != vkAllocateMemory(vk_state->device, &allocateInfo, vk_state->vkAllocator, pMemory))
+	if (VK_SUCCESS != vkAllocateMemory(vk_state->device, &allocateInfo, vk_state->vkAllocator, &vulkanImage->memory))
 	{
 		_FATAL("Vulkan image (texture) memory allocation failed");
 		return false;
 	}
 
-	vkBindImageMemory(vk_state->device, *pImage, *pMemory, 0);
+	vkBindImageMemory(vk_state->device, vulkanImage->handle, vulkanImage->memory, 0);
+
+	return true;
+}
+
+bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkImageView* pImageView)
+{
+	VkImageViewCreateInfo viewCreateInfo = {};
+	viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewCreateInfo.pNext = nullptr;
+	viewCreateInfo.flags = 0;
+	viewCreateInfo.image = pImage->handle;
+	viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewCreateInfo.format = pImage->format;
+	viewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewCreateInfo.subresourceRange.aspectMask = aspectMask;
+	viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	viewCreateInfo.subresourceRange.layerCount = 1;
+	viewCreateInfo.subresourceRange.baseMipLevel = 0;
+	viewCreateInfo.subresourceRange.levelCount = 1;
+
+	if (VK_SUCCESS != vkCreateImageView(vk_state->device, &viewCreateInfo, vk_state->vkAllocator, pImageView))
+	{
+		_FATAL("Texture image view creation failed");
+		return false;
+	}
 
 	return true;
 }
@@ -94,7 +115,7 @@ Texture TextureCreate(u32 width, u32 height, void* pixels)
 	createImageParameters.properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
 	// Creating the image resource
-	CreateImage(&createImageParameters, &image->handle, &image->memory);
+	CreateImage(&createImageParameters, image);
 
 	// Transitioning the image for copying, copying the image to gpu, transitioning the image for shader reads, transfering image resource ownership to graphics queue
 	{
@@ -242,28 +263,8 @@ Texture TextureCreate(u32 width, u32 height, void* pixels)
 	vk_state->requestedQueueAcquisitionOperationsDarray = (VkDependencyInfo**)DarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
 
 	// Creating the image view
-	VkImageViewCreateInfo viewCreateInfo = {};
-	viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewCreateInfo.pNext = nullptr;
-	viewCreateInfo.flags = 0;
-	viewCreateInfo.image = image->handle;
-	viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	viewCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
-	viewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	viewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	viewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	viewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	viewCreateInfo.subresourceRange.baseArrayLayer = 0;
-	viewCreateInfo.subresourceRange.layerCount = 1;
-	viewCreateInfo.subresourceRange.baseMipLevel = 0;
-	viewCreateInfo.subresourceRange.levelCount = 1;
-
-	if (VK_SUCCESS != vkCreateImageView(vk_state->device, &viewCreateInfo, vk_state->vkAllocator, &image->view))
-	{
-		_FATAL("Texture image view creation failed");
-		GRASSERT(false);
-	}
+	if (!CreateImageView(image, VK_IMAGE_ASPECT_COLOR_BIT, &image->view))
+		GRASSERT_MSG(false, "image view creation failed");
 
 	// Creating the sampler
 	VkSamplerCreateInfo samplerCreateInfo = {};

@@ -280,7 +280,17 @@ Shader ShaderCreate(const char* shaderName)
     multisamplingCreateInfo.alphaToOneEnable = VK_FALSE;
 
     // Depth/stencil
-    /// TODO: add depth stencil state create info
+    VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
+    depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencilCreateInfo.pNext = nullptr;
+    depthStencilCreateInfo.flags = 0;
+    depthStencilCreateInfo.depthTestEnable = VK_TRUE;
+    depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
+    depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
+    depthStencilCreateInfo.minDepthBounds = 0;
+    depthStencilCreateInfo.maxDepthBounds = 0;
+    depthStencilCreateInfo.stencilTestEnable = VK_FALSE;
 
     // Blending
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
@@ -319,8 +329,8 @@ Shader ShaderCreate(const char* shaderName)
     pipelineRenderingCreateInfo.viewMask = 0;
     pipelineRenderingCreateInfo.colorAttachmentCount = 1;
     pipelineRenderingCreateInfo.pColorAttachmentFormats = &vk_state->swapchainFormat;
-    pipelineRenderingCreateInfo.depthAttachmentFormat = 0;
-    pipelineRenderingCreateInfo.stencilAttachmentFormat = 0;
+    pipelineRenderingCreateInfo.depthAttachmentFormat = vk_state->depthStencilImage.format;
+    pipelineRenderingCreateInfo.stencilAttachmentFormat = vk_state->depthStencilImage.format;
 
     // Pipeline create info
     VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
@@ -335,7 +345,7 @@ Shader ShaderCreate(const char* shaderName)
     graphicsPipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
     graphicsPipelineCreateInfo.pRasterizationState = &rasterizerCreateInfo;
     graphicsPipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
-    graphicsPipelineCreateInfo.pDepthStencilState = nullptr;
+    graphicsPipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
     graphicsPipelineCreateInfo.pColorBlendState = &blendStateCreateInfo;
     graphicsPipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
     graphicsPipelineCreateInfo.layout = shader->pipelineLayout;

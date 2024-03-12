@@ -36,6 +36,7 @@ typedef struct VulkanImage
 	VkImageView view;
 	VkSampler sampler;
 	VkDeviceMemory memory;
+	VkFormat format;
 } VulkanImage;
 
 #define PROPERTY_MAX_NAME_LENGTH 20
@@ -138,6 +139,7 @@ typedef struct RendererState
 	VulkanShader* boundShader;										// Currently bound shader (pipeline object)
 	void** globalUniformBufferMappedArray;							// Global uniform mapped memory for updating global ubo data
 	VkDescriptorSet* globalDescriptorSetArray;						// Global descriptor set array, one per possible in flight frame
+	VulkanImage depthStencilImage;									// Image for the depth/stencil buffer
 
 	// Binary semaphores for synchronizing the swapchain with the screen and the GPU
 	VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image acquisition TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)
