@@ -1059,7 +1059,7 @@ void UpdateGlobalUniform(GlobalUniformObject* properties)
     MemoryCopy(vk_state->globalUniformBufferMappedArray[vk_state->currentInFlightFrameIndex], properties, sizeof(*properties));
 }
 
-void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, PushConstantObject* pushConstantValues)
+void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, mat4* pushConstantValues)
 {
     MaterialBind(clientMaterial);
     VertexBufferBind(clientVertexBuffer);

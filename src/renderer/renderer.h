@@ -17,7 +17,7 @@ bool BeginRendering();
 void EndRendering();
 
 void UpdateGlobalUniform(GlobalUniformObject* properties);
-void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, PushConstantObject* pushConstantValues);
+void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, mat4* pushConstantValues);
 
 
 

@@ -1,31 +1,38 @@
 #include "game.h"
 
+#include "containers/darray.h"
+#include "core/event.h"
+#include "core/input.h"
 #include "core/logger.h"
 #include "core/platform.h"
-#include "core/input.h"
-#include "core/event.h"
 #include "core/timer.h"
+#include "math/lin_alg.h"
 #include "renderer/material.h"
+#include "renderer/obj_loader.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
-#include "renderer/obj_loader.h"
 #include "renderer/texture.h"
-#include "math/lin_alg.h"
+
+typedef struct Scene
+{
+    VertexBuffer* vertexBufferDarray;
+    IndexBuffer* indexBufferDarray;
+    mat4* modelMatrixDarray;
+} Scene;
 
 typedef struct GameState
 {
+    Scene scene;
     Timer timer;
-    VertexBuffer vertexBuffer;
-    IndexBuffer indexBuffer;
     Shader shader;
     Material material;
     Texture texture;
     vec3 camPosition;
-	vec3 camRotation;
-	mat4 view;
-	mat4 proj;
-	bool mouseEnabled;
-	bool perspectiveEnabled;
+    vec3 camRotation;
+    mat4 view;
+    mat4 proj;
+    bool mouseEnabled;
+    bool perspectiveEnabled;
 } GameState;
 
 GameState* gameState = nullptr;
@@ -45,6 +52,50 @@ void GameInit()
 {
     gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
 
+    // Creating the scene
+    {
+        Scene* scene = &gameState->scene;
+        scene->vertexBufferDarray = DarrayCreate(sizeof(VertexBuffer), 5, GetGlobalAllocator(), MEM_TAG_GAME);
+        scene->indexBufferDarray = DarrayCreate(sizeof(IndexBuffer), 5, GetGlobalAllocator(), MEM_TAG_GAME);
+        scene->modelMatrixDarray = DarrayCreate(sizeof(mat4), 5, GetGlobalAllocator(), MEM_TAG_GAME);
+
+        VertexBuffer vb;
+        IndexBuffer ib;
+        mat4 modelMatrix;
+
+        // Loading gun
+        modelMatrix = mat4_3Dtranslate(vec3_create(0, 3, 0));
+        LoadObj("models/beefy_gun.obj", &vb, &ib, false);
+
+        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
+        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
+        scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
+
+        // Loading quad
+        modelMatrix = mat4_3Dscale(vec3_create(20, 1, 20));
+        LoadObj("models/quad.obj", &vb, &ib, false);
+
+        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
+        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
+        scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
+
+        // Loading sphere
+        modelMatrix = mat4_3Dtranslate(vec3_create(10, 1, 10));
+        LoadObj("models/sphere.obj", &vb, &ib, false);
+
+        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
+        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
+        scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
+
+        // Loading cube
+        modelMatrix = mat4_3Dtranslate(vec3_create(10, 1, -5));
+        LoadObj("models/cube.obj", &vb, &ib, false);
+
+        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
+        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
+        scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
+    }
+
     // Initializing rendering state
     gameState->shader = ShaderCreate("simple_shader");
     gameState->material = MaterialCreate(gameState->shader);
@@ -63,15 +114,13 @@ void GameInit()
 
     MaterialUpdateTexture(gameState->material, "albedo", gameState->texture);
     MaterialUpdateTexture(gameState->material, "heightMap", gameState->texture);
-    
-    LoadObj("models/beefy_gun.obj", &gameState->vertexBuffer, &gameState->indexBuffer, false);
 
     // Initializing camera
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
     gameState->proj = mat4_perspective(45.0f, windowAspectRatio, 0.1f, 1000.0f);
     gameState->view = mat4_identity();
-    gameState->camPosition = (vec3){0, 0, -10};
+    gameState->camPosition = (vec3){0, -5, -10};
     gameState->camRotation = (vec3){0, 0, 0};
 
     gameState->mouseEnabled = false;
@@ -86,11 +135,19 @@ void GameShutdown()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
-    IndexBufferDestroy(gameState->indexBuffer);
-    VertexBufferDestroy(gameState->vertexBuffer);
     MaterialDestroy(gameState->material);
     ShaderDestroy(gameState->shader);
     TextureDestroy(gameState->texture);
+
+    for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
+    {
+        VertexBufferDestroy(gameState->scene.vertexBufferDarray[i]);
+        IndexBufferDestroy(gameState->scene.indexBufferDarray[i]);
+    }
+
+    DarrayDestroy(gameState->scene.vertexBufferDarray);
+    DarrayDestroy(gameState->scene.indexBufferDarray);
+    DarrayDestroy(gameState->scene.modelMatrixDarray);
 
     Free(GetGlobalAllocator(), gameState);
 }
@@ -157,9 +214,10 @@ void GameUpdateAndRender()
     if (!BeginRendering())
         return;
 
-    PushConstantObject pushConstantValues = {};
-    pushConstantValues.model = mat4_identity();
-    Draw(gameState->material, gameState->vertexBuffer, gameState->indexBuffer, &pushConstantValues);
+    for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
+    {
+        Draw(gameState->material, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
+    }
 
     EndRendering();
 }
