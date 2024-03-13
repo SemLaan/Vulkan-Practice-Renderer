@@ -5,6 +5,7 @@
 #include "core/event.h"
 #include "core/logger.h"
 #include "core/meminc.h"
+#include "math/lin_alg.h"
 
 #include "renderer/texture.h"
 #include "vulkan_buffer.h"
@@ -613,8 +614,10 @@ bool InitializeRenderer()
     // ============================================================================================================================================================
     // ============================ Creating default shader and material ======================================================================================================
     // ============================================================================================================================================================
-    vk_state->defaultShader = ShaderCreate("simple_shader");
+    vk_state->defaultShader = ShaderCreate("default");
     vk_state->defaultMaterial = MaterialCreate(vk_state->defaultShader);
+    vec4 defaultColor = vec4_create(1, 0.5f, 1, 1);
+    MaterialUpdateProperty(vk_state->defaultMaterial, "color", &defaultColor);
 
     return true;
 }
