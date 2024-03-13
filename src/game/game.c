@@ -112,9 +112,6 @@ void GameInit()
 
     gameState->texture = TextureCreate(2, 1, pixels);
 
-    MaterialUpdateTexture(gameState->material, "albedo", gameState->texture);
-    MaterialUpdateTexture(gameState->material, "heightMap", gameState->texture);
-
     // Initializing camera
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
@@ -204,9 +201,13 @@ void GameUpdateAndRender()
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
     MaterialUpdateProperty(gameState->material, "color", &testColor);
 
-    vec4 directionalLight = mat4_mul_vec4(mat4_rotate_z(TimerSecondsSinceStart(gameState->timer)), vec4_create(1, 0, 0, 1));
+    vec4 directionalLight = mat4_mul_vec4(mat4_rotate_z(/*TimerSecondsSinceStart(gameState->timer)*/-1), vec4_create(1, 0, 0, 1));
+
+    vec3 camposcopy = gameState->camPosition;
+    camposcopy.x = camposcopy.x;
 
     GlobalUniformObject globalUniformObject = {};
+    globalUniformObject.viewPosition = vec3_invert_sign(camposcopy);
     globalUniformObject.projView = projView;
     globalUniformObject.directionalLight = vec4_to_vec3(directionalLight);
     UpdateGlobalUniform(&globalUniformObject);

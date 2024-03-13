@@ -46,8 +46,9 @@ typedef struct Material
 
 typedef struct GlobalUniformObject
 {
-	mat4 projView;
-	vec3 directionalLight;
+	_Alignas(16) mat4 projView;
+	_Alignas(16) vec3 viewPosition;
+	_Alignas(16) vec3 directionalLight;
 } GlobalUniformObject;
 
 typedef struct PushConstantObject
