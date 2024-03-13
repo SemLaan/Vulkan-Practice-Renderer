@@ -505,7 +505,7 @@ bool InitializeRenderer()
     descriptorSetLayoutBindings[0].binding = 0;
     descriptorSetLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorSetLayoutBindings[0].descriptorCount = 1;
-    descriptorSetLayoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    descriptorSetLayoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     descriptorSetLayoutBindings[0].pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};

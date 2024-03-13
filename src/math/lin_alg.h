@@ -85,6 +85,15 @@ static vec3 vec3_div_float(vec3 vec, f32 value)
 	return (vec3){ vec.x / value, vec.y / value, vec.z / value };
 }
 
+static vec3 vec3_create(float x, float y, float z)
+{
+	vec3 out;
+	out.x = x;
+	out.y = y;
+	out.z = z;
+	return out;
+}
+
 static vec4 vec4_create(float x, float y, float z, float w)
 {
 	vec4 out;

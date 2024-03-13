@@ -4,6 +4,7 @@
 #include "core/platform.h"
 #include "core/input.h"
 #include "core/event.h"
+#include "core/timer.h"
 #include "renderer/material.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
@@ -13,6 +14,7 @@
 
 typedef struct GameState
 {
+    Timer timer;
     VertexBuffer vertexBuffer;
     IndexBuffer indexBuffer;
     Shader shader;
@@ -76,6 +78,8 @@ void GameInit()
     gameState->perspectiveEnabled = true;
 
     RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
+
+    StartOrResetTimer(&gameState->timer);
 }
 
 void GameShutdown()
@@ -140,12 +144,14 @@ void GameUpdateAndRender()
 
     // ============================ Rendering ===================================
     mat4 projView = mat4_mul_mat4(gameState->proj, gameState->view);
-    MaterialUpdateProperty(gameState->material, "projView", &projView);
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
     MaterialUpdateProperty(gameState->material, "color", &testColor);
 
+    vec4 directionalLight = mat4_mul_vec4(mat4_rotate_z(TimerSecondsSinceStart(gameState->timer)), vec4_create(1, 0, 0, 1));
+
     GlobalUniformObject globalUniformObject = {};
     globalUniformObject.projView = projView;
+    globalUniformObject.directionalLight = vec4_to_vec3(directionalLight);
     UpdateGlobalUniform(&globalUniformObject);
 
     if (!BeginRendering())
