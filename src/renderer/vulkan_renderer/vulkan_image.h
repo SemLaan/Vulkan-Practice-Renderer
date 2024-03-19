@@ -15,6 +15,6 @@ typedef struct VulkanCreateImageParameters
 
 
 bool CreateImage(VulkanCreateImageParameters* pCreateParameters, VulkanImage* vulkanImage);
-bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkImageView* pImageView);
+bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask);
 
 ///TODO: create image view helper function maybe? since swapchain also needs it

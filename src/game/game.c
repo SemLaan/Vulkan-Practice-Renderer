@@ -12,6 +12,7 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
+#include "renderer/render_target.h"
 
 typedef struct Scene
 {
@@ -215,10 +216,14 @@ void GameUpdateAndRender()
     if (!BeginRendering())
         return;
 
+    RenderTargetStartRendering(GetMainRenderTarget());
+
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
     {
         Draw(gameState->material, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
     }
+
+    RenderTargetStopRendering(GetMainRenderTarget());
 
     EndRendering();
 }

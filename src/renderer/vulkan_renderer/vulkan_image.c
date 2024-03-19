@@ -60,7 +60,7 @@ bool CreateImage(VulkanCreateImageParameters* pCreateParameters, VulkanImage* vu
 	return true;
 }
 
-bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkImageView* pImageView)
+bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask)
 {
 	VkImageViewCreateInfo viewCreateInfo = {};
 	viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -79,7 +79,7 @@ bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkImage
 	viewCreateInfo.subresourceRange.baseMipLevel = 0;
 	viewCreateInfo.subresourceRange.levelCount = 1;
 
-	if (VK_SUCCESS != vkCreateImageView(vk_state->device, &viewCreateInfo, vk_state->vkAllocator, pImageView))
+	if (VK_SUCCESS != vkCreateImageView(vk_state->device, &viewCreateInfo, vk_state->vkAllocator, &pImage->view))
 	{
 		_FATAL("Texture image view creation failed");
 		return false;
@@ -263,7 +263,7 @@ Texture TextureCreate(u32 width, u32 height, void* pixels)
 	vk_state->requestedQueueAcquisitionOperationsDarray = (VkDependencyInfo**)DarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
 
 	// Creating the image view
-	if (!CreateImageView(image, VK_IMAGE_ASPECT_COLOR_BIT, &image->view))
+	if (!CreateImageView(image, VK_IMAGE_ASPECT_COLOR_BIT))
 		GRASSERT_MSG(false, "image view creation failed");
 
 	// Creating the sampler

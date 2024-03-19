@@ -19,5 +19,5 @@ void EndRendering();
 void UpdateGlobalUniform(GlobalUniformObject* properties);
 void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, mat4* pushConstantValues);
 
-
+RenderTarget GetMainRenderTarget();
 

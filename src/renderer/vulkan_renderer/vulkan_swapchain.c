@@ -2,6 +2,7 @@
 #include "core/platform.h"
 #include "vulkan_image.h"
 #include "vulkan_command_buffer.h"
+#include "../render_target.h"
 
 SwapchainSupportDetails QuerySwapchainSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
@@ -71,7 +72,7 @@ bool CreateSwapchain(RendererState* state)
 	createInfo.imageColorSpace = format.colorSpace;
 	createInfo.imageExtent = swapchainExtent;
 	createInfo.imageArrayLayers = 1;
-	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 	u32 queueFamilyIndices[2] = { state->graphicsQueue.index, state->presentQueueFamilyIndex };
 	if (state->graphicsQueue.index != state->presentQueueFamilyIndex)
@@ -136,65 +137,9 @@ bool CreateSwapchain(RendererState* state)
 
 	_TRACE("Vulkan swapchain created");
 
-	// ========================================== Depth/Stencil buffer ======================================================
+	// ========================================== Main render target ======================================================
 	{
-        VkFormatProperties properties;
-
-        vkGetPhysicalDeviceFormatProperties(vk_state->physicalDevice, VK_FORMAT_D32_SFLOAT_S8_UINT, &properties);
-        bool d32s8_support = (properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-
-        VkFormat depthStencilFormat;
-
-        // Implementation must support at least one of these so we dont have to check for d24s8 if d32s8 doesn't exists
-        if (d32s8_support)
-            depthStencilFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
-        else
-            depthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
-
-        VulkanCreateImageParameters createImageParameters = {};
-        createImageParameters.width = vk_state->swapchainExtent.width;
-        createImageParameters.height = vk_state->swapchainExtent.height;
-        createImageParameters.format = depthStencilFormat;
-        createImageParameters.tiling = VK_IMAGE_TILING_OPTIMAL;
-        createImageParameters.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        createImageParameters.properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-        CreateImage(&createImageParameters, &vk_state->depthStencilImage);
-		CreateImageView(&vk_state->depthStencilImage, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, &vk_state->depthStencilImage.view);
-
-		CommandBuffer oneTimeCommandBuffer = {};
-		AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
-
-		VkImageMemoryBarrier2 depthStencilTransitionImageBarrierInfo = {};
-        depthStencilTransitionImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        depthStencilTransitionImageBarrierInfo.pNext = nullptr;
-        depthStencilTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-        depthStencilTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_NONE;
-        depthStencilTransitionImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        depthStencilTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        depthStencilTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depthStencilTransitionImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        depthStencilTransitionImageBarrierInfo.srcQueueFamilyIndex = 0;
-        depthStencilTransitionImageBarrierInfo.dstQueueFamilyIndex = 0;
-        depthStencilTransitionImageBarrierInfo.image = vk_state->depthStencilImage.handle;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.baseMipLevel = 0;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.levelCount = 1;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.baseArrayLayer = 0;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.layerCount = 1;
-
-        VkDependencyInfo rendertargetTransitionDependencyInfo = {};
-        rendertargetTransitionDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        rendertargetTransitionDependencyInfo.pNext = nullptr;
-        rendertargetTransitionDependencyInfo.dependencyFlags = 0;
-        rendertargetTransitionDependencyInfo.memoryBarrierCount = 0;
-        rendertargetTransitionDependencyInfo.bufferMemoryBarrierCount = 0;
-        rendertargetTransitionDependencyInfo.imageMemoryBarrierCount = 1;
-        rendertargetTransitionDependencyInfo.pImageMemoryBarriers = &depthStencilTransitionImageBarrierInfo;
-
-        vkCmdPipelineBarrier2(oneTimeCommandBuffer.handle, &rendertargetTransitionDependencyInfo);
-
-		EndSubmitAndFreeSingleUseCommandBuffer(oneTimeCommandBuffer, 0, nullptr, 0, nullptr, nullptr);
+        vk_state->mainRenderTarget = RenderTargetCreate(swapchainExtent.width, swapchainExtent.height, RENDER_TARGET_USAGE_DISPLAY, RENDER_TARGET_USAGE_DEPTH);
     }
 
 	return true;
@@ -202,12 +147,8 @@ bool CreateSwapchain(RendererState* state)
 
 void DestroySwapchain(RendererState* state)
 {
-	if (vk_state->depthStencilImage.view)
-		vkDestroyImageView(vk_state->device, vk_state->depthStencilImage.view, vk_state->vkAllocator);
-	if (vk_state->depthStencilImage.handle)
-		vkDestroyImage(vk_state->device, vk_state->depthStencilImage.handle, vk_state->vkAllocator);
-	if (vk_state->depthStencilImage.memory)
-		vkFreeMemory(vk_state->device, vk_state->depthStencilImage.memory, vk_state->vkAllocator);
+	if (vk_state->mainRenderTarget.internalState)
+		RenderTargetDestroy(vk_state->mainRenderTarget);
 
 	if (state->swapchainImageViews)
 	{

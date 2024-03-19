@@ -469,6 +469,40 @@ bool InitializeRenderer()
     }
 
     // ============================================================================================================================================================
+    // ======================== Finding render target formats ============================================================================================================
+    // ============================================================================================================================================================
+    {
+        // Checking color format support
+        {
+            VkFormatProperties2 formatProperties = {};
+            formatProperties.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+            VkFormat requiredColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+            vkGetPhysicalDeviceFormatProperties2(vk_state->physicalDevice, requiredColorFormat, &formatProperties);
+
+            VkFormatFeatureFlags requiredFormatFeatures = VK_FORMAT_FEATURE_2_BLIT_SRC_BIT | VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT;
+            GRASSERT_MSG((formatProperties.formatProperties.optimalTilingFeatures & requiredFormatFeatures) == requiredFormatFeatures, "Color format required for render target not supported");
+
+            vk_state->renderTargetColorFormat = requiredColorFormat;
+        }
+
+        // Checking depth format support
+        {
+            VkFormatProperties2 formatProperties = {};
+            formatProperties.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+            VkFormat preferredDepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
+            VkFormat fallbackDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+            vkGetPhysicalDeviceFormatProperties2(vk_state->physicalDevice, preferredDepthFormat, &formatProperties);
+
+            VkFormatFeatureFlags requiredFormatFeatures = VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT;
+            bool d32s8_support = requiredFormatFeatures == (formatProperties.formatProperties.optimalTilingFeatures & requiredFormatFeatures);
+
+            _INFO("Chosen depth format: %s", d32s8_support ? "D32S8" : "D24S8");
+
+            vk_state->renderTargetDepthFormat = d32s8_support ? preferredDepthFormat : fallbackDepthFormat;
+        }
+    }
+
+    // ============================================================================================================================================================
     // ======================== Creating the swapchain ============================================================================================================
     // ============================================================================================================================================================
     if (!CreateSwapchain(vk_state))
@@ -840,82 +874,6 @@ bool BeginRendering()
 
     DarraySetSize(vk_state->requestedQueueAcquisitionOperationsDarray, 0);
 
-    // ====================================== Transition swapchain image to render attachment ======================================================
-    {
-        VkImageMemoryBarrier2 rendertargetTransitionImageBarrierInfo = {};
-        rendertargetTransitionImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        rendertargetTransitionImageBarrierInfo.pNext = nullptr;
-        rendertargetTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-        rendertargetTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_NONE;
-        rendertargetTransitionImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        rendertargetTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        rendertargetTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        rendertargetTransitionImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        rendertargetTransitionImageBarrierInfo.srcQueueFamilyIndex = 0;
-        rendertargetTransitionImageBarrierInfo.dstQueueFamilyIndex = 0;
-        rendertargetTransitionImageBarrierInfo.image = vk_state->swapchainImages[vk_state->currentSwapchainImageIndex];
-        rendertargetTransitionImageBarrierInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        rendertargetTransitionImageBarrierInfo.subresourceRange.baseMipLevel = 0;
-        rendertargetTransitionImageBarrierInfo.subresourceRange.levelCount = 1;
-        rendertargetTransitionImageBarrierInfo.subresourceRange.baseArrayLayer = 0;
-        rendertargetTransitionImageBarrierInfo.subresourceRange.layerCount = 1;
-
-        VkDependencyInfo rendertargetTransitionDependencyInfo = {};
-        rendertargetTransitionDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        rendertargetTransitionDependencyInfo.pNext = nullptr;
-        rendertargetTransitionDependencyInfo.dependencyFlags = 0;
-        rendertargetTransitionDependencyInfo.memoryBarrierCount = 0;
-        rendertargetTransitionDependencyInfo.bufferMemoryBarrierCount = 0;
-        rendertargetTransitionDependencyInfo.imageMemoryBarrierCount = 1;
-        rendertargetTransitionDependencyInfo.pImageMemoryBarriers = &rendertargetTransitionImageBarrierInfo;
-
-        vkCmdPipelineBarrier2(currentCommandBuffer, &rendertargetTransitionDependencyInfo);
-    }
-
-    // ==================================== Begin renderpass ==============================================
-    VkRenderingAttachmentInfo renderingAttachmentInfo = {};
-    renderingAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    renderingAttachmentInfo.pNext = nullptr;
-    renderingAttachmentInfo.imageView = vk_state->swapchainImageViews[vk_state->currentSwapchainImageIndex];
-    renderingAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    renderingAttachmentInfo.resolveMode = 0;
-    renderingAttachmentInfo.resolveImageView = nullptr;
-    renderingAttachmentInfo.resolveImageLayout = 0;
-    renderingAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    renderingAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    renderingAttachmentInfo.clearValue.color.float32[0] = 0;
-    renderingAttachmentInfo.clearValue.color.float32[1] = 0;
-    renderingAttachmentInfo.clearValue.color.float32[2] = 0;
-    renderingAttachmentInfo.clearValue.color.float32[3] = 1.0f;
-
-    VkRenderingAttachmentInfo depthAttachmentInfo = {};
-    depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depthAttachmentInfo.pNext = nullptr;
-    depthAttachmentInfo.imageView = vk_state->depthStencilImage.view;
-    depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachmentInfo.resolveMode = 0;
-    depthAttachmentInfo.resolveImageView = nullptr;
-    depthAttachmentInfo.resolveImageLayout = 0;
-    depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachmentInfo.clearValue.depthStencil.depth = 1.0f;
-
-    VkRenderingInfo renderingInfo = {};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.pNext = nullptr;
-    renderingInfo.flags = 0;
-    renderingInfo.renderArea.offset.x = 0;
-    renderingInfo.renderArea.offset.y = 0;
-    renderingInfo.renderArea.extent = vk_state->swapchainExtent;
-    renderingInfo.layerCount = 1;
-    renderingInfo.viewMask = 0;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &renderingAttachmentInfo;
-    renderingInfo.pDepthAttachment = &depthAttachmentInfo;
-    renderingInfo.pStencilAttachment = nullptr;
-
-    vkCmdBeginRendering(currentCommandBuffer, &renderingInfo);
-
     // Viewport and scissor
     VkViewport viewport = {};
     viewport.x = 0;
@@ -943,19 +901,85 @@ void EndRendering()
 {
     VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
 
-    // ==================================== End renderpass =================================================
-    vkCmdEndRendering(currentCommandBuffer);
+    // ====================================== Transition swapchain image to transfer dst ======================================================
+    {
+        VkImageMemoryBarrier2 rendertargetTransitionImageBarrierInfo = {};
+        rendertargetTransitionImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        rendertargetTransitionImageBarrierInfo.pNext = nullptr;
+        rendertargetTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        rendertargetTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        rendertargetTransitionImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+        rendertargetTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        rendertargetTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        rendertargetTransitionImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        rendertargetTransitionImageBarrierInfo.srcQueueFamilyIndex = 0;
+        rendertargetTransitionImageBarrierInfo.dstQueueFamilyIndex = 0;
+        rendertargetTransitionImageBarrierInfo.image = vk_state->swapchainImages[vk_state->currentSwapchainImageIndex];
+        rendertargetTransitionImageBarrierInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        rendertargetTransitionImageBarrierInfo.subresourceRange.baseMipLevel = 0;
+        rendertargetTransitionImageBarrierInfo.subresourceRange.levelCount = 1;
+        rendertargetTransitionImageBarrierInfo.subresourceRange.baseArrayLayer = 0;
+        rendertargetTransitionImageBarrierInfo.subresourceRange.layerCount = 1;
+
+        VkDependencyInfo rendertargetTransitionDependencyInfo = {};
+        rendertargetTransitionDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        rendertargetTransitionDependencyInfo.pNext = nullptr;
+        rendertargetTransitionDependencyInfo.dependencyFlags = 0;
+        rendertargetTransitionDependencyInfo.memoryBarrierCount = 0;
+        rendertargetTransitionDependencyInfo.bufferMemoryBarrierCount = 0;
+        rendertargetTransitionDependencyInfo.imageMemoryBarrierCount = 1;
+        rendertargetTransitionDependencyInfo.pImageMemoryBarriers = &rendertargetTransitionImageBarrierInfo;
+
+        vkCmdPipelineBarrier2(currentCommandBuffer, &rendertargetTransitionDependencyInfo);
+    }
+
+    VulkanRenderTarget* mainRenderTarget = vk_state->mainRenderTarget.internalState;
+
+    VkImageBlit2 blitRegion = {};
+    blitRegion.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
+    blitRegion.pNext = nullptr;
+
+    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blitRegion.srcSubresource.mipLevel = 0;
+    blitRegion.srcSubresource.baseArrayLayer = 0;
+    blitRegion.srcSubresource.layerCount = 1;
+
+    blitRegion.srcOffsets[1].x = mainRenderTarget->extent.width;
+    blitRegion.srcOffsets[1].y = mainRenderTarget->extent.height;
+    blitRegion.srcOffsets[1].z = 1;
+
+    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.dstSubresource.baseArrayLayer = 0;
+    blitRegion.dstSubresource.layerCount = 1;
+
+    blitRegion.dstOffsets[1].x = vk_state->swapchainExtent.width;
+    blitRegion.dstOffsets[1].y = vk_state->swapchainExtent.height;
+    blitRegion.dstOffsets[1].z = 1;
+
+    VkBlitImageInfo2 blitInfo = {};
+    blitInfo.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2;
+    blitInfo.pNext = nullptr;
+    blitInfo.srcImage = mainRenderTarget->colorImage.handle;
+    blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    blitInfo.dstImage = vk_state->swapchainImages[vk_state->currentSwapchainImageIndex];
+    blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    blitInfo.regionCount = 1;
+    blitInfo.pRegions = &blitRegion;
+    blitInfo.filter = VK_FILTER_LINEAR;
+
+    vkCmdBlitImage2(currentCommandBuffer, &blitInfo);
 
     // ====================================== Transition swapchain image to present ready ======================================================
     {
         VkImageMemoryBarrier2 rendertargetTransitionImageBarrierInfo = {};
         rendertargetTransitionImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         rendertargetTransitionImageBarrierInfo.pNext = nullptr;
-        rendertargetTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        rendertargetTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        rendertargetTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+        rendertargetTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
         rendertargetTransitionImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         rendertargetTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_NONE;
-        rendertargetTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        rendertargetTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         rendertargetTransitionImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         rendertargetTransitionImageBarrierInfo.srcQueueFamilyIndex = 0;
         rendertargetTransitionImageBarrierInfo.dstQueueFamilyIndex = 0;
@@ -1071,6 +1095,11 @@ void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer 
 
     vkCmdPushConstants(currentCommandBuffer, vk_state->boundShader->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(*pushConstantValues), pushConstantValues);
     vkCmdDrawIndexed(currentCommandBuffer, indexBuffer->indexCount, 1, 0, 0, 0);
+}
+
+RenderTarget GetMainRenderTarget()
+{
+    return vk_state->mainRenderTarget;
 }
 
 static bool OnWindowResize(EventCode type, EventData data)

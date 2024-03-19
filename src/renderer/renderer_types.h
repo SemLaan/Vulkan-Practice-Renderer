@@ -6,6 +6,14 @@
 #define TEXTURE_CHANNELS 4
 
 
+typedef enum RenderTargetUsage
+{
+	RENDER_TARGET_USAGE_TEXTURE,
+	RENDER_TARGET_USAGE_DISPLAY,
+	RENDER_TARGET_USAGE_DEPTH,
+	RENDER_TARGET_USAGE_NONE
+} RenderTargetUsage;
+
 // TODO: try not to use this for anything new because this will probably get removed
 typedef struct Vertex
 {
@@ -43,6 +51,11 @@ typedef struct Material
 {
 	void* internalState;
 } Material;
+
+typedef struct RenderTarget
+{
+	void* internalState;
+} RenderTarget;
 
 typedef struct GlobalUniformObject
 {

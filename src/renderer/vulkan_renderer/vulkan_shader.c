@@ -328,9 +328,9 @@ Shader ShaderCreate(const char* shaderName)
     pipelineRenderingCreateInfo.pNext = nullptr;
     pipelineRenderingCreateInfo.viewMask = 0;
     pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    pipelineRenderingCreateInfo.pColorAttachmentFormats = &vk_state->swapchainFormat;
-    pipelineRenderingCreateInfo.depthAttachmentFormat = vk_state->depthStencilImage.format;
-    pipelineRenderingCreateInfo.stencilAttachmentFormat = vk_state->depthStencilImage.format;
+    pipelineRenderingCreateInfo.pColorAttachmentFormats = &vk_state->renderTargetColorFormat;
+    pipelineRenderingCreateInfo.depthAttachmentFormat = vk_state->renderTargetDepthFormat;
+    pipelineRenderingCreateInfo.stencilAttachmentFormat = vk_state->renderTargetDepthFormat;
 
     // Pipeline create info
     VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};

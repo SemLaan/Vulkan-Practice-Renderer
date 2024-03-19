@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "containers/darray.h"
 #include "../buffer.h"
+#include "../render_target.h"
 
 typedef struct RendererState RendererState;
 extern RendererState* vk_state;
@@ -12,7 +13,6 @@ extern RendererState* vk_state;
 #define QUEUE_ACQUISITION_POOL_BLOCK_SIZE 160 // 160 bytes (2.5 cache lines) 32 byte aligned, enough to store VkDependencyInfo + (VkImageMemoryBarrier2 or VkBufferMemoryBarrier2)
 
 
-// TODO: if still under 32B when finished, switch to pool allocator (or some other size pool allocator)
 typedef struct VulkanVertexBuffer
 {
 	VkDeviceSize size;
@@ -20,7 +20,6 @@ typedef struct VulkanVertexBuffer
 	VkDeviceMemory memory;
 } VulkanVertexBuffer;
 
-// TODO: if still under 32B when finished, switch to pool allocator (or some other size pool allocator)
 typedef struct VulkanIndexBuffer
 {
 	VkDeviceSize size;
@@ -29,7 +28,6 @@ typedef struct VulkanIndexBuffer
 	size_t indexCount;
 } VulkanIndexBuffer;
 
-// TODO: if still under 32B when finished, switch to pool allocator (or some other size pool allocator)
 typedef struct VulkanImage
 {
 	VkImage handle;
@@ -38,6 +36,15 @@ typedef struct VulkanImage
 	VkDeviceMemory memory;
 	VkFormat format;
 } VulkanImage;
+
+typedef struct VulkanRenderTarget
+{
+	VkExtent2D extent;
+	RenderTargetUsage colorBufferUsage;
+	RenderTargetUsage depthBufferUsage;
+	VulkanImage colorImage;
+	VulkanImage depthImage;
+} VulkanRenderTarget;
 
 #define PROPERTY_MAX_NAME_LENGTH 20
 
@@ -139,7 +146,7 @@ typedef struct RendererState
 	VulkanShader* boundShader;										// Currently bound shader (pipeline object)
 	void** globalUniformBufferMappedArray;							// Global uniform mapped memory for updating global ubo data
 	VkDescriptorSet* globalDescriptorSetArray;						// Global descriptor set array, one per possible in flight frame
-	VulkanImage depthStencilImage;									// Image for the depth/stencil buffer
+	RenderTarget mainRenderTarget;									// Render target used for rendering the main scene
 
 	// Binary semaphores for synchronizing the swapchain with the screen and the GPU
 	VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image acquisition TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)
@@ -167,6 +174,8 @@ typedef struct RendererState
 	Material defaultMaterial;										// Material based on default shader
 
 	// Data that is only used on startup/shutdown
+	VkFormat renderTargetColorFormat;								// Image format used for render target color textures
+	VkFormat renderTargetDepthFormat;								// Image format used for render target depth textures
 	VkInstance instance;											// Vulkan instance handle
 	VkPhysicalDevice physicalDevice;								// Physical device handle
 	SwapchainSupportDetails swapchainSupport;						// Data about swapchain capabilities
