@@ -10,7 +10,7 @@ layout(location = 1) in vec2 texCoord;
 layout(location = 2) in vec3 fragPosition;
 
 
-layout(set = 1, binding = 0) uniform UniformBufferObject
+layout(BIND 0) uniform UniformBufferObject
 {
     vec4 color;
     float roughness;

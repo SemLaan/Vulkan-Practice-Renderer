@@ -880,22 +880,6 @@ bool BeginRendering()
 
     DarraySetSize(vk_state->requestedQueueAcquisitionOperationsDarray, 0);
 
-    // Viewport and scissor
-    VkViewport viewport = {};
-    viewport.x = 0;
-    viewport.y = (f32)vk_state->swapchainExtent.height;
-    viewport.width = (f32)vk_state->swapchainExtent.width;
-    viewport.height = -(f32)vk_state->swapchainExtent.height;
-    viewport.minDepth = 1.0f;
-    viewport.maxDepth = 0.0f;
-    vkCmdSetViewport(currentCommandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor = {};
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent = vk_state->swapchainExtent;
-    vkCmdSetScissor(currentCommandBuffer, 0, 1, &scissor);
-
     // Binding global ubo
     VulkanShader* defaultShader = vk_state->defaultShader.internalState;
     vkCmdBindDescriptorSets(currentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, defaultShader->pipelineLayout, 0, 1, &vk_state->globalDescriptorSetArray[vk_state->currentInFlightFrameIndex], 0, nullptr);

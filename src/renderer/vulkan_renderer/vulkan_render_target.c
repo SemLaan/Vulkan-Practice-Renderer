@@ -339,6 +339,22 @@ void RenderTargetStartRendering(RenderTarget clientRenderTarget)
         renderingInfo.pDepthAttachment = nullptr;
     renderingInfo.pStencilAttachment = nullptr;
 
+    // Viewport and scissor
+    VkViewport viewport = {};
+    viewport.x = 0;
+    viewport.y = (f32)renderTarget->extent.height;
+    viewport.width = (f32)renderTarget->extent.width;
+    viewport.height = -(f32)renderTarget->extent.height;
+    viewport.minDepth = 1.0f;
+    viewport.maxDepth = 0.0f;
+    vkCmdSetViewport(currentCommandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent = renderTarget->extent;
+    vkCmdSetScissor(currentCommandBuffer, 0, 1, &scissor);
+
     vkCmdBeginRendering(currentCommandBuffer, &renderingInfo);
 }
 

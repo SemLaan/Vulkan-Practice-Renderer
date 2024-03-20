@@ -46,17 +46,22 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
         // Parsing the text
         char* uniformStart = nullptr;
 
+
+#define LAYOUT_TEXT "\nlayout(BIND "
+#define LAYOUT_TEXT_SIZE 14
+#define UNIFORM_TEXT ") uniform"
+#define UNIFORM_TEXT_SIZE 10
         // Finding the uniform block
         for (u32 i = 0; i < fileSize - 100 /*minus one hundred to not check past the end of the file after finding an enter in the last line*/; i++)
         {
             if (text[i] == '\n')
             {
-                if (MemoryCompare(text + i, "\nlayout(set = 1, binding = ", 27) && MemoryCompare(text + i + 28, ") uniform", 9) && BracketBeforeSemicolon(text + i + 28))
+                if (MemoryCompare(text + i, LAYOUT_TEXT, LAYOUT_TEXT_SIZE - 1) && MemoryCompare(text + i + LAYOUT_TEXT_SIZE, UNIFORM_TEXT, UNIFORM_TEXT_SIZE - 1) && BracketBeforeSemicolon(text + i + LAYOUT_TEXT_SIZE))
                 {
-                    ref_propertyData->bindingIndex = *(text + i + 27) - 48;
+                    ref_propertyData->bindingIndex = *(text + i + LAYOUT_TEXT_SIZE - 1) - /*going from char to int*/48;
 
                     // Setting uniform start to the actual start of the first white spaces before the actual uniform data
-                    uniformStart = text + i + 37;
+                    uniformStart = text + i + LAYOUT_TEXT_SIZE + UNIFORM_TEXT_SIZE - 1;
                     while (*uniformStart != '{')
                         uniformStart++;
                     uniformStart++;
@@ -197,6 +202,8 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
 
     // ============================================== Getting uniform texture data ============================================================
     {
+        #define UNIFORM_SAMPLER_TEXT ") uniform sampler2D"
+        #define UNIFORM_SAMPLER_TEXT_SIZE 20
         // Finding the uniform blocks
         ref_textureData->textureCount = 0;
         u32 bindingIndices[10];
@@ -206,12 +213,12 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
             GRASSERT_DEBUG(ref_textureData->textureCount < 8); // TODO: make the texture count limit higher if necessary, this needs to be coordinated with vulkan_shader and vulkan_material
             if (text[i] == '\n')
             {
-                if (MemoryCompare(text + i, "\nlayout(set = 1, binding = ", 27) && MemoryCompare(text + i + 28, ") uniform sampler2D", 19) && !BracketBeforeSemicolon(text + i + 28))
+                if (MemoryCompare(text + i, LAYOUT_TEXT, LAYOUT_TEXT_SIZE - 1) && MemoryCompare(text + i + LAYOUT_TEXT_SIZE, UNIFORM_SAMPLER_TEXT, UNIFORM_SAMPLER_TEXT_SIZE - 1) && !BracketBeforeSemicolon(text + i + LAYOUT_TEXT_SIZE))
                 {
-                    bindingIndices[ref_textureData->textureCount] = *(text + i + 27) - 48;
+                    bindingIndices[ref_textureData->textureCount] = *(text + i + LAYOUT_TEXT_SIZE - 1) - 48/*translating char to int*/;
 
                     // ===== Getting the property name
-                    char* namePtr = text + i + 48;
+                    char* namePtr = text + i + LAYOUT_TEXT_SIZE + UNIFORM_SAMPLER_TEXT_SIZE;
                     u32 nameLength = 0;
                     while (*namePtr != ';')
                     {
@@ -219,7 +226,7 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
                         nameLength++;
                     }
 
-                    MemoryCopy(nameStrings + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH, text + i + 48, nameLength);
+                    MemoryCopy(nameStrings + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH, text + i + LAYOUT_TEXT_SIZE + UNIFORM_SAMPLER_TEXT_SIZE, nameLength);
                     nameStrings[nameLength + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH] = '\0';
 
                     //_DEBUG("TexName: %s", nameStrings + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH);
