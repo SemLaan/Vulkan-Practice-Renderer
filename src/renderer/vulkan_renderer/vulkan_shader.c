@@ -17,6 +17,10 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
     VulkanShader* shader = (VulkanShader*)clientShader.internalState;
     MemoryZero(shader, sizeof(*shader));
 
+    bool fragmentShader = pCreateInfo->fragmentShaderName;
+    if (!fragmentShader)
+        pCreateInfo->fragmentShaderName = "no fragment shader";
+
     // Preparing filename strings
     char* compiledVertFilename = Alloc(vk_state->rendererAllocator, 4 * MAX_FILEPATH_SIZE, MEM_TAG_RENDERER_SUBSYS);
     char* compiledFragFilename = compiledVertFilename + MAX_FILEPATH_SIZE;
@@ -55,7 +59,14 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
     // ======================== Getting the properties/uniforms from the raw shader ==========================================================================
     // ============================================================================================================================================================
     GetUniformDataFromShader(rawVertFilename, &shader->vertUniformPropertiesData, &shader->vertUniformTexturesData);
-    GetUniformDataFromShader(rawFragFilename, &shader->fragUniformPropertiesData, &shader->fragUniformTexturesData);
+    if (fragmentShader)
+        GetUniformDataFromShader(rawFragFilename, &shader->fragUniformPropertiesData, &shader->fragUniformTexturesData);
+    else
+    {
+        shader->fragUniformPropertiesData.propertyCount = 0;
+        shader->fragUniformPropertiesData.uniformBufferSize = 0;
+        shader->fragUniformTexturesData.textureCount = 0;
+    }
 
     VkDeviceSize uniformBufferAlignmentRequirement = vk_state->deviceProperties.limits.minUniformBufferOffsetAlignment;
 
@@ -182,7 +193,8 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
     VkShaderModule vertShaderModule;
     VkShaderModule fragShaderModule;
     CreateShaderModule(compiledVertFilename, vk_state, &vertShaderModule);
-    CreateShaderModule(compiledFragFilename, vk_state, &fragShaderModule);
+    if (fragmentShader)
+        CreateShaderModule(compiledFragFilename, vk_state, &fragShaderModule);
 
     // Shader stages
     VkPipelineShaderStageCreateInfo shaderStagesCreateInfo[2] = {};
@@ -194,13 +206,16 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
     shaderStagesCreateInfo[0].pName = "main";
     shaderStagesCreateInfo[0].pSpecializationInfo = nullptr;
 
-    shaderStagesCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStagesCreateInfo[1].pNext = nullptr;
-    shaderStagesCreateInfo[1].flags = 0;
-    shaderStagesCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    shaderStagesCreateInfo[1].module = fragShaderModule;
-    shaderStagesCreateInfo[1].pName = "main";
-    shaderStagesCreateInfo[1].pSpecializationInfo = nullptr;
+    if (fragmentShader)
+    {
+        shaderStagesCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        shaderStagesCreateInfo[1].pNext = nullptr;
+        shaderStagesCreateInfo[1].flags = 0;
+        shaderStagesCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        shaderStagesCreateInfo[1].module = fragShaderModule;
+        shaderStagesCreateInfo[1].pName = "main";
+        shaderStagesCreateInfo[1].pSpecializationInfo = nullptr;
+    }
 
     // Vertex input
     VkVertexInputBindingDescription vertexBindingDescription = {};
@@ -355,7 +370,10 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
     graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     graphicsPipelineCreateInfo.pNext = &pipelineRenderingCreateInfo;
     graphicsPipelineCreateInfo.flags = 0;
-    graphicsPipelineCreateInfo.stageCount = 2;
+    if (fragmentShader)
+        graphicsPipelineCreateInfo.stageCount = 2;
+    else
+        graphicsPipelineCreateInfo.stageCount = 1;
     graphicsPipelineCreateInfo.pStages = shaderStagesCreateInfo;
     graphicsPipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;
     graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblerCreateInfo;
@@ -378,7 +396,8 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
     }
 
     vkDestroyShaderModule(vk_state->device, vertShaderModule, vk_state->vkAllocator);
-    vkDestroyShaderModule(vk_state->device, fragShaderModule, vk_state->vkAllocator);
+    if (fragmentShader)
+        vkDestroyShaderModule(vk_state->device, fragShaderModule, vk_state->vkAllocator);
 
     Free(vk_state->rendererAllocator, compiledVertFilename);
 

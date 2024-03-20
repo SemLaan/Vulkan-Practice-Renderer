@@ -26,10 +26,12 @@ typedef struct GameState
     Scene scene;
     Timer timer;
     RenderTarget shadowMapRenderTarget;
-    Shader simpleLightingShader;
-    Shader simpleTextureShader;
-    Material simpleLightingMaterial;
-    Material simpleTextureMaterial;
+    Shader lightingShader;
+    Shader uiTextureShader;
+    Shader shadowShader;
+    Material shadowMaterial;
+    Material lightingMaterial;
+    Material uiTextureMaterial;
     Texture texture;
     vec3 camPosition;
     vec3 camRotation;
@@ -104,21 +106,30 @@ void GameInit()
     gameState->shadowMapRenderTarget = RenderTargetCreate(500, 500, RENDER_TARGET_USAGE_NONE, RENDER_TARGET_USAGE_TEXTURE);
 
     ShaderCreateInfo shaderCreateInfo = {};
+    shaderCreateInfo.renderTargetStencil = false;
+
     shaderCreateInfo.vertexShaderName = "simple_shader";
     shaderCreateInfo.fragmentShaderName = "simple_shader";
-    shaderCreateInfo.renderTargetColor = false;
+    shaderCreateInfo.renderTargetColor = true;
     shaderCreateInfo.renderTargetDepth = true;
-    shaderCreateInfo.renderTargetStencil = false;
-    gameState->simpleLightingShader = ShaderCreate(&shaderCreateInfo);
+    gameState->lightingShader = ShaderCreate(&shaderCreateInfo);
+
     shaderCreateInfo.vertexShaderName = "ui_texture";
     shaderCreateInfo.fragmentShaderName = "ui_texture";
     shaderCreateInfo.renderTargetColor = true;
     shaderCreateInfo.renderTargetDepth = false;
-    gameState->simpleTextureShader = ShaderCreate(&shaderCreateInfo);
+    gameState->uiTextureShader = ShaderCreate(&shaderCreateInfo);
 
-    gameState->simpleLightingMaterial = MaterialCreate(gameState->simpleLightingShader);
-    gameState->simpleTextureMaterial = MaterialCreate(gameState->simpleTextureShader);
-    MaterialUpdateTexture(gameState->simpleTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget));
+    shaderCreateInfo.vertexShaderName = "shadow";
+    shaderCreateInfo.fragmentShaderName = nullptr;
+    shaderCreateInfo.renderTargetColor = false;
+    shaderCreateInfo.renderTargetDepth = true;
+    gameState->shadowShader = ShaderCreate(&shaderCreateInfo);
+
+    gameState->shadowMaterial = MaterialCreate(gameState->shadowShader);
+    gameState->lightingMaterial = MaterialCreate(gameState->lightingShader);
+    gameState->uiTextureMaterial = MaterialCreate(gameState->uiTextureShader);
+    MaterialUpdateTexture(gameState->uiTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget));
 
     u8 pixels[TEXTURE_CHANNELS * 2];
     pixels[0] = 255;
@@ -152,11 +163,13 @@ void GameShutdown()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
-    MaterialDestroy(gameState->simpleTextureMaterial);
-    ShaderDestroy(gameState->simpleTextureShader);
+    MaterialDestroy(gameState->shadowMaterial);
+    ShaderDestroy(gameState->shadowShader);
+    MaterialDestroy(gameState->uiTextureMaterial);
+    ShaderDestroy(gameState->uiTextureShader);
     RenderTargetDestroy(gameState->shadowMapRenderTarget);
-    MaterialDestroy(gameState->simpleLightingMaterial);
-    ShaderDestroy(gameState->simpleLightingShader);
+    MaterialDestroy(gameState->lightingMaterial);
+    ShaderDestroy(gameState->lightingShader);
     TextureDestroy(gameState->texture);
 
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
@@ -223,15 +236,17 @@ void GameUpdateAndRender()
     mat4 projView = mat4_mul_mat4(gameState->proj, gameState->view);
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
     float roughness = 0; // sin(TimerSecondsSinceStart(gameState->timer)) / 2 + 0.5f;
-    MaterialUpdateProperty(gameState->simpleLightingMaterial, "color", &testColor);
-    MaterialUpdateProperty(gameState->simpleLightingMaterial, "roughness", &roughness);
+    MaterialUpdateProperty(gameState->lightingMaterial, "color", &testColor);
+    MaterialUpdateProperty(gameState->lightingMaterial, "roughness", &roughness);
 
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
     mat4 uiProj = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
-    MaterialUpdateProperty(gameState->simpleTextureMaterial, "uiProjection", &uiProj);
+    MaterialUpdateProperty(gameState->uiTextureMaterial, "uiProjection", &uiProj);
 
     vec4 directionalLight = mat4_mul_vec4(mat4_rotate_z(/*TimerSecondsSinceStart(gameState->timer)*/ -1), vec4_create(1, 0, 0, 1));
+
+    MaterialUpdateProperty(gameState->shadowMaterial, "shadowProjView", &projView);
 
     GlobalUniformObject globalUniformObject = {};
     globalUniformObject.viewPosition = vec3_invert_sign(gameState->camPosition);
@@ -246,7 +261,7 @@ void GameUpdateAndRender()
 
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
     {
-        Draw(gameState->simpleLightingMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
+        Draw(gameState->shadowMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
     }
 
     RenderTargetStopRendering(gameState->shadowMapRenderTarget);
@@ -255,14 +270,14 @@ void GameUpdateAndRender()
 
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
     {
-        Draw(gameState->simpleLightingMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
+        Draw(gameState->lightingMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
     }
 
     mat4 translation = mat4_2Dtranslate((vec2){windowAspectRatio, 1});
     mat4 rotate = mat4_rotate_x(-PI / 2);
     mat4 scale = mat4_2Dscale((vec2){windowAspectRatio, 1});
     mat4 modelMatrix = mat4_mul_mat4(translation, mat4_mul_mat4(rotate, scale));
-    Draw(gameState->simpleTextureMaterial, gameState->scene.vertexBufferDarray[1], gameState->scene.indexBufferDarray[1], &modelMatrix);
+    Draw(gameState->uiTextureMaterial, gameState->scene.vertexBufferDarray[1], gameState->scene.indexBufferDarray[1], &modelMatrix);
 
     RenderTargetStopRendering(GetMainRenderTarget());
 
