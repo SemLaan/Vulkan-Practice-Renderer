@@ -4,7 +4,7 @@
 #include "containers/darray.h"
 
 #define TEXTURE_CHANNELS 4
-
+#define DEFAULT_SHADER_NAME "default"
 
 typedef enum RenderTargetUsage
 {
@@ -39,6 +39,15 @@ typedef struct Texture
 {
 	void* internalState;
 } Texture;
+
+typedef struct ShaderCreateInfo
+{
+	const char* vertexShaderName;
+	const char* fragmentShaderName;
+	bool renderTargetColor;
+	bool renderTargetDepth;
+	bool renderTargetStencil;// TODO: this does nothing yet
+} ShaderCreateInfo;
 
 // Handle to a shader
 typedef struct Shader

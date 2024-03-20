@@ -101,12 +101,23 @@ void GameInit()
     }
 
     // Initializing rendering state
-    gameState->shadowMapRenderTarget = RenderTargetCreate(2460, 1440, RENDER_TARGET_USAGE_TEXTURE, RENDER_TARGET_USAGE_TEXTURE);
-    gameState->simpleLightingShader = ShaderCreate("simple_shader");
+    gameState->shadowMapRenderTarget = RenderTargetCreate(2460, 1440, RENDER_TARGET_USAGE_NONE, RENDER_TARGET_USAGE_TEXTURE);
+    
+    ShaderCreateInfo shaderCreateInfo = {};
+    shaderCreateInfo.vertexShaderName = "simple_shader";
+    shaderCreateInfo.fragmentShaderName = "simple_shader";
+    shaderCreateInfo.renderTargetColor = false;
+    shaderCreateInfo.renderTargetDepth = true;
+    shaderCreateInfo.renderTargetStencil = false;
+    gameState->simpleLightingShader = ShaderCreate(&shaderCreateInfo);
+    shaderCreateInfo.vertexShaderName = "simple_texture";
+    shaderCreateInfo.fragmentShaderName = "simple_texture";
+    shaderCreateInfo.renderTargetColor = true;
+    gameState->simpleTextureShader = ShaderCreate(&shaderCreateInfo);
+
     gameState->simpleLightingMaterial = MaterialCreate(gameState->simpleLightingShader);
-    gameState->simpleTextureShader = ShaderCreate("simple_texture");
     gameState->simpleTextureMaterial = MaterialCreate(gameState->simpleTextureShader);
-    MaterialUpdateTexture(gameState->simpleTextureMaterial, "tex", GetColorAsTexture(gameState->shadowMapRenderTarget));
+    MaterialUpdateTexture(gameState->simpleTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget));
 
     u8 pixels[TEXTURE_CHANNELS * 2];
     pixels[0] = 255;
@@ -210,7 +221,9 @@ void GameUpdateAndRender()
     // ============================ Rendering ===================================
     mat4 projView = mat4_mul_mat4(gameState->proj, gameState->view);
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
+    float roughness = 0;//sin(TimerSecondsSinceStart(gameState->timer)) / 2 + 0.5f;
     MaterialUpdateProperty(gameState->simpleLightingMaterial, "color", &testColor);
+    MaterialUpdateProperty(gameState->simpleLightingMaterial, "roughness", &roughness);
 
     vec4 directionalLight = mat4_mul_vec4(mat4_rotate_z(/*TimerSecondsSinceStart(gameState->timer)*/-1), vec4_create(1, 0, 0, 1));
 

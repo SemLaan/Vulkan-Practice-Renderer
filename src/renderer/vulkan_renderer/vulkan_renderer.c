@@ -648,7 +648,13 @@ bool InitializeRenderer()
     // ============================================================================================================================================================
     // ============================ Creating default shader and material ======================================================================================================
     // ============================================================================================================================================================
-    vk_state->defaultShader = ShaderCreate("default");
+    ShaderCreateInfo shaderCreateInfo = {};
+    shaderCreateInfo.vertexShaderName = DEFAULT_SHADER_NAME;
+    shaderCreateInfo.fragmentShaderName = DEFAULT_SHADER_NAME;
+    shaderCreateInfo.renderTargetColor = true;
+    shaderCreateInfo.renderTargetDepth = true;
+    shaderCreateInfo.renderTargetStencil = false;
+    vk_state->defaultShader = ShaderCreate(&shaderCreateInfo);
     vk_state->defaultMaterial = MaterialCreate(vk_state->defaultShader);
     vec4 defaultColor = vec4_create(1, 0.5f, 1, 1);
     MaterialUpdateProperty(vk_state->defaultMaterial, "color", &defaultColor);

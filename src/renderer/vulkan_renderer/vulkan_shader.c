@@ -10,7 +10,7 @@
 
 #define MAX_FILEPATH_SIZE 100
 
-Shader ShaderCreate(const char* shaderName)
+Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
 {
     Shader clientShader;
     clientShader.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanShader), MEM_TAG_RENDERER_SUBSYS);
@@ -23,7 +23,8 @@ Shader ShaderCreate(const char* shaderName)
     char* rawVertFilename = compiledFragFilename + MAX_FILEPATH_SIZE;
     char* rawFragFilename = rawVertFilename + MAX_FILEPATH_SIZE;
 
-    u32 shaderNameLength = strlen(shaderName);
+    u32 vertShaderNameLength = strlen(pCreateInfo->vertexShaderName);
+    u32 fragShaderNameLength = strlen(pCreateInfo->fragmentShaderName);
 
 #define SHADERS_PREFIX_LENGTH 8
     const char* shaderFolderPrefix = "shaders/";
@@ -35,20 +36,20 @@ Shader ShaderCreate(const char* shaderName)
     MemoryCopy(rawFragFilename, shaderFolderPrefix, SHADERS_PREFIX_LENGTH);
 
     // Adding filename
-    MemoryCopy(compiledVertFilename + SHADERS_PREFIX_LENGTH, shaderName, shaderNameLength);
-    MemoryCopy(compiledFragFilename + SHADERS_PREFIX_LENGTH, shaderName, shaderNameLength);
-    MemoryCopy(rawVertFilename + SHADERS_PREFIX_LENGTH, shaderName, shaderNameLength);
-    MemoryCopy(rawFragFilename + SHADERS_PREFIX_LENGTH, shaderName, shaderNameLength);
+    MemoryCopy(compiledVertFilename + SHADERS_PREFIX_LENGTH, pCreateInfo->vertexShaderName, vertShaderNameLength);
+    MemoryCopy(compiledFragFilename + SHADERS_PREFIX_LENGTH, pCreateInfo->fragmentShaderName, fragShaderNameLength);
+    MemoryCopy(rawVertFilename + SHADERS_PREFIX_LENGTH, pCreateInfo->vertexShaderName, vertShaderNameLength);
+    MemoryCopy(rawFragFilename + SHADERS_PREFIX_LENGTH, pCreateInfo->fragmentShaderName, fragShaderNameLength);
 
     // Adding different postfixes
     const char* vertPostfix = ".vert.spv";
     const char* fragPostfix = ".frag.spv";
     const char* rawVertPostfix = ".vert";
     const char* rawFragPostfix = ".frag";
-    MemoryCopy(compiledVertFilename + SHADERS_PREFIX_LENGTH + shaderNameLength, vertPostfix, 10);
-    MemoryCopy(compiledFragFilename + SHADERS_PREFIX_LENGTH + shaderNameLength, fragPostfix, 10);
-    MemoryCopy(rawVertFilename + SHADERS_PREFIX_LENGTH + shaderNameLength, rawVertPostfix, 6);
-    MemoryCopy(rawFragFilename + SHADERS_PREFIX_LENGTH + shaderNameLength, rawFragPostfix, 6);
+    MemoryCopy(compiledVertFilename + SHADERS_PREFIX_LENGTH + vertShaderNameLength, vertPostfix, 10);
+    MemoryCopy(compiledFragFilename + SHADERS_PREFIX_LENGTH + fragShaderNameLength, fragPostfix, 10);
+    MemoryCopy(rawVertFilename + SHADERS_PREFIX_LENGTH + vertShaderNameLength, rawVertPostfix, 6);
+    MemoryCopy(rawFragFilename + SHADERS_PREFIX_LENGTH + fragShaderNameLength, rawFragPostfix, 6);
 
     // ============================================================================================================================================================
     // ======================== Getting the properties/uniforms from the raw shader ==========================================================================
@@ -284,18 +285,32 @@ Shader ShaderCreate(const char* shaderName)
     depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencilCreateInfo.pNext = nullptr;
     depthStencilCreateInfo.flags = 0;
-    depthStencilCreateInfo.depthTestEnable = VK_TRUE;
-    depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
+    if (pCreateInfo->renderTargetDepth)
+    {
+        depthStencilCreateInfo.depthTestEnable = VK_TRUE;
+        depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
+    }
+    else
+    {
+        depthStencilCreateInfo.depthTestEnable = VK_FALSE;
+        depthStencilCreateInfo.depthWriteEnable = VK_FALSE;
+    }
     depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
     depthStencilCreateInfo.minDepthBounds = 0;
     depthStencilCreateInfo.maxDepthBounds = 0;
-    depthStencilCreateInfo.stencilTestEnable = VK_FALSE;
+    if (pCreateInfo->renderTargetStencil)
+        depthStencilCreateInfo.stencilTestEnable = VK_TRUE;
+    else
+        depthStencilCreateInfo.stencilTestEnable = VK_FALSE;
 
     // Blending
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_TRUE;
+    if (pCreateInfo->renderTargetColor)
+        colorBlendAttachment.blendEnable = VK_TRUE;
+    else
+        colorBlendAttachment.blendEnable = VK_FALSE;
     colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
@@ -327,7 +342,10 @@ Shader ShaderCreate(const char* shaderName)
     pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     pipelineRenderingCreateInfo.pNext = nullptr;
     pipelineRenderingCreateInfo.viewMask = 0;
-    pipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    if (pCreateInfo->renderTargetColor)
+        pipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    else
+        pipelineRenderingCreateInfo.colorAttachmentCount = 0;
     pipelineRenderingCreateInfo.pColorAttachmentFormats = &vk_state->renderTargetColorFormat;
     pipelineRenderingCreateInfo.depthAttachmentFormat = vk_state->renderTargetDepthFormat;
     pipelineRenderingCreateInfo.stencilAttachmentFormat = vk_state->renderTargetDepthFormat;

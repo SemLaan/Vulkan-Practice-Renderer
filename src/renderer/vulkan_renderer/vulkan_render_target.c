@@ -193,6 +193,8 @@ void RenderTargetDestroy(RenderTarget clientRenderTarget)
             vkDestroyImage(vk_state->device, renderTarget->depthImage.handle, vk_state->vkAllocator);
         if (renderTarget->depthImage.memory)
             vkFreeMemory(vk_state->device, renderTarget->depthImage.memory, vk_state->vkAllocator);
+        if (renderTarget->depthBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
+            vkDestroySampler(vk_state->device, renderTarget->depthImage.sampler, vk_state->vkAllocator);
     }
 
     if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_DISPLAY || renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
@@ -203,6 +205,8 @@ void RenderTargetDestroy(RenderTarget clientRenderTarget)
             vkDestroyImage(vk_state->device, renderTarget->colorImage.handle, vk_state->vkAllocator);
         if (renderTarget->colorImage.memory)
             vkFreeMemory(vk_state->device, renderTarget->colorImage.memory, vk_state->vkAllocator);
+        if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
+            vkDestroySampler(vk_state->device, renderTarget->colorImage.sampler, vk_state->vkAllocator);
     }
 }
 
@@ -216,24 +220,27 @@ void RenderTargetStartRendering(RenderTarget clientRenderTarget)
         VkImageMemoryBarrier2 rendertargetTransitionImageBarrierInfos[2] = {};
         u32 barrierCount = 0;
 
-        // Transitioning color image
-        rendertargetTransitionImageBarrierInfos[barrierCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        rendertargetTransitionImageBarrierInfos[barrierCount].pNext = nullptr;
-        rendertargetTransitionImageBarrierInfos[barrierCount].srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-        rendertargetTransitionImageBarrierInfos[barrierCount].srcAccessMask = VK_ACCESS_2_NONE;
-        rendertargetTransitionImageBarrierInfos[barrierCount].dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        rendertargetTransitionImageBarrierInfos[barrierCount].dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        rendertargetTransitionImageBarrierInfos[barrierCount].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        rendertargetTransitionImageBarrierInfos[barrierCount].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        rendertargetTransitionImageBarrierInfos[barrierCount].srcQueueFamilyIndex = 0;
-        rendertargetTransitionImageBarrierInfos[barrierCount].dstQueueFamilyIndex = 0;
-        rendertargetTransitionImageBarrierInfos[barrierCount].image = renderTarget->colorImage.handle;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.baseMipLevel = 0;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.levelCount = 1;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.baseArrayLayer = 0;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.layerCount = 1;
-        barrierCount++;
+        // Transitioning color image if there is one
+        if (renderTarget->colorBufferUsage != RENDER_TARGET_USAGE_NONE)
+        {
+            rendertargetTransitionImageBarrierInfos[barrierCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            rendertargetTransitionImageBarrierInfos[barrierCount].pNext = nullptr;
+            rendertargetTransitionImageBarrierInfos[barrierCount].srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+            rendertargetTransitionImageBarrierInfos[barrierCount].srcAccessMask = VK_ACCESS_2_NONE;
+            rendertargetTransitionImageBarrierInfos[barrierCount].dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            rendertargetTransitionImageBarrierInfos[barrierCount].dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            rendertargetTransitionImageBarrierInfos[barrierCount].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            rendertargetTransitionImageBarrierInfos[barrierCount].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            rendertargetTransitionImageBarrierInfos[barrierCount].srcQueueFamilyIndex = 0;
+            rendertargetTransitionImageBarrierInfos[barrierCount].dstQueueFamilyIndex = 0;
+            rendertargetTransitionImageBarrierInfos[barrierCount].image = renderTarget->colorImage.handle;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.baseMipLevel = 0;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.levelCount = 1;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.baseArrayLayer = 0;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.layerCount = 1;
+            barrierCount++;
+        }
 
         // Transitioning depth image if a transition is required (which is only if it is used as a texture aswell)
         if (renderTarget->depthBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
@@ -347,34 +354,37 @@ void RenderTargetStopRendering(RenderTarget clientRenderTarget)
         VkImageMemoryBarrier2 rendertargetTransitionImageBarrierInfos[2] = {};
         u32 barrierCount = 0;
 
-        // Transitioning color image
-        rendertargetTransitionImageBarrierInfos[barrierCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        rendertargetTransitionImageBarrierInfos[barrierCount].pNext = nullptr;
-        rendertargetTransitionImageBarrierInfos[barrierCount].srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        rendertargetTransitionImageBarrierInfos[barrierCount].srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_DISPLAY)
+        // Transitioning color image if there is one
+        if (renderTarget->colorBufferUsage != RENDER_TARGET_USAGE_NONE)
         {
-            rendertargetTransitionImageBarrierInfos[barrierCount].dstStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
-            rendertargetTransitionImageBarrierInfos[barrierCount].dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            rendertargetTransitionImageBarrierInfos[barrierCount].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            rendertargetTransitionImageBarrierInfos[barrierCount].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            rendertargetTransitionImageBarrierInfos[barrierCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            rendertargetTransitionImageBarrierInfos[barrierCount].pNext = nullptr;
+            rendertargetTransitionImageBarrierInfos[barrierCount].srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            rendertargetTransitionImageBarrierInfos[barrierCount].srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_DISPLAY)
+            {
+                rendertargetTransitionImageBarrierInfos[barrierCount].dstStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+                rendertargetTransitionImageBarrierInfos[barrierCount].dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+                rendertargetTransitionImageBarrierInfos[barrierCount].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                rendertargetTransitionImageBarrierInfos[barrierCount].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            }
+            else if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
+            {
+                rendertargetTransitionImageBarrierInfos[barrierCount].dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+                rendertargetTransitionImageBarrierInfos[barrierCount].dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+                rendertargetTransitionImageBarrierInfos[barrierCount].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                rendertargetTransitionImageBarrierInfos[barrierCount].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            }
+            rendertargetTransitionImageBarrierInfos[barrierCount].srcQueueFamilyIndex = 0;
+            rendertargetTransitionImageBarrierInfos[barrierCount].dstQueueFamilyIndex = 0;
+            rendertargetTransitionImageBarrierInfos[barrierCount].image = renderTarget->colorImage.handle;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.baseMipLevel = 0;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.levelCount = 1;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.baseArrayLayer = 0;
+            rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.layerCount = 1;
+            barrierCount++;
         }
-        else if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
-        {
-            rendertargetTransitionImageBarrierInfos[barrierCount].dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-            rendertargetTransitionImageBarrierInfos[barrierCount].dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-            rendertargetTransitionImageBarrierInfos[barrierCount].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            rendertargetTransitionImageBarrierInfos[barrierCount].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        }
-        rendertargetTransitionImageBarrierInfos[barrierCount].srcQueueFamilyIndex = 0;
-        rendertargetTransitionImageBarrierInfos[barrierCount].dstQueueFamilyIndex = 0;
-        rendertargetTransitionImageBarrierInfos[barrierCount].image = renderTarget->colorImage.handle;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.baseMipLevel = 0;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.levelCount = 1;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.baseArrayLayer = 0;
-        rendertargetTransitionImageBarrierInfos[barrierCount].subresourceRange.layerCount = 1;
-        barrierCount++;
 
         // Transitioning depth image if a transition is required (which is only if it is used as a texture aswell)
         if (renderTarget->depthBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
