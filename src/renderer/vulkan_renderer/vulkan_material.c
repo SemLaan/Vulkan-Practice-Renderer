@@ -19,8 +19,11 @@ Material MaterialCreate(Shader clientShader)
     // ============================================================================================================================================================
     // ======================== Creating uniform buffers ============================================================================
     // ============================================================================================================================================================
-    CreateBuffer(shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBuffer, &material->uniformBufferMemory);
-    vkMapMemory(vk_state->device, material->uniformBufferMemory, 0, shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, 0, &material->uniformBufferMapped);
+    if (shader->totalUniformDataSize > 0)
+    {
+        CreateBuffer(shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBuffer, &material->uniformBufferMemory);
+        vkMapMemory(vk_state->device, material->uniformBufferMemory, 0, shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, 0, &material->uniformBufferMapped);
+    }
 
     // ============================================================================================================================================================
     // ======================== Allocating descriptor sets ============================================================================
@@ -144,10 +147,14 @@ Material MaterialCreate(Shader clientShader)
 void MaterialDestroy(Material clientMaterial)
 {
     VulkanMaterial* material = clientMaterial.internalState;
+    VulkanShader* shader = material->shader;
 
-    vkUnmapMemory(vk_state->device, material->uniformBufferMemory);
-    vkDestroyBuffer(vk_state->device, material->uniformBuffer, vk_state->vkAllocator);
-    vkFreeMemory(vk_state->device, material->uniformBufferMemory, vk_state->vkAllocator);
+    if (shader->totalUniformDataSize > 0)
+    {
+        vkUnmapMemory(vk_state->device, material->uniformBufferMemory);
+        vkDestroyBuffer(vk_state->device, material->uniformBuffer, vk_state->vkAllocator);
+        vkFreeMemory(vk_state->device, material->uniformBufferMemory, vk_state->vkAllocator);
+    }
 
     Free(vk_state->rendererAllocator, material);
 }

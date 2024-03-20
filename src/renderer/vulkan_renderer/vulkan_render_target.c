@@ -1,8 +1,8 @@
 #include "../render_target.h"
+#include "core/asserts.h"
 #include "vulkan_command_buffer.h"
-#include "vulkan_types.h"
-
 #include "vulkan_image.h"
+#include "vulkan_types.h"
 
 RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBufferUsage, RenderTargetUsage depthBufferUsage)
 {
@@ -32,6 +32,35 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
 
         CreateImage(&createImageParameters, &renderTarget->colorImage);
         CreateImageView(&renderTarget->colorImage, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        // Creating sampler if this render target's color buffer will be used as texture
+        if (colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
+        {
+            VkSamplerCreateInfo samplerCreateInfo = {};
+            samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            samplerCreateInfo.pNext = nullptr;
+            samplerCreateInfo.flags = 0;
+            samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+            samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+            samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCreateInfo.anisotropyEnable = VK_FALSE;
+            samplerCreateInfo.maxAnisotropy = 1.0f;
+            samplerCreateInfo.compareEnable = VK_FALSE;
+            samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+            samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            samplerCreateInfo.mipLodBias = 0.0f;
+            samplerCreateInfo.minLod = 0.0f;
+            samplerCreateInfo.maxLod = 0.0f;
+            samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+
+            if (VK_SUCCESS != vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &renderTarget->colorImage.sampler))
+            {
+                GRASSERT_MSG(false, "failed to create image sampler");
+            }
+        }
 
         CommandBuffer oneTimeCommandBuffer = {};
         AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
@@ -83,7 +112,36 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
         createImageParameters.properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
         CreateImage(&createImageParameters, &renderTarget->depthImage);
-        CreateImageView(&renderTarget->depthImage, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+        CreateImageView(&renderTarget->depthImage, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+        // Creating sampler if this render target's depth buffer will be used as texture
+        if (depthBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
+        {
+            VkSamplerCreateInfo samplerCreateInfo = {};
+            samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            samplerCreateInfo.pNext = nullptr;
+            samplerCreateInfo.flags = 0;
+            samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+            samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+            samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCreateInfo.anisotropyEnable = VK_FALSE;
+            samplerCreateInfo.maxAnisotropy = 1.0f;
+            samplerCreateInfo.compareEnable = VK_FALSE;
+            samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+            samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            samplerCreateInfo.mipLodBias = 0.0f;
+            samplerCreateInfo.minLod = 0.0f;
+            samplerCreateInfo.maxLod = 0.0f;
+            samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+
+            if (VK_SUCCESS != vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &renderTarget->depthImage.sampler))
+            {
+                GRASSERT_MSG(false, "failed to create image sampler");
+            }
+        }
 
         CommandBuffer oneTimeCommandBuffer = {};
         AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
@@ -354,5 +412,24 @@ void RenderTargetStopRendering(RenderTarget clientRenderTarget)
     }
 }
 
-Texture GetColorAsTexture(RenderTarget clientRenderTarget);
-Texture GetDepthAsTexture(RenderTarget clientRenderTarget);
+Texture GetColorAsTexture(RenderTarget clientRenderTarget)
+{
+    VulkanRenderTarget* renderTarget = clientRenderTarget.internalState;
+
+    GRASSERT(renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE);
+
+    Texture texture = {};
+    texture.internalState = &renderTarget->colorImage;
+    return texture;
+}
+
+Texture GetDepthAsTexture(RenderTarget clientRenderTarget)
+{
+    VulkanRenderTarget* renderTarget = clientRenderTarget.internalState;
+
+    GRASSERT(renderTarget->depthBufferUsage == RENDER_TARGET_USAGE_TEXTURE);
+
+    Texture texture = {};
+    texture.internalState = &renderTarget->depthImage;
+    return texture;
+}

@@ -25,8 +25,11 @@ typedef struct GameState
 {
     Scene scene;
     Timer timer;
-    Shader shader;
-    Material material;
+    RenderTarget shadowMapRenderTarget;
+    Shader simpleLightingShader;
+    Shader simpleTextureShader;
+    Material simpleLightingMaterial;
+    Material simpleTextureMaterial;
     Texture texture;
     vec3 camPosition;
     vec3 camRotation;
@@ -45,7 +48,7 @@ bool OnWindowResize(EventCode type, EventData data)
 {
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
-    gameState->proj = mat4_perspective(45.0f, windowAspectRatio, 0.1f, 1000.0f);
+    gameState->proj = mat4_perspective(45.0f, windowAspectRatio, 0.1f, 200.0f);
     return false;
 }
 
@@ -98,8 +101,12 @@ void GameInit()
     }
 
     // Initializing rendering state
-    gameState->shader = ShaderCreate("simple_shader");
-    gameState->material = MaterialCreate(gameState->shader);
+    gameState->shadowMapRenderTarget = RenderTargetCreate(2460, 1440, RENDER_TARGET_USAGE_TEXTURE, RENDER_TARGET_USAGE_TEXTURE);
+    gameState->simpleLightingShader = ShaderCreate("simple_shader");
+    gameState->simpleLightingMaterial = MaterialCreate(gameState->simpleLightingShader);
+    gameState->simpleTextureShader = ShaderCreate("simple_texture");
+    gameState->simpleTextureMaterial = MaterialCreate(gameState->simpleTextureShader);
+    MaterialUpdateTexture(gameState->simpleTextureMaterial, "tex", GetColorAsTexture(gameState->shadowMapRenderTarget));
 
     u8 pixels[TEXTURE_CHANNELS * 2];
     pixels[0] = 255;
@@ -133,8 +140,11 @@ void GameShutdown()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
-    MaterialDestroy(gameState->material);
-    ShaderDestroy(gameState->shader);
+    MaterialDestroy(gameState->simpleTextureMaterial);
+    ShaderDestroy(gameState->simpleTextureShader);
+    RenderTargetDestroy(gameState->shadowMapRenderTarget);
+    MaterialDestroy(gameState->simpleLightingMaterial);
+    ShaderDestroy(gameState->simpleLightingShader);
     TextureDestroy(gameState->texture);
 
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
@@ -200,7 +210,7 @@ void GameUpdateAndRender()
     // ============================ Rendering ===================================
     mat4 projView = mat4_mul_mat4(gameState->proj, gameState->view);
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
-    MaterialUpdateProperty(gameState->material, "color", &testColor);
+    MaterialUpdateProperty(gameState->simpleLightingMaterial, "color", &testColor);
 
     vec4 directionalLight = mat4_mul_vec4(mat4_rotate_z(/*TimerSecondsSinceStart(gameState->timer)*/-1), vec4_create(1, 0, 0, 1));
 
@@ -216,11 +226,23 @@ void GameUpdateAndRender()
     if (!BeginRendering())
         return;
 
+    RenderTargetStartRendering(gameState->shadowMapRenderTarget);
+
+    for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
+    {
+        Draw(gameState->simpleLightingMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
+    }
+
+    RenderTargetStopRendering(gameState->shadowMapRenderTarget);
+
     RenderTargetStartRendering(GetMainRenderTarget());
 
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
     {
-        Draw(gameState->material, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
+        if (i != 1)
+            Draw(gameState->simpleLightingMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
+        else
+            Draw(gameState->simpleTextureMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
     }
 
     RenderTargetStopRendering(GetMainRenderTarget());
