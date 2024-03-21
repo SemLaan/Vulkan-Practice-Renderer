@@ -12,18 +12,33 @@ layout(location = 2) in vec3 fragPosition;
 
 layout(BIND 0) uniform UniformBufferObject
 {
+    mat4 lightTransform;
     vec4 color;
     float roughness;
 } ubo;
+
+layout(BIND 1) uniform sampler2D shadowMap;
+
 
 void main() 
 {
     vec3 norm = normalize(normal);
 
-    float light = BlinnPhongSpecular(norm, globalubo.viewPosition, fragPosition, globalubo.directionalLight, ubo.roughness);
-    light += LambertianDiffuseSimple(norm, globalubo.directionalLight);
+    //float rawDepth = 1 - texture(tex, vec2(texCoord.x, 1-texCoord.y)).r;
+    vec4 shadowPosition = ubo.lightTransform * vec4(fragPosition, 1);
+    vec2 shadowCoords = shadowPosition.xy * 0.5 + 0.5;
+    float closestDepth = texture(shadowMap, vec2(shadowCoords.x, 1-shadowCoords.y)).r;
+
+    //float bias = max(0.03 * (1.0 - dot(norm, globalubo.directionalLight)), 0.02);
+    float bias = 0.005;  
+    float shadow = closestDepth > (1-shadowPosition.z) - bias ? 1.0 : 0.0;
+
+
+    float specular = BlinnPhongSpecular(norm, globalubo.viewPosition, fragPosition, globalubo.directionalLight, ubo.roughness);
+    float diffuse = LambertianDiffuseSimple(norm, globalubo.directionalLight);
     // Ambient
-    light += 0.1;
+    float light = 0.1 + (diffuse + specular) * shadow;
 
     outColor = ubo.color * vec4(light, light, light, 1);
+    //outColor = vec4(shadowCoords.x, shadowCoords.y, 0, 1);
 }

@@ -50,7 +50,7 @@ bool OnWindowResize(EventCode type, EventData data)
 {
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
-    gameState->proj = mat4_perspective(45.0f, windowAspectRatio, 0.1f, 200.0f);
+    gameState->proj = mat4_perspective(45.0f, windowAspectRatio, 1.0f, 200.0f);
     return false;
 }
 
@@ -103,7 +103,7 @@ void GameInit()
     }
 
     // Initializing rendering state
-    gameState->shadowMapRenderTarget = RenderTargetCreate(500, 500, RENDER_TARGET_USAGE_NONE, RENDER_TARGET_USAGE_TEXTURE);
+    gameState->shadowMapRenderTarget = RenderTargetCreate(2000, 2000, RENDER_TARGET_USAGE_NONE, RENDER_TARGET_USAGE_TEXTURE);
 
     ShaderCreateInfo shaderCreateInfo = {};
     shaderCreateInfo.renderTargetStencil = false;
@@ -130,6 +130,7 @@ void GameInit()
     gameState->lightingMaterial = MaterialCreate(gameState->lightingShader);
     gameState->uiTextureMaterial = MaterialCreate(gameState->uiTextureShader);
     MaterialUpdateTexture(gameState->uiTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget));
+    MaterialUpdateTexture(gameState->lightingMaterial, "shadowMap", GetDepthAsTexture(gameState->shadowMapRenderTarget));
 
     u8 pixels[TEXTURE_CHANNELS * 2];
     pixels[0] = 255;
@@ -146,7 +147,7 @@ void GameInit()
     // Initializing camera
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
-    gameState->proj = mat4_perspective(45.0f, windowAspectRatio, 0.1f, 1000.0f);
+    gameState->proj = mat4_perspective(45.0f, windowAspectRatio, 1.0f, 200.0f);
     gameState->view = mat4_identity();
     gameState->camPosition = (vec3){0, -5, -10};
     gameState->camRotation = (vec3){0, 0, 0};
@@ -235,23 +236,35 @@ void GameUpdateAndRender()
     // ============================ Rendering ===================================
     mat4 projView = mat4_mul_mat4(gameState->proj, gameState->view);
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
-    float roughness = 0; // sin(TimerSecondsSinceStart(gameState->timer)) / 2 + 0.5f;
+    f32 roughness = 0; // sin(TimerSecondsSinceStart(gameState->timer)) / 2 + 0.5f;
     MaterialUpdateProperty(gameState->lightingMaterial, "color", &testColor);
     MaterialUpdateProperty(gameState->lightingMaterial, "roughness", &roughness);
 
     vec2i windowSize = GetPlatformWindowSize();
-    float windowAspectRatio = windowSize.x / (float)windowSize.y;
+    f32 windowAspectRatio = windowSize.x / (float)windowSize.y;
     mat4 uiProj = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
     MaterialUpdateProperty(gameState->uiTextureMaterial, "uiProjection", &uiProj);
 
-    vec4 directionalLight = mat4_mul_vec4(mat4_rotate_z(/*TimerSecondsSinceStart(gameState->timer)*/ -1), vec4_create(1, 0, 0, 1));
+    vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
+    mat4 shadowRotation = mat4_rotate_xyz(vec3_invert_sign(lightRotationVec));
 
-    MaterialUpdateProperty(gameState->shadowMaterial, "shadowProjView", &projView);
+    vec3 directionalLight = {shadowRotation.values[2 + COL4(0)], shadowRotation.values[2 + COL4(1)], shadowRotation.values[2 + COL4(2)]};
+
+    f32 zNear = 1;
+    f32 zFar = 60;
+    mat4 shadowProj = mat4_orthographic(-20, 20, -20, 20, zNear, zFar);
+    mat4 shadowTranslate = mat4_3Dtranslate(vec3_create(0, 0, -40));
+    mat4 shadowView = mat4_mul_mat4(shadowTranslate, shadowRotation);
+    mat4 shadowProjView = mat4_mul_mat4(shadowProj, shadowView);
+    MaterialUpdateProperty(gameState->shadowMaterial, "shadowProjView", &shadowProjView);
+    MaterialUpdateProperty(gameState->lightingMaterial, "lightTransform", &shadowProjView);
+    MaterialUpdateProperty(gameState->uiTextureMaterial, "zNear", &zNear);
+    MaterialUpdateProperty(gameState->uiTextureMaterial, "zFar", &zFar);
 
     GlobalUniformObject globalUniformObject = {};
     globalUniformObject.viewPosition = vec3_invert_sign(gameState->camPosition);
     globalUniformObject.projView = projView;
-    globalUniformObject.directionalLight = vec4_to_vec3(directionalLight);
+    globalUniformObject.directionalLight = directionalLight;
     UpdateGlobalUniform(&globalUniformObject);
 
     if (!BeginRendering())
