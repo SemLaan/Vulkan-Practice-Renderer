@@ -29,10 +29,12 @@ void main()
     vec2 shadowCoords = shadowPosition.xy * 0.5 + 0.5;
     float closestDepth = texture(shadowMap, vec2(shadowCoords.x, 1-shadowCoords.y)).r;
 
-    //float bias = max(0.03 * (1.0 - dot(norm, globalubo.directionalLight)), 0.02);
-    float bias = 0.005;  
-    float shadow = closestDepth > (1-shadowPosition.z) - bias ? 1.0 : 0.0;
+    float bias = max(0.001 * (1.0 - dot(norm, globalubo.directionalLight)), 0.0001);
+    //float bias = 0.005;  
+    float shadow = closestDepth > min(1-shadowPosition.z, 1) - bias ? 1.0 : 0.0;
 
+    if (1-shadowPosition.z > 1)
+        shadow = 1;
 
     float specular = BlinnPhongSpecular(norm, globalubo.viewPosition, fragPosition, globalubo.directionalLight, ubo.roughness);
     float diffuse = LambertianDiffuseSimple(norm, globalubo.directionalLight);

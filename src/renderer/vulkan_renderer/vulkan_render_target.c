@@ -123,9 +123,9 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
             samplerCreateInfo.flags = 0;
             samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
             samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-            samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+            samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+            samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
             samplerCreateInfo.anisotropyEnable = VK_FALSE;
             samplerCreateInfo.maxAnisotropy = 1.0f;
             samplerCreateInfo.compareEnable = VK_FALSE;
@@ -134,7 +134,7 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
             samplerCreateInfo.mipLodBias = 0.0f;
             samplerCreateInfo.minLod = 0.0f;
             samplerCreateInfo.maxLod = 0.0f;
-            samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
             samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
 
             if (VK_SUCCESS != vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &renderTarget->depthImage.sampler))

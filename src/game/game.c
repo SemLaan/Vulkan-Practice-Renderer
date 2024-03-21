@@ -251,7 +251,7 @@ void GameUpdateAndRender()
     vec3 directionalLight = {shadowRotation.values[2 + COL4(0)], shadowRotation.values[2 + COL4(1)], shadowRotation.values[2 + COL4(2)]};
 
     f32 zNear = 1;
-    f32 zFar = 60;
+    f32 zFar = 200;
     mat4 shadowProj = mat4_orthographic(-20, 20, -20, 20, zNear, zFar);
     mat4 shadowTranslate = mat4_3Dtranslate(vec3_create(0, 0, -40));
     mat4 shadowView = mat4_mul_mat4(shadowTranslate, shadowRotation);
