@@ -103,7 +103,7 @@ void GameInit()
     }
 
     // Initializing rendering state
-    gameState->shadowMapRenderTarget = RenderTargetCreate(2000, 2000, RENDER_TARGET_USAGE_NONE, RENDER_TARGET_USAGE_TEXTURE);
+    gameState->shadowMapRenderTarget = RenderTargetCreate(4000, 4000, RENDER_TARGET_USAGE_NONE, RENDER_TARGET_USAGE_TEXTURE);
 
     ShaderCreateInfo shaderCreateInfo = {};
     shaderCreateInfo.renderTargetStencil = false;
@@ -240,12 +240,15 @@ void GameUpdateAndRender()
     MaterialUpdateProperty(gameState->lightingMaterial, "color", &testColor);
     MaterialUpdateProperty(gameState->lightingMaterial, "roughness", &roughness);
 
+    
+
     vec2i windowSize = GetPlatformWindowSize();
     f32 windowAspectRatio = windowSize.x / (float)windowSize.y;
     mat4 uiProj = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
     MaterialUpdateProperty(gameState->uiTextureMaterial, "uiProjection", &uiProj);
 
-    vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
+    //vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
+    vec3 lightRotationVec = vec3_create(0.5f, PI/2, 0);
     mat4 shadowRotation = mat4_rotate_xyz(vec3_invert_sign(lightRotationVec));
 
     vec3 directionalLight = {shadowRotation.values[2 + COL4(0)], shadowRotation.values[2 + COL4(1)], shadowRotation.values[2 + COL4(2)]};

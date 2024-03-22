@@ -17,3 +17,4 @@ float LambertianDiffuseSimple(vec3 norm, vec3 lightDirection)
 {
     return max(dot(norm, lightDirection), 0);
 }
+
