@@ -18,7 +18,7 @@ layout(BIND 0) uniform UniformBufferObject
     float roughness;
 } ubo;
 
-layout(BIND 1) uniform sampler2D shadowMap;
+layout(BIND 1) uniform sampler2DShadow shadowMap;
 
 
 const uint g_PoissonSamplesCount = 18;
@@ -73,11 +73,13 @@ void main()
     {
         //vec2 tempCoord = shadowMapCoords + randomRotation * g_PoissonSamples[i] * 0.0008;
         vec2 tempCoord = shadowMapCoords + randomRotation * g_PoissonSamples[i] * 0.001;
-        float closestDepth = texture(shadowMap, vec2(tempCoord.x, tempCoord.y)).r;
-        accumulatedShadow += closestDepth > min(1-shadowSpacePosition.z, 1) - bias ? 1.0 : 0.0;
+        //float closestDepth = texture(shadowMap, vec2(tempCoord.x, tempCoord.y)).r;
+        //accumulatedShadow += closestDepth > min(1-shadowSpacePosition.z, 1) - bias ? 1.0 : 0.0;
+        accumulatedShadow += texture(shadowMap, vec3(tempCoord, min(1-shadowSpacePosition.z, 1) - bias));
     }
 
     float shadow = accumulatedShadow / g_PoissonSamplesCount;
+    //float shadow = HardShadow(shadowSpacePosition.xyz, norm, globalubo.directionalLight, shadowMap);
 
     if (1-shadowSpacePosition.z > 1)
         shadow = 1;

@@ -128,8 +128,8 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
             samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
             samplerCreateInfo.anisotropyEnable = VK_FALSE;
             samplerCreateInfo.maxAnisotropy = 1.0f;
-            samplerCreateInfo.compareEnable = VK_FALSE;
-            samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+            samplerCreateInfo.compareEnable = VK_TRUE;
+            samplerCreateInfo.compareOp = VK_COMPARE_OP_LESS;
             samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
             samplerCreateInfo.mipLodBias = 0.0f;
             samplerCreateInfo.minLod = 0.0f;

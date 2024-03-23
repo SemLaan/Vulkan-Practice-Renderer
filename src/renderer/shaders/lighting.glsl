@@ -19,13 +19,13 @@ float LambertianDiffuseSimple(vec3 norm, vec3 lightDirection)
 }
 
 // Calculates whether the current fragment is in shadow or not, returns 0 if in shadow, 1 if out of shadow
-float HardShadow(vec3 shadowSpacePosition, vec3 normal, vec3 lightDirection, sampler2D shadowMap)
+float HardShadow(vec3 shadowSpacePosition, vec3 normal, vec3 lightDirection, sampler2DShadow shadowMap)
 {
     vec2 shadowMapCoords = shadowSpacePosition.xy * 0.5 + 0.5;
     shadowMapCoords.y = 1 - shadowMapCoords.y;
     float bias = max(0.001 * (1.0 - dot(normal, lightDirection)), 0.0001);
 
-    float shadow = texture(shadowMap, vec2(shadowMapCoords.x, shadowMapCoords.y)).r > min(1-shadowSpacePosition.z, 1) - bias ? 1.0 : 0.0;
+    float shadow = texture(shadowMap, vec3(shadowMapCoords, min(1-shadowSpacePosition.z, 1) - bias));
     return shadow;
 }
 

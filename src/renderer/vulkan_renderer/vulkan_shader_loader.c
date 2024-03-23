@@ -218,7 +218,11 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
                     bindingIndices[ref_textureData->textureCount] = *(text + i + LAYOUT_TEXT_SIZE - 1) - 48/*translating char to int*/;
 
                     // ===== Getting the property name
-                    char* namePtr = text + i + LAYOUT_TEXT_SIZE + UNIFORM_SAMPLER_TEXT_SIZE;
+                    char* namePtr = text + i + LAYOUT_TEXT_SIZE + UNIFORM_SAMPLER_TEXT_SIZE - 2;
+                    while (*namePtr != ' ')namePtr++;
+                    namePtr++;
+                    char* namePtrCopy = namePtr;
+
                     u32 nameLength = 0;
                     while (*namePtr != ';')
                     {
@@ -226,7 +230,7 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
                         nameLength++;
                     }
 
-                    MemoryCopy(nameStrings + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH, text + i + LAYOUT_TEXT_SIZE + UNIFORM_SAMPLER_TEXT_SIZE, nameLength);
+                    MemoryCopy(nameStrings + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH, namePtrCopy, nameLength);
                     nameStrings[nameLength + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH] = '\0';
 
                     //_DEBUG("TexName: %s", nameStrings + ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH);
