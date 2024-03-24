@@ -129,8 +129,8 @@ void GameInit()
     gameState->shadowMaterial = MaterialCreate(gameState->shadowShader);
     gameState->lightingMaterial = MaterialCreate(gameState->lightingShader);
     gameState->uiTextureMaterial = MaterialCreate(gameState->uiTextureShader);
-    MaterialUpdateTexture(gameState->uiTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget));
-    MaterialUpdateTexture(gameState->lightingMaterial, "shadowMap", GetDepthAsTexture(gameState->shadowMapRenderTarget));
+    MaterialUpdateTexture(gameState->uiTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
+    MaterialUpdateTexture(gameState->lightingMaterial, "shadowMap", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_SHADOW);
 
     u8 pixels[TEXTURE_CHANNELS * 2];
     pixels[0] = 255;

@@ -40,6 +40,18 @@ typedef struct Texture
 	void* internalState;
 } Texture;
 
+// Enum with possible sampler configurations
+typedef enum SamplerType
+{
+	SAMPLER_TYPE_NEAREST_CLAMP_EDGE,
+	SAMPLER_TYPE_NEAREST_REPEAT,
+	SAMPLER_TYPE_LINEAR_CLAMP_EDGE,
+	SAMPLER_TYPE_LINEAR_REPEAT,
+	SAMPLER_TYPE_ANISOTROPIC_CLAMP_EDGE,
+	SAMPLER_TYPE_ANISOTROPIC_REPEAT,
+	SAMPLER_TYPE_SHADOW,
+} SamplerType;
+
 typedef struct ShaderCreateInfo
 {
 	const char* vertexShaderName;

@@ -102,7 +102,7 @@ Material MaterialCreate(Shader clientShader)
         VulkanImage* defaultTexture = vk_state->defaultTexture.internalState;
 
         VkDescriptorImageInfo descriptorImageInfo = {};
-        descriptorImageInfo.sampler = defaultTexture->sampler;
+        descriptorImageInfo.sampler = vk_state->samplers->nearestRepeat;
         descriptorImageInfo.imageView = defaultTexture->view;
         descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -192,7 +192,7 @@ void MaterialUpdateProperty(Material clientMaterial, const char* name, void* val
     GRASSERT_MSG(false, "Property name couldn't be found");
 }
 
-void MaterialUpdateTexture(Material clientMaterial, const char* name, Texture clientTexture)
+void MaterialUpdateTexture(Material clientMaterial, const char* name, Texture clientTexture, SamplerType samplerType)
 {
     VulkanMaterial* material = clientMaterial.internalState;
     VulkanShader* shader = material->shader;
@@ -201,8 +201,40 @@ void MaterialUpdateTexture(Material clientMaterial, const char* name, Texture cl
 
     VulkanImage* texture = clientTexture.internalState;
 
+    // Getting the relevant sampler
+    VkSampler sampler = nullptr;
+    {
+        switch (samplerType)
+        {
+        case SAMPLER_TYPE_NEAREST_CLAMP_EDGE:
+            sampler = vk_state->samplers->nearestClampEdge;
+            break;
+        case SAMPLER_TYPE_NEAREST_REPEAT:
+            sampler = vk_state->samplers->nearestRepeat;
+            break;
+        case SAMPLER_TYPE_LINEAR_CLAMP_EDGE:
+            sampler = vk_state->samplers->linearClampEdge;
+            break;
+        case SAMPLER_TYPE_LINEAR_REPEAT:
+            sampler = vk_state->samplers->linearRepeat;
+            break;
+        case SAMPLER_TYPE_ANISOTROPIC_CLAMP_EDGE:
+            GRASSERT_MSG(false, "not implemented");
+            break;
+        case SAMPLER_TYPE_ANISOTROPIC_REPEAT:
+            GRASSERT_MSG(false, "not implemented");
+            break;
+        case SAMPLER_TYPE_SHADOW:
+            sampler = vk_state->samplers->shadow;
+            break;
+        default:
+            GRASSERT_MSG(false, "Invalid sampler type");
+            break;
+        }
+    }
+
     VkDescriptorImageInfo descriptorImageInfo = {};
-    descriptorImageInfo.sampler = texture->sampler;
+    descriptorImageInfo.sampler = sampler;
     descriptorImageInfo.imageView = texture->view;
     descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 

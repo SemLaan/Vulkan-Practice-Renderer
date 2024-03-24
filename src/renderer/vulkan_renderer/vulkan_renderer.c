@@ -532,6 +532,61 @@ bool InitializeRenderer()
     }
 
     // ============================================================================================================================================================
+    // ======================== Creating samplers ============================================================================================================
+    // ============================================================================================================================================================
+    vk_state->samplers = Alloc(vk_state->rendererAllocator, sizeof(*vk_state->samplers), MEM_TAG_RENDERER_SUBSYS);
+
+    {
+        VkSamplerCreateInfo samplerCreateInfo = {};
+        samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerCreateInfo.pNext = nullptr;
+        samplerCreateInfo.flags = 0;
+        samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+        samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+        samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerCreateInfo.anisotropyEnable = VK_FALSE;
+        samplerCreateInfo.maxAnisotropy = 1.0f;
+        samplerCreateInfo.compareEnable = VK_FALSE;
+        samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        samplerCreateInfo.mipLodBias = 0.0f;
+        samplerCreateInfo.minLod = 0.0f;
+        samplerCreateInfo.maxLod = 0.0f;
+        samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+        samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+
+        VK_CHECK(vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &vk_state->samplers->nearestClampEdge));
+
+        samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+        VK_CHECK(vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &vk_state->samplers->nearestRepeat));
+
+        samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+        samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+        samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+        VK_CHECK(vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &vk_state->samplers->linearRepeat));
+
+        samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+        VK_CHECK(vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &vk_state->samplers->linearClampEdge));
+
+        samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerCreateInfo.compareEnable = VK_TRUE;
+        samplerCreateInfo.compareOp = VK_COMPARE_OP_LESS;
+
+        VK_CHECK(vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &vk_state->samplers->shadow));
+    }
+
+    // ============================================================================================================================================================
     // ======================== Creating GlobalUBO descriptor set and buffer ============================================================================================================
     // ============================================================================================================================================================
     // Descriptor set layout
@@ -719,6 +774,20 @@ void ShutdownRenderer()
     Free(vk_state->rendererAllocator, vk_state->globalUniformBufferMappedArray);
     Free(vk_state->rendererAllocator, vk_state->globalUniformBufferArray);
     Free(vk_state->rendererAllocator, vk_state->globalUniformMemoryArray);
+
+    // ============================================================================================================================================================
+    // ====================== Destroying samplers if they were created ==============================================================================================
+    // ============================================================================================================================================================
+    if (vk_state->samplers)
+    {
+        vkDestroySampler(vk_state->device, vk_state->samplers->nearestClampEdge, vk_state->vkAllocator);
+        vkDestroySampler(vk_state->device, vk_state->samplers->nearestRepeat, vk_state->vkAllocator);
+        vkDestroySampler(vk_state->device, vk_state->samplers->linearClampEdge, vk_state->vkAllocator);
+        vkDestroySampler(vk_state->device, vk_state->samplers->linearRepeat, vk_state->vkAllocator);
+        vkDestroySampler(vk_state->device, vk_state->samplers->shadow, vk_state->vkAllocator);
+
+        Free(vk_state->rendererAllocator, vk_state->samplers);
+    }
 
     // ============================================================================================================================================================
     // ====================== Destroying descriptor pool if it was created ==============================================================================================

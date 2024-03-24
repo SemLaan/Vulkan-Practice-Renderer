@@ -33,35 +33,6 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
         CreateImage(&createImageParameters, &renderTarget->colorImage);
         CreateImageView(&renderTarget->colorImage, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        // Creating sampler if this render target's color buffer will be used as texture
-        if (colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
-        {
-            VkSamplerCreateInfo samplerCreateInfo = {};
-            samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-            samplerCreateInfo.pNext = nullptr;
-            samplerCreateInfo.flags = 0;
-            samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-            samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-            samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            samplerCreateInfo.anisotropyEnable = VK_FALSE;
-            samplerCreateInfo.maxAnisotropy = 1.0f;
-            samplerCreateInfo.compareEnable = VK_FALSE;
-            samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-            samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-            samplerCreateInfo.mipLodBias = 0.0f;
-            samplerCreateInfo.minLod = 0.0f;
-            samplerCreateInfo.maxLod = 0.0f;
-            samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-            samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-
-            if (VK_SUCCESS != vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &renderTarget->colorImage.sampler))
-            {
-                GRASSERT_MSG(false, "failed to create image sampler");
-            }
-        }
-
         CommandBuffer oneTimeCommandBuffer = {};
         AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
 
@@ -114,35 +85,6 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
         CreateImage(&createImageParameters, &renderTarget->depthImage);
         CreateImageView(&renderTarget->depthImage, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-        // Creating sampler if this render target's depth buffer will be used as texture
-        if (depthBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
-        {
-            VkSamplerCreateInfo samplerCreateInfo = {};
-            samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-            samplerCreateInfo.pNext = nullptr;
-            samplerCreateInfo.flags = 0;
-            samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-            samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-            samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-            samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-            samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-            samplerCreateInfo.anisotropyEnable = VK_FALSE;
-            samplerCreateInfo.maxAnisotropy = 1.0f;
-            samplerCreateInfo.compareEnable = VK_TRUE;
-            samplerCreateInfo.compareOp = VK_COMPARE_OP_LESS;
-            samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-            samplerCreateInfo.mipLodBias = 0.0f;
-            samplerCreateInfo.minLod = 0.0f;
-            samplerCreateInfo.maxLod = 0.0f;
-            samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-            samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-
-            if (VK_SUCCESS != vkCreateSampler(vk_state->device, &samplerCreateInfo, vk_state->vkAllocator, &renderTarget->depthImage.sampler))
-            {
-                GRASSERT_MSG(false, "failed to create image sampler");
-            }
-        }
-
         CommandBuffer oneTimeCommandBuffer = {};
         AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
 
@@ -193,8 +135,6 @@ void RenderTargetDestroy(RenderTarget clientRenderTarget)
             vkDestroyImage(vk_state->device, renderTarget->depthImage.handle, vk_state->vkAllocator);
         if (renderTarget->depthImage.memory)
             vkFreeMemory(vk_state->device, renderTarget->depthImage.memory, vk_state->vkAllocator);
-        if (renderTarget->depthBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
-            vkDestroySampler(vk_state->device, renderTarget->depthImage.sampler, vk_state->vkAllocator);
     }
 
     if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_DISPLAY || renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
@@ -205,8 +145,6 @@ void RenderTargetDestroy(RenderTarget clientRenderTarget)
             vkDestroyImage(vk_state->device, renderTarget->colorImage.handle, vk_state->vkAllocator);
         if (renderTarget->colorImage.memory)
             vkFreeMemory(vk_state->device, renderTarget->colorImage.memory, vk_state->vkAllocator);
-        if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
-            vkDestroySampler(vk_state->device, renderTarget->colorImage.sampler, vk_state->vkAllocator);
     }
 }
 

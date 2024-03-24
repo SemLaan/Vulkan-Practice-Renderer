@@ -12,6 +12,16 @@ extern RendererState* vk_state;
 #define RENDER_POOL_BLOCK_SIZE_32 32
 #define QUEUE_ACQUISITION_POOL_BLOCK_SIZE 160 // 160 bytes (2.5 cache lines) 32 byte aligned, enough to store VkDependencyInfo + (VkImageMemoryBarrier2 or VkBufferMemoryBarrier2)
 
+#define VK_CHECK(x)                                                 \
+	do                                                              \
+	{                                                               \
+		VkResult err = x;                                           \
+		if (err)                                                    \
+		{                                                           \
+			_ERROR("Detected vulkan error: %i", err);				\
+			debugBreak();                                           \
+		}                                                           \
+	} while (0)
 
 typedef struct VulkanVertexBuffer
 {
@@ -32,7 +42,6 @@ typedef struct VulkanImage
 {
 	VkImage handle;
 	VkImageView view;
-	VkSampler sampler;
 	VkDeviceMemory memory;
 	VkFormat format;
 } VulkanImage;
@@ -129,6 +138,15 @@ typedef struct SwapchainSupportDetails
 	VkPresentModeKHR* presentModes;
 } SwapchainSupportDetails;
 
+typedef struct VulkanSamplers
+{
+	VkSampler nearestClampEdge;
+	VkSampler nearestRepeat;
+	VkSampler linearClampEdge;
+	VkSampler linearRepeat;
+	VkSampler shadow;				// Sampler with comparisson state enabled for percentage closer filtering
+} VulkanSamplers;
+
 typedef struct RendererState
 {
 	// Frequently used data (every frame)
@@ -172,6 +190,7 @@ typedef struct RendererState
 	VkDescriptorPool descriptorPool;								// Pool used to allocate descriptor sets for all materials
 	Shader defaultShader;											// Fallback shader that is very simple, this shaders pipeline layout is used to bind the global ubo
 	Material defaultMaterial;										// Material based on default shader
+	VulkanSamplers* samplers;										// All the different texture samplers
 
 	// Data that is only used on startup/shutdown
 	VkFormat renderTargetColorFormat;								// Image format used for render target color textures

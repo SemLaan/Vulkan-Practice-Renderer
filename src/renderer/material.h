@@ -11,6 +11,6 @@ void MaterialDestroy(Material clientMaterial);
 // Updates the uniform values of the given material
 void MaterialUpdateProperty(Material clientMaterial, const char* name, void* value);
 // Updates the uniform values of the given material
-void MaterialUpdateTexture(Material clientMaterial, const char* name, Texture clientTexture);
+void MaterialUpdateTexture(Material clientMaterial, const char* name, Texture clientTexture, SamplerType samplerType);
 // Binds the material for rendering
 void MaterialBind(Material clientMaterial);
