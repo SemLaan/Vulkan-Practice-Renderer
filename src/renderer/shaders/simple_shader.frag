@@ -22,16 +22,7 @@ layout(BIND 1) uniform sampler2DShadow shadowMapCompare;
 layout(BIND 2) uniform sampler2D shadowMap;
 
 
-mat2 MatrixFromAngle2D(float theta)
-{
-    float sinTheta = sin(theta);
-    float cosTheta = cos(theta);
 
-    vec2 row1 = vec2(cosTheta, sinTheta);
-    vec2 row2 = vec2(-sinTheta, cosTheta);
-    mat2 result = mat2(row1, row2);
-    return result;
-}
 
 void main() 
 {
@@ -39,34 +30,18 @@ void main()
 
     // Calculating shadow
     vec4 shadowSpacePosition = ubo.lightTransform * vec4(fragPosition, 1); // TODO: this can be calculated in the vert shader and interpolated
-    //vec2 shadowMapCoords = shadowSpacePosition.xy * 0.5 + 0.5;
-    //shadowMapCoords.y = 1 - shadowMapCoords.y;
-    //float bias = max(0.001 * (1.0 - dot(norm, globalubo.directionalLight)), 0.0001);
-    //mat2 randomRotation = MatrixFromAngle2D(6.28 * random(shadowMapCoords));
 
+    // PCSS
+    float shadow = PCSS(shadowMapCompare, shadowMap, shadowSpacePosition.xyz, norm, globalubo.directionalLight, 6.28 * random(shadowSpacePosition.xy));
 
-    //float accumulatedShadow = 0;
-    //for (uint i = 0; i < g_PoissonSamplesCount; i++)
-    //{
-        //vec2 tempCoord = shadowMapCoords + randomRotation * g_PoissonSamples[i] * 0.0008;
-    //    vec2 tempCoord = shadowMapCoords + randomRotation * g_PoissonSamples[i] * 0.001;
-        //float closestDepth = texture(shadowMap, vec2(tempCoord.x, tempCoord.y)).r;
-        //accumulatedShadow += closestDepth > min(1-shadowSpacePosition.z, 1) - bias ? 1.0 : 0.0;
-    //    accumulatedShadow += texture(shadowMapCompare, vec3(tempCoord, min(1-shadowSpacePosition.z, 1) - bias));
-    //}
-
-    //float shadow = accumulatedShadow / g_PoissonSamplesCount;
-    //float shadow = HardShadow(shadowSpacePosition.xyz, norm, globalubo.directionalLight, shadowMapCompare);
-
+    // PCF
     vec2 shadowMapCoords = shadowSpacePosition.xy * 0.5 + 0.5;
     shadowMapCoords.y = 1 - shadowMapCoords.y;
+    float fragDepth = min(1-shadowSpacePosition.z, 1);
+    //float shadow = PercentageCloserFilter(shadowMapCoords, fragDepth, 0.006, shadowMapCompare, norm, globalubo.directionalLight, 6.28 * random(shadowSpacePosition.xy));
 
-    float pcss = PCSS(shadowMapCompare, shadowMap, shadowSpacePosition.xyz, norm, globalubo.directionalLight);
-    float shadow = PercentageCloserFilter(shadowMapCoords, shadowSpacePosition.z, 0.001, shadowMapCompare, norm, globalubo.directionalLight);
-
-    outColor = vec4(pcss.rrr, 1);
-    return;
-
+    // Hard shadow
+    //float shadow = HardShadow(shadowSpacePosition.xyz, norm, globalubo.directionalLight, shadowMapCompare);
 
     if (1-shadowSpacePosition.z > 1)
         shadow = 1;

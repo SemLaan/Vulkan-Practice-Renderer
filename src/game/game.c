@@ -86,7 +86,7 @@ void GameInit()
         scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
 
         // Loading sphere
-        modelMatrix = mat4_3Dtranslate(vec3_create(10, 1, 10));
+        modelMatrix = mat4_3Dtranslate(vec3_create(0, 10, 10));
         LoadObj("models/sphere.obj", &vb, &ib, false);
 
         scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
@@ -130,7 +130,7 @@ void GameInit()
     gameState->lightingMaterial = MaterialCreate(gameState->lightingShader);
     gameState->uiTextureMaterial = MaterialCreate(gameState->uiTextureShader);
     MaterialUpdateTexture(gameState->uiTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
-    MaterialUpdateTexture(gameState->lightingMaterial, "shadowMap", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
+    MaterialUpdateTexture(gameState->lightingMaterial, "shadowMap", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
     MaterialUpdateTexture(gameState->lightingMaterial, "shadowMapCompare", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_SHADOW);
 
     u8 pixels[TEXTURE_CHANNELS * 2];
@@ -248,8 +248,8 @@ void GameUpdateAndRender()
     mat4 uiProj = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
     MaterialUpdateProperty(gameState->uiTextureMaterial, "uiProjection", &uiProj);
 
-    //vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
-    vec3 lightRotationVec = vec3_create(0.5f, PI/2, 0);
+    vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
+    //vec3 lightRotationVec = vec3_create(0.5f, PI/2, 0);
     mat4 shadowRotation = mat4_rotate_xyz(vec3_invert_sign(lightRotationVec));
 
     vec3 directionalLight = {shadowRotation.values[2 + COL4(0)], shadowRotation.values[2 + COL4(1)], shadowRotation.values[2 + COL4(2)]};

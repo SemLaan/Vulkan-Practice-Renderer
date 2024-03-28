@@ -23,6 +23,18 @@ const vec2 g_PoissonSamples[POISSON_SAMPLE_COUNT] =
 };
 
 
+mat2 MatrixFromAngle2D(float theta)
+{
+    float sinTheta = sin(theta);
+    float cosTheta = cos(theta);
+
+    vec2 row1 = vec2(cosTheta, sinTheta);
+    vec2 row2 = vec2(-sinTheta, cosTheta);
+    mat2 result = mat2(row1, row2);
+    return result;
+}
+
+
 // Calculates the specular component of the light value using the blinn phong technique (assumes world space)
 // Roughness is expected to be between 0 and 1
 float BlinnPhongSpecular(vec3 norm, vec3 viewPosition, vec3 fragPosition, vec3 lightDirection, float roughness)
@@ -49,58 +61,49 @@ float HardShadow(vec3 shadowSpaceFragPosition, vec3 normal, vec3 lightDirection,
     shadowMapCoords.y = 1 - shadowMapCoords.y;
     float bias = max(0.001 * (1.0 - dot(normal, lightDirection)), 0.0001);
 
-    float shadow = texture(shadowMapCompare, vec3(shadowMapCoords, min(1-shadowSpaceFragPosition.z, 1) - bias));
+    float shadow = texture(shadowMapCompare, vec3(shadowMapCoords, min(1-shadowSpaceFragPosition.z, 1) - bias*0.5));
     return shadow;
 }
 
 
 
 // Returns a value from zero to one bases on how occluded this pixel is (zero is completely occluded)
-float PercentageCloserFilter(vec2 shadowMapCoords, float fragmentDepth, float filterRadius, sampler2DShadow shadowMapCompare, vec3 normal, vec3 lightDirection)
+float PercentageCloserFilter(vec2 shadowMapCoords, float fragmentDepth, float filterRadius, sampler2DShadow shadowMapCompare, vec3 normal, vec3 lightDirection, float samplerRotationValue)
 {
     float sum = 0;
     float bias = max(0.001 * (1.0 - dot(normal, lightDirection)), 0.0001);
+    mat2 randomRotationMatrix = MatrixFromAngle2D(samplerRotationValue);
 
     for (int i = 0; i < POISSON_SAMPLE_COUNT; i++)
     {
-        vec2 offset = g_PoissonSamples[i] * filterRadius;
-        sum += texture(shadowMapCompare, vec3(shadowMapCoords + offset, min(1-fragmentDepth, 1) - bias));
+        vec2 offset = randomRotationMatrix * g_PoissonSamples[i] * filterRadius;
+        sum += texture(shadowMapCompare, vec3(shadowMapCoords + offset, fragmentDepth - bias - length(offset)));
     }
 
     return sum / POISSON_SAMPLE_COUNT;
 }
 
-const float LIGHT_SIZE = 0.001;
+const float LIGHT_SIZE = 0.006;
 // Percentage closer soft shadows
-float PCSS(sampler2DShadow shadowMapCompare, sampler2D shadowMap, vec3 shadowSpaceFragPosition, vec3 normal, vec3 lightDirection)
+float PCSS(sampler2DShadow shadowMapCompare, sampler2D shadowMap, vec3 shadowSpaceFragPosition, vec3 normal, vec3 lightDirection, float samplerRotationValue)
 {
     vec2 shadowMapCoords = shadowSpaceFragPosition.xy * 0.5 + 0.5;
     shadowMapCoords.y = 1 - shadowMapCoords.y;
     float fragDepth = min(1-shadowSpaceFragPosition.z, 1);
     float bias = max(0.001 * (1.0 - dot(normal, lightDirection)), 0.0001);
-    
+    mat2 randomRotationMatrix = MatrixFromAngle2D(samplerRotationValue);
+
     // Calculate avg blocker depth
     float blockerSum = 0;
     float blockerCount = 0;
 
-    float blockerSearchRadius = 0.001;//LIGHT_SIZE * fragDepth;
-    
-    float shadowMapDepth = texture(shadowMap, shadowMapCoords).r;
-    if (shadowMapDepth > fragDepth - bias)
-    {
-        return 1;
-        blockerCount += 1;
-        blockerSum += shadowMapDepth;
-    }
-    else
-    {
-        return shadowMapDepth;
-    }
+    float blockerSearchRadius = LIGHT_SIZE;// * (fragDepth - 0.01) / fragDepth;
 
     for (int i = 0; i < POISSON_SAMPLE_COUNT; i++)
     {
-        float shadowMapDepth = texture(shadowMap, shadowMapCoords + g_PoissonSamples[i] * blockerSearchRadius).r;
-        if (shadowMapDepth > fragDepth - bias)
+        vec2 offset = randomRotationMatrix * g_PoissonSamples[i] * blockerSearchRadius;
+        float shadowMapDepth = texture(shadowMap, shadowMapCoords + offset).r;
+        if (shadowMapDepth <= fragDepth - bias - length(offset))
         {
             blockerCount += 1;
             blockerSum += shadowMapDepth;
@@ -113,35 +116,18 @@ float PCSS(sampler2DShadow shadowMapCompare, sampler2D shadowMap, vec3 shadowSpa
 
     float avgBlockerDepth = blockerSum / blockerCount;
 
-    return avgBlockerDepth;
-
-    // Calculate penumbra ration
-
+    // Calculate filter radius
+    float penumbraRatio = (fragDepth - avgBlockerDepth) / avgBlockerDepth;
+    float filterRadius = penumbraRatio * LIGHT_SIZE / fragDepth;
 
     // Calculate final shadow value with pcf
+    float pcfSum = 0;
 
-}
-
-/*
-// Calculating shadow
-    vec4 shadowSpacePosition = ubo.lightTransform * vec4(fragPosition, 1); // TODO: this can be calculated in the vert shader and interpolated
-    vec2 shadowMapCoords = shadowSpacePosition.xy * 0.5 + 0.5;
-    shadowMapCoords.y = 1 - shadowMapCoords.y;
-    float bias = max(0.001 * (1.0 - dot(norm, globalubo.directionalLight)), 0.0001);
-    mat2 randomRotation = MatrixFromAngle2D(6.28 * random(shadowMapCoords));
-
-
-    float accumulatedShadow = 0;
-    for (uint i = 0; i < g_PoissonSamplesCount; i++)
+    for (int i = 0; i < POISSON_SAMPLE_COUNT; i++)
     {
-        //vec2 tempCoord = shadowMapCoords + randomRotation * g_PoissonSamples[i] * 0.0008;
-        vec2 tempCoord = shadowMapCoords + randomRotation * g_PoissonSamples[i] * 0.001;
-        float closestDepth = texture(shadowMap, vec2(tempCoord.x, tempCoord.y)).r;
-        accumulatedShadow += closestDepth > min(1-shadowSpacePosition.z, 1) - bias ? 1.0 : 0.0;
+        vec2 offset = randomRotationMatrix * g_PoissonSamples[i] * filterRadius;
+        pcfSum += texture(shadowMapCompare, vec3(shadowMapCoords + offset, fragDepth - bias - length(offset)));
     }
 
-    float shadow = accumulatedShadow / g_PoissonSamplesCount;
-    //float shadow = texture(shadowMap, vec2(shadowMapCoords.x, shadowMapCoords.y)).r > min(1-shadowSpacePosition.z, 1) - bias ? 1.0 : 0.0;
-
-    if (1-shadowSpacePosition.z > 1)
-        shadow = 1;*/
+    return pcfSum / POISSON_SAMPLE_COUNT;
+}
