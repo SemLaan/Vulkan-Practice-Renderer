@@ -241,7 +241,7 @@ void MaterialUpdateTexture(Material clientMaterial, const char* name, Texture cl
     // Looping through all vertex shader texture properties trying to find the texture being set
     for (int i = 0; i < shader->vertUniformTexturesData.textureCount; i++)
     {
-        if (MemoryCompare(name, shader->vertUniformTexturesData.textureNameArray[i], nameLength))
+        if (nameLength == strlen(shader->vertUniformTexturesData.textureNameArray[i]) && MemoryCompare(name, shader->vertUniformTexturesData.textureNameArray[i], nameLength))
         {
             // Updating the descriptor bindings for the texture being set
             VkWriteDescriptorSet descriptorWrites[MAX_FRAMES_IN_FLIGHT] = {};
@@ -268,7 +268,7 @@ void MaterialUpdateTexture(Material clientMaterial, const char* name, Texture cl
     // Looping through all fragment shader texture properties trying to find the texture being set
     for (int i = 0; i < shader->fragUniformTexturesData.textureCount; i++)
     {
-        if (MemoryCompare(name, shader->fragUniformTexturesData.textureNameArray[i], nameLength))
+        if (nameLength == strlen(shader->fragUniformTexturesData.textureNameArray[i]) && MemoryCompare(name, shader->fragUniformTexturesData.textureNameArray[i], nameLength))
         {
             // Updating the descriptor bindings for the texture being set
             VkWriteDescriptorSet descriptorWrites[MAX_FRAMES_IN_FLIGHT] = {};

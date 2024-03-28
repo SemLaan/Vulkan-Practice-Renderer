@@ -18,8 +18,8 @@ layout(BIND 0) uniform UniformBufferObject
     float roughness;
 } ubo;
 
-layout(BIND 2) uniform sampler2D shadowMap;
 layout(BIND 1) uniform sampler2DShadow shadowMapCompare;
+layout(BIND 2) uniform sampler2D shadowMap;
 
 
 mat2 MatrixFromAngle2D(float theta)
