@@ -280,25 +280,31 @@ void GameUpdateAndRender()
 
     RenderTargetStartRendering(gameState->shadowMapRenderTarget);
 
+    MaterialBind(gameState->shadowMaterial);
+
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
     {
-        Draw(gameState->shadowMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
+        Draw(1, &gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i], 1);
     }
 
     RenderTargetStopRendering(gameState->shadowMapRenderTarget);
 
     RenderTargetStartRendering(GetMainRenderTarget());
 
+    MaterialBind(gameState->lightingMaterial);
+
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
     {
-        Draw(gameState->lightingMaterial, gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i]);
+        Draw(1, &gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i], 1);
     }
+
+    MaterialBind(gameState->uiTextureMaterial);
 
     mat4 translation = mat4_2Dtranslate((vec2){windowAspectRatio, 1});
     mat4 rotate = mat4_rotate_x(-PI / 2);
     mat4 scale = mat4_2Dscale((vec2){windowAspectRatio, 1});
     mat4 modelMatrix = mat4_mul_mat4(translation, mat4_mul_mat4(rotate, scale));
-    Draw(gameState->uiTextureMaterial, gameState->scene.vertexBufferDarray[1], gameState->scene.indexBufferDarray[1], &modelMatrix);
+    Draw(1, &gameState->scene.vertexBufferDarray[1], gameState->scene.indexBufferDarray[1], &modelMatrix, 1);
 
     RenderTargetStopRendering(GetMainRenderTarget());
 

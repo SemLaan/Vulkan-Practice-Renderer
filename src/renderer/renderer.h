@@ -17,6 +17,6 @@ bool BeginRendering();
 void EndRendering();
 
 void UpdateGlobalUniform(GlobalUniformObject* properties);
-void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, mat4* pushConstantValues);
+void Draw(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer clientIndexBuffer, mat4* pushConstantValues, u32 instanceCount);
 
 RenderTarget GetMainRenderTarget();

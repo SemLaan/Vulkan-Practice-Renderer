@@ -1146,18 +1146,26 @@ void UpdateGlobalUniform(GlobalUniformObject* properties)
     MemoryCopy(vk_state->globalUniformBufferMappedArray[vk_state->currentInFlightFrameIndex], properties, sizeof(*properties));
 }
 
-void Draw(Material clientMaterial, VertexBuffer clientVertexBuffer, IndexBuffer clientIndexBuffer, mat4* pushConstantValues)
+void Draw(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer clientIndexBuffer, mat4* pushConstantValues, u32 instanceCount)
 {
-    MaterialBind(clientMaterial);
-    VertexBufferBind(clientVertexBuffer);
-    IndexBufferBind(clientIndexBuffer);
-
+    VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
     VulkanIndexBuffer* indexBuffer = clientIndexBuffer.internalState;
 
-    VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
+    // Getting vertex buffer vulkan handles for binding
+    VkBuffer vertexBuffers[2] = {};
+    for (int i = 0; i < vertexBufferCount; i++)
+    {
+        VulkanVertexBuffer* vb = clientVertexBuffers[i].internalState;
+        vertexBuffers[i] = vb->handle;
+    }
+
+    // binding index and vertex buffers
+    VkDeviceSize offsets[2] = {0, 0};
+    vkCmdBindVertexBuffers(currentCommandBuffer, 0, vertexBufferCount, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(currentCommandBuffer, indexBuffer->handle, offsets[0], VK_INDEX_TYPE_UINT32);
 
     vkCmdPushConstants(currentCommandBuffer, vk_state->boundShader->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(*pushConstantValues), pushConstantValues);
-    vkCmdDrawIndexed(currentCommandBuffer, indexBuffer->indexCount, 1, 0, 0, 0);
+    vkCmdDrawIndexed(currentCommandBuffer, indexBuffer->indexCount, instanceCount, 0, 0, 0);
 }
 
 RenderTarget GetMainRenderTarget()
