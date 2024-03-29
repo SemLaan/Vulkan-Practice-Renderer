@@ -14,14 +14,6 @@ typedef enum RenderTargetUsage
 	RENDER_TARGET_USAGE_NONE
 } RenderTargetUsage;
 
-// TODO: try not to use this for anything new because this will probably get removed
-typedef struct Vertex
-{
-	vec3 position;
-	vec3 normal;
-	vec2 texCoord;
-} Vertex;
-
 // Handle to a vertex buffer
 typedef struct VertexBuffer
 {
