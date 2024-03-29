@@ -32,7 +32,7 @@ void main()
     vec4 shadowSpacePosition = ubo.lightTransform * vec4(fragPosition, 1); // TODO: this can be calculated in the vert shader and interpolated
 
     // PCSS
-    float shadow = PCSS(shadowMapCompare, shadowMap, shadowSpacePosition.xyz, norm, globalubo.directionalLight, 6.28 * random(shadowSpacePosition.xy));
+    //float shadow = PCSS(shadowMapCompare, shadowMap, shadowSpacePosition.xyz, norm, globalubo.directionalLight, 6.28 * random(shadowSpacePosition.xy));
 
     // PCF
     vec2 shadowMapCoords = shadowSpacePosition.xy * 0.5 + 0.5;
@@ -41,7 +41,7 @@ void main()
     //float shadow = PercentageCloserFilter(shadowMapCoords, fragDepth, 0.006, shadowMapCompare, norm, globalubo.directionalLight, 6.28 * random(shadowSpacePosition.xy));
 
     // Hard shadow
-    //float shadow = HardShadow(shadowSpacePosition.xyz, norm, globalubo.directionalLight, shadowMapCompare);
+    float shadow = HardShadow(shadowSpacePosition.xyz, norm, globalubo.directionalLight, shadowMapCompare);
 
     if (1-shadowSpacePosition.z > 1)
         shadow = 1;

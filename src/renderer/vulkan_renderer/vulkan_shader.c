@@ -217,36 +217,108 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
         shaderStagesCreateInfo[1].pSpecializationInfo = nullptr;
     }
 
-    // Vertex input
-    VkVertexInputBindingDescription vertexBindingDescription = {};
-    vertexBindingDescription.binding = 0;
-    vertexBindingDescription.stride = sizeof(Vertex);
-    vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    // ======================================================== Vertex input ===========================================================================
+    // Creating lookup tables
+    u32 attributeSizes[20] = {};
+    attributeSizes[VERTEX_ATTRIBUTE_TYPE_FLOAT] = 4;
+    attributeSizes[VERTEX_ATTRIBUTE_TYPE_VEC2] = 8;
+    attributeSizes[VERTEX_ATTRIBUTE_TYPE_VEC3] = 12;
+    attributeSizes[VERTEX_ATTRIBUTE_TYPE_VEC4] = 16;
+    VkFormat attributeFormats[20] = {};
+    attributeFormats[VERTEX_ATTRIBUTE_TYPE_FLOAT] = VK_FORMAT_R32_SFLOAT;
+    attributeFormats[VERTEX_ATTRIBUTE_TYPE_VEC2] = VK_FORMAT_R32G32_SFLOAT;
+    attributeFormats[VERTEX_ATTRIBUTE_TYPE_VEC3] = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeFormats[VERTEX_ATTRIBUTE_TYPE_VEC4] = VK_FORMAT_R32G32B32A32_SFLOAT;
 
-#define VERTEX_ATTRIBUTE_COUNT 3
-    VkVertexInputAttributeDescription attributeDescriptions[VERTEX_ATTRIBUTE_COUNT] = {};
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(Vertex, position);
+    // ================ Preprocessing vertex attributes to turn matrices into 4 vec4's
+    VertexBufferLayout vbLayoutCopy = pCreateInfo->vertexBufferLayout;
+    {
+        // Per vertex attributes
+        u32 attribIndex = 0;
+        for (int i = 0; i < pCreateInfo->vertexBufferLayout.perVertexAttributeCount; i++)
+        {
+            if (pCreateInfo->vertexBufferLayout.perVertexAttributes[i] == VERTEX_ATTRIBUTE_TYPE_MAT4)
+            {
+                vbLayoutCopy.perVertexAttributeCount += 3; // The matrix goes from being one attrib to being four so we add three
+                vbLayoutCopy.perVertexAttributes[attribIndex] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+                vbLayoutCopy.perVertexAttributes[attribIndex+1] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+                vbLayoutCopy.perVertexAttributes[attribIndex+2] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+                vbLayoutCopy.perVertexAttributes[attribIndex+3] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+                attribIndex += 4;
+            }
+            else
+            {
+                vbLayoutCopy.perVertexAttributes[attribIndex] = pCreateInfo->vertexBufferLayout.perVertexAttributes[i];
+                attribIndex++;
+            }
+        }
+        // Per instance attributes
+        attribIndex = 0;
+        for (int i = 0; i < pCreateInfo->vertexBufferLayout.perInstanceAttributeCount; i++)
+        {
+            if (pCreateInfo->vertexBufferLayout.perInstanceAttributes[i] == VERTEX_ATTRIBUTE_TYPE_MAT4)
+            {
+                vbLayoutCopy.perInstanceAttributeCount += 3; // The matrix goes from being one attrib to being four so we add three
+                vbLayoutCopy.perInstanceAttributes[attribIndex] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+                vbLayoutCopy.perInstanceAttributes[attribIndex+1] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+                vbLayoutCopy.perInstanceAttributes[attribIndex+2] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+                vbLayoutCopy.perInstanceAttributes[attribIndex+3] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+                attribIndex += 4;
+            }
+            else
+            {
+                vbLayoutCopy.perInstanceAttributes[attribIndex] = pCreateInfo->vertexBufferLayout.perInstanceAttributes[i];
+                attribIndex++;
+            }
+        }
+    }
 
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(Vertex, normal);
+    // Filling in vulkan stucts for vertex attributes
+    u32 totalAttributeCount = vbLayoutCopy.perVertexAttributeCount + vbLayoutCopy.perInstanceAttributeCount;
+    GRASSERT(totalAttributeCount < MAX_VERTEX_ATTRIBUTES);
+    VkVertexInputAttributeDescription attributeDescriptions[MAX_VERTEX_ATTRIBUTES] = {};
+    u32 vertexStride = 0;
+    u32 instanceStride = 0;
 
-    attributeDescriptions[2].location = 2;
-    attributeDescriptions[2].binding = 0;
-    attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+    for (int i = 0; i < totalAttributeCount; i++)
+    {
+        attributeDescriptions[i].location = i;
+        attributeDescriptions[i].binding = 0;
+
+        if (i < vbLayoutCopy.perVertexAttributeCount) // if it's a vertex attribute
+        {
+            attributeDescriptions[i].format = attributeFormats[vbLayoutCopy.perVertexAttributes[i]];
+            attributeDescriptions[i].offset = vertexStride;
+            vertexStride += attributeSizes[vbLayoutCopy.perVertexAttributes[i]];
+        }
+        else // if it's an instance attribute
+        {
+            attributeDescriptions[i].format = attributeFormats[vbLayoutCopy.perInstanceAttributes[i]];
+            attributeDescriptions[i].offset = instanceStride;
+            instanceStride += attributeSizes[vbLayoutCopy.perInstanceAttributes[i]];
+        }
+    }
+
+    VkVertexInputBindingDescription vertexBindingDescriptions[2] = {};
+    vertexBindingDescriptions[0].binding = 0;
+    vertexBindingDescriptions[0].stride = vertexStride;
+    vertexBindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    vertexBindingDescriptions[1].binding = 1;
+    vertexBindingDescriptions[1].stride = instanceStride;
+    vertexBindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+
+    u32 vertexBindingDescriptionCount = 1;
+    if (vbLayoutCopy.perInstanceAttributeCount > 0)
+        vertexBindingDescriptionCount++;
 
     VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
     vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputCreateInfo.pNext = nullptr;
     vertexInputCreateInfo.flags = 0;
-    vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-    vertexInputCreateInfo.pVertexBindingDescriptions = &vertexBindingDescription;
-    vertexInputCreateInfo.vertexAttributeDescriptionCount = VERTEX_ATTRIBUTE_COUNT;
+    vertexInputCreateInfo.vertexBindingDescriptionCount = vertexBindingDescriptionCount;
+    vertexInputCreateInfo.pVertexBindingDescriptions = vertexBindingDescriptions;
+    vertexInputCreateInfo.vertexAttributeDescriptionCount = totalAttributeCount;
     vertexInputCreateInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
     // Input assembler

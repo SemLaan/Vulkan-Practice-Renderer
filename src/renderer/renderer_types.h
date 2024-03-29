@@ -52,10 +52,30 @@ typedef enum SamplerType
 	SAMPLER_TYPE_SHADOW,
 } SamplerType;
 
+typedef enum VertexAttributeType
+{
+	VERTEX_ATTRIBUTE_TYPE_FLOAT,
+	VERTEX_ATTRIBUTE_TYPE_VEC2,
+	VERTEX_ATTRIBUTE_TYPE_VEC3,
+	VERTEX_ATTRIBUTE_TYPE_VEC4,
+	VERTEX_ATTRIBUTE_TYPE_MAT4,
+} VertexAttributeType;
+
+#define MAX_VERTEX_ATTRIBUTES 15
+// Tells the shader how to read in vertex data
+typedef struct VertexBufferLayout
+{
+	u32 perVertexAttributeCount;
+	u32 perInstanceAttributeCount;
+	VertexAttributeType perVertexAttributes[MAX_VERTEX_ATTRIBUTES];
+	VertexAttributeType perInstanceAttributes[MAX_VERTEX_ATTRIBUTES];
+} VertexBufferLayout;
+
 typedef struct ShaderCreateInfo
 {
 	const char* vertexShaderName;
 	const char* fragmentShaderName;
+	VertexBufferLayout vertexBufferLayout;
 	bool renderTargetColor;
 	bool renderTargetDepth;
 	bool renderTargetStencil;// TODO: this does nothing yet

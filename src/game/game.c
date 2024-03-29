@@ -107,6 +107,10 @@ void GameInit()
 
     ShaderCreateInfo shaderCreateInfo = {};
     shaderCreateInfo.renderTargetStencil = false;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 3;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;
 
     shaderCreateInfo.vertexShaderName = "simple_shader";
     shaderCreateInfo.fragmentShaderName = "simple_shader";
@@ -248,8 +252,8 @@ void GameUpdateAndRender()
     mat4 uiProj = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
     MaterialUpdateProperty(gameState->uiTextureMaterial, "uiProjection", &uiProj);
 
-    vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
-    //vec3 lightRotationVec = vec3_create(0.5f, PI/2, 0);
+    //vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
+    vec3 lightRotationVec = vec3_create(0.5f, PI/2, 0);
     mat4 shadowRotation = mat4_rotate_xyz(vec3_invert_sign(lightRotationVec));
 
     vec3 directionalLight = {shadowRotation.values[2 + COL4(0)], shadowRotation.values[2 + COL4(1)], shadowRotation.values[2 + COL4(2)]};

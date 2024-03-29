@@ -706,6 +706,10 @@ bool InitializeRenderer()
     ShaderCreateInfo shaderCreateInfo = {};
     shaderCreateInfo.vertexShaderName = DEFAULT_SHADER_NAME;
     shaderCreateInfo.fragmentShaderName = DEFAULT_SHADER_NAME;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 3;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;
     shaderCreateInfo.renderTargetColor = true;
     shaderCreateInfo.renderTargetDepth = true;
     shaderCreateInfo.renderTargetStencil = false;
