@@ -36,7 +36,6 @@ void main()
 
     // PCF
     vec2 shadowMapCoords = shadowSpacePosition.xy * 0.5 + 0.5;
-    shadowMapCoords.y = 1 - shadowMapCoords.y;
     float fragDepth = min(1-shadowSpacePosition.z, 1);
     //float shadow = PercentageCloserFilter(shadowMapCoords, fragDepth, 0.006, shadowMapCompare, norm, globalubo.directionalLight, 6.28 * random(shadowSpacePosition.xy));
 

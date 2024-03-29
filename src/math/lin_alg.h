@@ -285,7 +285,7 @@ static mat4 mat4_perspective(f32 verticalFovDegrees, f32 aspectRatio, f32 near, 
 	mat4 projection = {};
 
 	projection.values[0 + COL4(0)] = x;
-	projection.values[1 + COL4(1)] = y;
+	projection.values[1 + COL4(1)] = -y;
 	projection.values[2 + COL4(2)] = A;
 	projection.values[2 + COL4(3)] = B;
 	projection.values[3 + COL4(3)] = 0.f;
@@ -299,11 +299,11 @@ static mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near
 	mat4 projection = {};
 
 	projection.values[0 + COL4(0)] = 2.f / (right - left);
-	projection.values[1 + COL4(1)] = 2.f / (top - bottom);
+	projection.values[1 + COL4(1)] = -2.f / (top - bottom);
 	projection.values[2 + COL4(2)] = 1.f / (far - near);
 	projection.values[3 + COL4(3)] = 1.f;
 	projection.values[0 + COL4(3)] = -(right + left) / (right - left);
-	projection.values[1 + COL4(3)] = -(top + bottom) / (top - bottom);
+	projection.values[1 + COL4(3)] = (top + bottom) / (top - bottom);
 	projection.values[2 + COL4(3)] = near / (far - near) + 1;
 
 	return projection;

@@ -58,7 +58,6 @@ float LambertianDiffuseSimple(vec3 norm, vec3 lightDirection)
 float HardShadow(vec3 shadowSpaceFragPosition, vec3 normal, vec3 lightDirection, sampler2DShadow shadowMapCompare)
 {
     vec2 shadowMapCoords = shadowSpaceFragPosition.xy * 0.5 + 0.5;
-    shadowMapCoords.y = 1 - shadowMapCoords.y;
     float bias = max(0.001 * (1.0 - dot(normal, lightDirection)), 0.0001);
 
     float shadow = texture(shadowMapCompare, vec3(shadowMapCoords, min(1-shadowSpaceFragPosition.z, 1) - bias*0.5));
@@ -88,7 +87,6 @@ const float LIGHT_SIZE = 0.006;
 float PCSS(sampler2DShadow shadowMapCompare, sampler2D shadowMap, vec3 shadowSpaceFragPosition, vec3 normal, vec3 lightDirection, float samplerRotationValue)
 {
     vec2 shadowMapCoords = shadowSpaceFragPosition.xy * 0.5 + 0.5;
-    shadowMapCoords.y = 1 - shadowMapCoords.y;
     float fragDepth = min(1-shadowSpaceFragPosition.z, 1);
     float bias = max(0.001 * (1.0 - dot(normal, lightDirection)), 0.0001);
     mat2 randomRotationMatrix = MatrixFromAngle2D(samplerRotationValue);
