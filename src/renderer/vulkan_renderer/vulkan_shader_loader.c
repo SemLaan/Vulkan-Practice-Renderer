@@ -30,7 +30,7 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
     FILE* file = fopen(filename, "r");
 
     if (file == NULL)
-        GRASSERT_MSG(false, "Failed to open raw vertex shader file.");
+        GRASSERT_MSG(false, "Failed to open raw shader file.");
 
     fseek(file, 0L, SEEK_END);
 

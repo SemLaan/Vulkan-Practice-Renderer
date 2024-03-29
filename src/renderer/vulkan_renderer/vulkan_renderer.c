@@ -1164,7 +1164,8 @@ void Draw(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer 
     vkCmdBindVertexBuffers(currentCommandBuffer, 0, vertexBufferCount, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(currentCommandBuffer, indexBuffer->handle, offsets[0], VK_INDEX_TYPE_UINT32);
 
-    vkCmdPushConstants(currentCommandBuffer, vk_state->boundShader->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(*pushConstantValues), pushConstantValues);
+    if (pushConstantValues)
+        vkCmdPushConstants(currentCommandBuffer, vk_state->boundShader->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(*pushConstantValues), pushConstantValues);
     vkCmdDrawIndexed(currentCommandBuffer, indexBuffer->indexCount, instanceCount, 0, 0, 0);
 }
 

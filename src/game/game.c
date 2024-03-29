@@ -16,6 +16,9 @@
 
 typedef struct Scene
 {
+    VertexBuffer sphereVB;
+    IndexBuffer sphereIB;
+    VertexBuffer instancedVB;
     VertexBuffer* vertexBufferDarray;
     IndexBuffer* indexBufferDarray;
     mat4* modelMatrixDarray;
@@ -27,10 +30,14 @@ typedef struct GameState
     Timer timer;
     RenderTarget shadowMapRenderTarget;
     Shader lightingShader;
+    Shader instancedLightingShader;
     Shader uiTextureShader;
     Shader shadowShader;
+    Shader instancedShadowShader;
+    Material instancedShadowMaterial;
     Material shadowMaterial;
     Material lightingMaterial;
+    Material instancedLightingMaterial;
     Material uiTextureMaterial;
     Texture texture;
     vec3 camPosition;
@@ -87,11 +94,11 @@ void GameInit()
 
         // Loading sphere
         modelMatrix = mat4_3Dtranslate(vec3_create(0, 10, 10));
-        LoadObj("models/sphere.obj", &vb, &ib, false);
+        LoadObj("models/sphere.obj", &scene->sphereVB, &scene->sphereIB, false);
 
-        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
-        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
-        scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
+        //scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
+        //scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
+        //scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
 
         // Loading cube
         modelMatrix = mat4_3Dtranslate(vec3_create(10, 1, -5));
@@ -100,6 +107,12 @@ void GameInit()
         scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
         scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
         scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
+
+        mat4 instanceData[3] = {};
+        instanceData[0] = mat4_3Dtranslate(vec3_create(0, 10, 10));
+        instanceData[1] = mat4_3Dtranslate(vec3_create(10, 1, 10));
+        instanceData[2] = mat4_3Dtranslate(vec3_create(10, 5, 10));
+        scene->instancedVB = VertexBufferCreate(instanceData, sizeof(instanceData));
     }
 
     // Initializing rendering state
@@ -130,12 +143,29 @@ void GameInit()
     shaderCreateInfo.renderTargetDepth = true;
     gameState->shadowShader = ShaderCreate(&shaderCreateInfo);
 
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 1;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_MAT4;
+    shaderCreateInfo.vertexShaderName = "shadow_instanced";
+
+    gameState->instancedShadowShader = ShaderCreate(&shaderCreateInfo);
+
+    shaderCreateInfo.vertexShaderName = "simple_shader_instanced";
+    shaderCreateInfo.fragmentShaderName = "simple_shader";
+    shaderCreateInfo.renderTargetColor = true;
+    shaderCreateInfo.renderTargetDepth = true;
+
+    gameState->instancedLightingShader = ShaderCreate(&shaderCreateInfo);
+
     gameState->shadowMaterial = MaterialCreate(gameState->shadowShader);
+    gameState->instancedShadowMaterial = MaterialCreate(gameState->instancedShadowShader);
+    gameState->instancedLightingMaterial = MaterialCreate(gameState->instancedLightingShader);
     gameState->lightingMaterial = MaterialCreate(gameState->lightingShader);
     gameState->uiTextureMaterial = MaterialCreate(gameState->uiTextureShader);
     MaterialUpdateTexture(gameState->uiTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
     MaterialUpdateTexture(gameState->lightingMaterial, "shadowMap", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
     MaterialUpdateTexture(gameState->lightingMaterial, "shadowMapCompare", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_SHADOW);
+    MaterialUpdateTexture(gameState->instancedLightingMaterial, "shadowMap", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+    MaterialUpdateTexture(gameState->instancedLightingMaterial, "shadowMapCompare", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_SHADOW);
 
     u8 pixels[TEXTURE_CHANNELS * 2];
     pixels[0] = 255;
@@ -169,6 +199,10 @@ void GameShutdown()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
+    MaterialDestroy(gameState->instancedLightingMaterial);
+    MaterialDestroy(gameState->instancedShadowMaterial);
+    ShaderDestroy(gameState->instancedLightingShader);
+    ShaderDestroy(gameState->instancedShadowShader);
     MaterialDestroy(gameState->shadowMaterial);
     ShaderDestroy(gameState->shadowShader);
     MaterialDestroy(gameState->uiTextureMaterial);
@@ -183,6 +217,10 @@ void GameShutdown()
         VertexBufferDestroy(gameState->scene.vertexBufferDarray[i]);
         IndexBufferDestroy(gameState->scene.indexBufferDarray[i]);
     }
+
+    VertexBufferDestroy(gameState->scene.sphereVB);
+    VertexBufferDestroy(gameState->scene.instancedVB);
+    IndexBufferDestroy(gameState->scene.sphereIB);
 
     DarrayDestroy(gameState->scene.vertexBufferDarray);
     DarrayDestroy(gameState->scene.indexBufferDarray);
@@ -244,7 +282,8 @@ void GameUpdateAndRender()
     f32 roughness = 0; // sin(TimerSecondsSinceStart(gameState->timer)) / 2 + 0.5f;
     MaterialUpdateProperty(gameState->lightingMaterial, "color", &testColor);
     MaterialUpdateProperty(gameState->lightingMaterial, "roughness", &roughness);
-
+    MaterialUpdateProperty(gameState->instancedLightingMaterial, "color", &testColor);
+    MaterialUpdateProperty(gameState->instancedLightingMaterial, "roughness", &roughness);
     
 
     vec2i windowSize = GetPlatformWindowSize();
@@ -266,6 +305,8 @@ void GameUpdateAndRender()
     mat4 shadowProjView = mat4_mul_mat4(shadowProj, shadowView);
     MaterialUpdateProperty(gameState->shadowMaterial, "shadowProjView", &shadowProjView);
     MaterialUpdateProperty(gameState->lightingMaterial, "lightTransform", &shadowProjView);
+    MaterialUpdateProperty(gameState->instancedShadowMaterial, "shadowProjView", &shadowProjView);
+    MaterialUpdateProperty(gameState->instancedLightingMaterial, "lightTransform", &shadowProjView);
     MaterialUpdateProperty(gameState->uiTextureMaterial, "zNear", &zNear);
     MaterialUpdateProperty(gameState->uiTextureMaterial, "zFar", &zFar);
 
@@ -275,9 +316,11 @@ void GameUpdateAndRender()
     globalUniformObject.directionalLight = directionalLight;
     UpdateGlobalUniform(&globalUniformObject);
 
+    // ======================================================= Rendering ================================================
     if (!BeginRendering())
         return;
 
+    // ================== Rendering shadowmap
     RenderTargetStartRendering(gameState->shadowMapRenderTarget);
 
     MaterialBind(gameState->shadowMaterial);
@@ -287,8 +330,13 @@ void GameUpdateAndRender()
         Draw(1, &gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i], 1);
     }
 
+    VertexBuffer instancedVBPair[2] = {gameState->scene.sphereVB, gameState->scene.instancedVB};
+    MaterialBind(gameState->instancedShadowMaterial);
+    Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, 3);
+
     RenderTargetStopRendering(gameState->shadowMapRenderTarget);
 
+    // ================== Rendering scene
     RenderTargetStartRendering(GetMainRenderTarget());
 
     MaterialBind(gameState->lightingMaterial);
@@ -297,6 +345,9 @@ void GameUpdateAndRender()
     {
         Draw(1, &gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i], 1);
     }
+
+    MaterialBind(gameState->instancedLightingMaterial);
+    Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, 3);
 
     MaterialBind(gameState->uiTextureMaterial);
 

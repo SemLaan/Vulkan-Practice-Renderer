@@ -55,6 +55,9 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
     MemoryCopy(rawVertFilename + SHADERS_PREFIX_LENGTH + vertShaderNameLength, rawVertPostfix, 6);
     MemoryCopy(rawFragFilename + SHADERS_PREFIX_LENGTH + fragShaderNameLength, rawFragPostfix, 6);
 
+    if (!fragmentShader)
+        pCreateInfo->fragmentShaderName = nullptr;
+
     // ============================================================================================================================================================
     // ======================== Getting the properties/uniforms from the raw shader ==========================================================================
     // ============================================================================================================================================================
@@ -283,19 +286,20 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
     for (int i = 0; i < totalAttributeCount; i++)
     {
         attributeDescriptions[i].location = i;
-        attributeDescriptions[i].binding = 0;
 
         if (i < vbLayoutCopy.perVertexAttributeCount) // if it's a vertex attribute
         {
+            attributeDescriptions[i].binding = 0;
             attributeDescriptions[i].format = attributeFormats[vbLayoutCopy.perVertexAttributes[i]];
             attributeDescriptions[i].offset = vertexStride;
             vertexStride += attributeSizes[vbLayoutCopy.perVertexAttributes[i]];
         }
         else // if it's an instance attribute
         {
-            attributeDescriptions[i].format = attributeFormats[vbLayoutCopy.perInstanceAttributes[i]];
+            attributeDescriptions[i].binding = 1;
+            attributeDescriptions[i].format = attributeFormats[vbLayoutCopy.perInstanceAttributes[i - vbLayoutCopy.perVertexAttributeCount]];
             attributeDescriptions[i].offset = instanceStride;
-            instanceStride += attributeSizes[vbLayoutCopy.perInstanceAttributes[i]];
+            instanceStride += attributeSizes[vbLayoutCopy.perInstanceAttributes[i - vbLayoutCopy.perVertexAttributeCount]];
         }
     }
 
