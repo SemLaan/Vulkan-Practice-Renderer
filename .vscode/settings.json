@@ -16,6 +16,8 @@
         "darray.h": "c",
         "renderer_types.h": "c",
         "material.h": "c",
-        "vulkan_command_buffer.h": "c"
+        "vulkan_command_buffer.h": "c",
+        "font_loader.h": "c",
+        "stdint.h": "c"
     }
 }

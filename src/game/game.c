@@ -13,6 +13,7 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
+#include "renderer/ui/font_loader.h"
 
 typedef struct Scene
 {
@@ -63,6 +64,9 @@ bool OnWindowResize(EventCode type, EventData data)
 
 void GameInit()
 {
+    LoadFont("Roboto-Black.ttf");
+
+
     gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
 
     // Creating the scene
