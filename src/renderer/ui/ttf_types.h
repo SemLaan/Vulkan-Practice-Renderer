@@ -3,8 +3,6 @@
 #include "defines.h"
 #include <stdio.h>
 
-
-
 static inline u32 readU32(FILE* file)
 {
     u8 buf[4];
@@ -39,6 +37,14 @@ static inline i16 readI16(FILE* file)
     buf[0] = buf[1];
     buf[1] = temp;
     return *(i16*)buf;
+}
+
+static inline void readU16Array(FILE* file, u16* ref_array, u32 arraySize)
+{
+    for (u32 i = 0; i < arraySize; i++)
+    {
+        ref_array[i] = readU16(file);
+    }
 }
 
 // Describes how many other tables there are
@@ -134,7 +140,6 @@ typedef struct LongHorMetric
     i16 leftSideBearing;
 } LongHorMetric;
 
-
 static inline LongHorMetric readLongHorMetric(FILE* file)
 {
     LongHorMetric longHorMetric;
@@ -195,18 +200,69 @@ static inline CmapFormat4 readCmapFormat4(FILE* file)
     return cmap;
 }
 
+typedef struct FontHeaderTable
+{
+    u32 version;
+    u32 fontRevision;
+    u32 checkSumAdjustment;
+    u32 magicNumber;
+    u16 flags;
+    u16 unitsPerEm;
+    u64 created; // data in this is worthless because it's not loaded properly (because it's not needed)
+    u64 modified; // data in this is worthless because it's not loaded properly (because it's not needed)
+    i16 xMin;
+    i16 yMin;
+    i16 xMax;
+    i16 yMax;
+    u16 macStyle;
+    u16 lowestRecPPEM;
+    i16 fontDirectionHint;
+    i16 indexToLocFormat;
+    i16 glyphDataFormat;
+} FontHeaderTable;
+
+static inline FontHeaderTable readFontHeaderTable(FILE* file)
+{
+    FontHeaderTable fontHeaderTable;
+    fontHeaderTable.version = readU32(file);
+    fontHeaderTable.fontRevision = readU32(file);
+    fontHeaderTable.checkSumAdjustment = readU32(file);
+    fontHeaderTable.magicNumber = readU32(file);
+    fontHeaderTable.flags = readU16(file);
+    fontHeaderTable.unitsPerEm = readU16(file);
+    fontHeaderTable.created = readU32(file);
+    readU32(file);
+    fontHeaderTable.modified = readU32(file);
+    readU32(file);
+    fontHeaderTable.xMin = readI16(file);
+    fontHeaderTable.yMin = readI16(file);
+    fontHeaderTable.xMax = readI16(file);
+    fontHeaderTable.yMax = readI16(file);
+    fontHeaderTable.macStyle = readU16(file);
+    fontHeaderTable.lowestRecPPEM = readU16(file);
+    fontHeaderTable.fontDirectionHint = readI16(file);
+    fontHeaderTable.indexToLocFormat = readI16(file);
+    fontHeaderTable.glyphDataFormat = readI16(file);
+    return fontHeaderTable;
+}
 
 #define MAX_TABLE_RECORDS 50
 #define MAX_LONG_HOR_METRICS 2000
 #define MAX_CMAP_ENCODINGS 10
+#define CHAR_COUNT 255
+#define ID_DELTA_MOD 65536
 
 typedef struct TTFData
 {
     OffsetTable offsetTable;
     TableRecord tableRecords[MAX_TABLE_RECORDS];
+    FontHeaderTable fontHeaderTable;
     HorizontalHeaderTable horizontalHeaderTable;
     LongHorMetric longHorMetrics[MAX_LONG_HOR_METRICS];
     CmapIndex cmapIndex;
     CmapEncoding cmapEncodings[MAX_CMAP_ENCODINGS];
     CmapFormat4 cmap;
+    u32 cmapIndices[CHAR_COUNT];
+    i64 glyphOffsetTableOffset;// loca
+    i64 glyphTableOffset;// glyf
 } TTFData;
