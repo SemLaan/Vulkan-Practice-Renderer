@@ -2,12 +2,14 @@
 #include "ttf_types.h"
 
 #include "core/asserts.h"
+#include "core/meminc.h"
+#include "math/lin_alg.h"
 #include <stdio.h>
 #include <string.h>
 
 #define FORMAT_4_MAX_SEGMENTS 200
 
-void LoadFont(const char* filename)
+GlyphData LoadFont(const char* filename)
 {
     TTFData ttfData = {};
 
@@ -56,8 +58,8 @@ void LoadFont(const char* filename)
             for (int j = 0; j < ttfData.horizontalHeaderTable.numOfLongHorMetrics; j++)
             {
                 ttfData.longHorMetrics[j] = readLongHorMetric(file);
-                //if (j % 20 == 0)
-                    //_DEBUG("Advance width: %u", ttfData.longHorMetrics[j].advanceWidth);
+                // if (j % 20 == 0)
+                //_DEBUG("Advance width: %u", ttfData.longHorMetrics[j].advanceWidth);
             }
         }
         else if (0 == strncmp(ttfData.tableRecords[i].tag, "cmap", 4))
@@ -110,24 +112,24 @@ void LoadFont(const char* filename)
                                 // This means the font doesn't have this character
                                 if (charCode < startCode[segment])
                                 {
-                                    ttfData.cmapIndices[charCode] = 0;
+                                    ttfData.glyphIndices[charCode] = 0;
                                     break;
                                 }
 
                                 if (idRangeOffset[segment] == 0)
                                 {
-                                    ttfData.cmapIndices[charCode] = (charCode + idDelta[segment]) % ID_DELTA_MOD;
+                                    ttfData.glyphIndices[charCode] = (charCode + idDelta[segment]) % ID_DELTA_MOD;
                                 }
                                 else
                                 {
                                     u32 glyphId = *(idRangeOffset[segment] / 2 + (charCode - startCode[segment]) + &idRangeOffset[segment]);
                                     if (glyphId == 0)
                                     {
-                                        ttfData.cmapIndices[charCode] = 0;
+                                        ttfData.glyphIndices[charCode] = 0;
                                     }
                                     else
                                     {
-                                        ttfData.cmapIndices[charCode] = (glyphId + idDelta[segment]) % ID_DELTA_MOD;
+                                        ttfData.glyphIndices[charCode] = (glyphId + idDelta[segment]) % ID_DELTA_MOD;
                                     }
                                 }
 
@@ -144,22 +146,128 @@ void LoadFont(const char* filename)
         GRASSERT(0 == fseek(file, nextRecordStreamPos, SEEK_SET));
     }
 
-
     for (u32 charCode = 0; charCode < CHAR_COUNT; charCode++)
     {
+        if (charCode != 'W')
+            continue;
+
         i64 glyphOffset = ttfData.glyphTableOffset;
         if (ttfData.fontHeaderTable.indexToLocFormat == 1)
         {
-            GRASSERT(0 == fseek(file, ttfData.glyphOffsetTableOffset + ttfData.cmapIndices[charCode] * sizeof(u32), SEEK_SET));
+            GRASSERT(0 == fseek(file, ttfData.glyphOffsetTableOffset + ttfData.glyphIndices[charCode] * sizeof(u32), SEEK_SET));
             glyphOffset += readU32(file);
         }
         else
         {
-            GRASSERT(0 == fseek(file, ttfData.glyphOffsetTableOffset + ttfData.cmapIndices[charCode] * sizeof(u16), SEEK_SET));
+            GRASSERT(0 == fseek(file, ttfData.glyphOffsetTableOffset + ttfData.glyphIndices[charCode] * sizeof(u16), SEEK_SET));
             glyphOffset += readU16(file) * 2;
         }
 
         GRASSERT(0 == fseek(file, glyphOffset, SEEK_SET));
-        
+
+        GlyphHeader glyphHeader = readGlyphHeader(file);
+
+        GRASSERT(glyphHeader.numberOfContours < MAX_CONTOURS);
+
+        if (glyphHeader.numberOfContours >= 0) // if simple glyph
+        {
+            u16 endPtsOfContours[MAX_CONTOURS] = {};
+            readU16Array(file, endPtsOfContours, glyphHeader.numberOfContours);
+            u32 totalPoints = endPtsOfContours[glyphHeader.numberOfContours - 1] + 1;
+            GRASSERT(totalPoints < MAX_POINTS);
+
+            u16 instructionLength = readU16(file);
+            GRASSERT(0 == fseek(file, instructionLength, SEEK_CUR));
+
+            _DEBUG("Countour count: %i, Point count: %u", glyphHeader.numberOfContours, totalPoints);
+            for (int d = 0; d < glyphHeader.numberOfContours; d++)
+                _DEBUG("Contour end %i: %u", d, endPtsOfContours[d]);
+
+            u8 processedFlags[MAX_POINTS] = {};
+
+            u32 flagIndex = 0;
+            while (flagIndex < totalPoints)
+            {
+                u8 currentFlag = readU8(file);
+                processedFlags[flagIndex] = currentFlag;
+                flagIndex++;
+
+                if (currentFlag & POINT_FLAG_REPEAT_FLAG)
+                {
+                    u8 repetitionCount = readU8(file);
+                    for (int repetition = 0; repetition < repetitionCount; repetition++)
+                    {
+                        processedFlags[flagIndex] = currentFlag;
+                        flagIndex++;
+                    }
+                }
+            }
+
+            GRASSERT(flagIndex == totalPoints);
+
+            vec2* resultPositions = Alloc(GetGlobalAllocator(), sizeof(*resultPositions) * totalPoints, MEM_TAG_LOGGING_SUBSYS);
+
+            // Reading x coordinates
+            i32 relativePosition = 0;
+            for (int pointIndex = 0; pointIndex < totalPoints; pointIndex++)
+            {
+                if (processedFlags[pointIndex] & POINT_FLAG_X_SHORT_VECTOR)
+                {
+                    i32 xOffset = readU8(file);
+                    if (processedFlags[pointIndex] & POINT_FLAG_X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR)
+                        relativePosition += xOffset;
+                    else
+                        relativePosition -= xOffset;
+                }
+                else if (0 == (processedFlags[pointIndex] & POINT_FLAG_X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR))
+                {
+                    relativePosition += readI16(file);
+                }
+
+                resultPositions[pointIndex].x = (f32)relativePosition / (f32)ttfData.fontHeaderTable.unitsPerEm;
+            }
+
+            // Reading y coordinates
+            relativePosition = 0;
+            for (int pointIndex = 0; pointIndex < totalPoints; pointIndex++)
+            {
+                if (processedFlags[pointIndex] & POINT_FLAG_Y_SHORT_VECTOR)
+                {
+                    i32 yOffset = readU8(file);
+                    if (processedFlags[pointIndex] & POINT_FLAG_Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR)
+                        relativePosition += yOffset;
+                    else
+                        relativePosition -= yOffset;
+                }
+                else if (0 == (processedFlags[pointIndex] & POINT_FLAG_Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR))
+                {
+                    relativePosition += readI16(file);
+                }
+
+                resultPositions[pointIndex].y = (f32)relativePosition / (f32)ttfData.fontHeaderTable.unitsPerEm;
+            }
+
+            // Debug printing
+            u32 contourIndex = 0;
+            for (int pointIndex = 0; pointIndex < totalPoints; pointIndex++)
+            {
+                _DEBUG("x: %f, y: %f", resultPositions[pointIndex].x, resultPositions[pointIndex].y);
+                if (endPtsOfContours[contourIndex] == pointIndex)
+                {
+                    _DEBUG("End of contour");
+                    contourIndex++;
+                }
+            }
+
+            GlyphData glyphData = {};
+            glyphData.pointCount = totalPoints;
+            glyphData.points = resultPositions;
+
+            return glyphData;
+        }
+        else    // if complex glyph
+        {
+
+        }
     }
 }

@@ -23,6 +23,7 @@ typedef struct Scene
     VertexBuffer* vertexBufferDarray;
     IndexBuffer* indexBufferDarray;
     mat4* modelMatrixDarray;
+    u32 instanceCount;
 } Scene;
 
 typedef struct GameState
@@ -53,6 +54,7 @@ GameState* gameState = nullptr;
 
 #define QUAD_VERT_COUNT 4
 #define QUAD_INDEX_COUNT 6
+#define MAX_INSTANCE_COUNT 200
 
 bool OnWindowResize(EventCode type, EventData data)
 {
@@ -64,7 +66,7 @@ bool OnWindowResize(EventCode type, EventData data)
 
 void GameInit()
 {
-    LoadFont("Roboto-Black.ttf");
+    GlyphData glyphData = LoadFont("Roboto-Black.ttf");
 
 
     gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
@@ -112,10 +114,14 @@ void GameInit()
         scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
         scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
 
-        mat4 instanceData[3] = {};
-        instanceData[0] = mat4_3Dtranslate(vec3_create(0, 10, 10));
-        instanceData[1] = mat4_3Dtranslate(vec3_create(10, 1, 10));
-        instanceData[2] = mat4_3Dtranslate(vec3_create(10, 5, 10));
+        scene->instanceCount = glyphData.pointCount;
+        mat4 instanceData[MAX_INSTANCE_COUNT] = {};
+        for (int i = 0; i < scene->instanceCount; i++)
+        {
+            mat4 translation = mat4_2Dtranslate(vec2_add_vec2(vec2_mul_f32(glyphData.points[i], 15), (vec2){0, 10}));
+            mat4 scale = mat4_3Dscale(vec3_create(0.3f, 0.3f, 0.3f));
+            instanceData[i] = mat4_mul_mat4(translation, scale);
+        }
         scene->instancedVB = VertexBufferCreate(instanceData, sizeof(instanceData));
     }
 
@@ -336,7 +342,7 @@ void GameUpdateAndRender()
 
     VertexBuffer instancedVBPair[2] = {gameState->scene.sphereVB, gameState->scene.instancedVB};
     MaterialBind(gameState->instancedShadowMaterial);
-    Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, 3);
+    Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, gameState->scene.instanceCount);
 
     RenderTargetStopRendering(gameState->shadowMapRenderTarget);
 
@@ -351,7 +357,7 @@ void GameUpdateAndRender()
     }
 
     MaterialBind(gameState->instancedLightingMaterial);
-    Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, 3);
+    Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, gameState->scene.instanceCount);
 
     MaterialBind(gameState->uiTextureMaterial);
 

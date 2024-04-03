@@ -28,6 +28,14 @@ static inline u16 readU16(FILE* file)
     return *(u16*)buf;
 }
 
+static inline u8 readU8(FILE* file)
+{
+    u8 buf[1];
+    u32 readSize = fread(buf, 1, 1, file);
+    GRASSERT(readSize == 1);
+    return *buf;
+}
+
 static inline i16 readI16(FILE* file)
 {
     u8 buf[2];
@@ -246,11 +254,40 @@ static inline FontHeaderTable readFontHeaderTable(FILE* file)
     return fontHeaderTable;
 }
 
+typedef struct GlyphHeader
+{
+    i16 numberOfContours;
+    i16 xMin;
+    i16 yMin;
+    i16 xMax;
+    i16 yMax;
+} GlyphHeader;
+
+static inline GlyphHeader readGlyphHeader(FILE* file)
+{
+    GlyphHeader glyphHeader = {};
+    glyphHeader.numberOfContours = readI16(file);
+    glyphHeader.xMin = readI16(file);
+    glyphHeader.yMin = readI16(file);
+    glyphHeader.xMax = readI16(file);
+    glyphHeader.yMax = readI16(file);
+    return glyphHeader;
+}
+
+#define POINT_FLAG_ON_CURVE_POINT 0x01
+#define POINT_FLAG_X_SHORT_VECTOR 0x02
+#define POINT_FLAG_Y_SHORT_VECTOR 0x04
+#define POINT_FLAG_REPEAT_FLAG 0x08
+#define POINT_FLAG_X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR 0x10
+#define POINT_FLAG_Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR 0x20
+
 #define MAX_TABLE_RECORDS 50
 #define MAX_LONG_HOR_METRICS 2000
 #define MAX_CMAP_ENCODINGS 10
 #define CHAR_COUNT 255
 #define ID_DELTA_MOD 65536
+#define MAX_CONTOURS 10
+#define MAX_POINTS 1000
 
 typedef struct TTFData
 {
@@ -262,7 +299,7 @@ typedef struct TTFData
     CmapIndex cmapIndex;
     CmapEncoding cmapEncodings[MAX_CMAP_ENCODINGS];
     CmapFormat4 cmap;
-    u32 cmapIndices[CHAR_COUNT];
+    u32 glyphIndices[CHAR_COUNT];
     i64 glyphOffsetTableOffset;// loca
     i64 glyphTableOffset;// glyf
 } TTFData;
