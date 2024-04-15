@@ -216,7 +216,7 @@ typedef struct FontHeaderTable
     u32 magicNumber;
     u16 flags;
     u16 unitsPerEm;
-    u64 created; // data in this is worthless because it's not loaded properly (because it's not needed)
+    u64 created;  // data in this is worthless because it's not loaded properly (because it's not needed)
     u64 modified; // data in this is worthless because it's not loaded properly (because it's not needed)
     i16 xMin;
     i16 yMin;
@@ -252,6 +252,46 @@ static inline FontHeaderTable readFontHeaderTable(FILE* file)
     fontHeaderTable.indexToLocFormat = readI16(file);
     fontHeaderTable.glyphDataFormat = readI16(file);
     return fontHeaderTable;
+}
+
+typedef struct MaxP
+{
+    u32 version;
+    u16 numGlyphs;
+    u16 maxPoints;
+    u16 maxContours;
+    u16 maxCompositePoints;
+    u16 maxCompositeContours;
+    u16 maxZones;
+    u16 maxTwilightPoints;
+    u16 maxStorage;
+    u16 maxFunctionDefs;
+    u16 maxInstructionDefs;
+    u16 maxStackElements;
+    u16 maxSizeOfInstructions;
+    u16 maxComponentElements;
+    u16 maxComponentDepth;
+} MaxP;
+
+static inline MaxP readMaxP(FILE* file)
+{
+    MaxP maxP;
+    maxP.version = readU32(file);
+    maxP.numGlyphs = readU16(file);
+    maxP.maxPoints = readU16(file);
+    maxP.maxContours = readU16(file);
+    maxP.maxCompositePoints = readU16(file);
+    maxP.maxCompositeContours = readU16(file);
+    maxP.maxZones = readU16(file);
+    maxP.maxTwilightPoints = readU16(file);
+    maxP.maxStorage = readU16(file);
+    maxP.maxFunctionDefs = readU16(file);
+    maxP.maxInstructionDefs = readU16(file);
+    maxP.maxStackElements = readU16(file);
+    maxP.maxSizeOfInstructions = readU16(file);
+    maxP.maxComponentElements = readU16(file);
+    maxP.maxComponentDepth = readU16(file);
+    return maxP;
 }
 
 typedef struct GlyphHeader
@@ -294,12 +334,13 @@ typedef struct TTFData
     OffsetTable offsetTable;
     TableRecord tableRecords[MAX_TABLE_RECORDS];
     FontHeaderTable fontHeaderTable;
+    MaxP maxP;
     HorizontalHeaderTable horizontalHeaderTable;
     LongHorMetric longHorMetrics[MAX_LONG_HOR_METRICS];
     CmapIndex cmapIndex;
     CmapEncoding cmapEncodings[MAX_CMAP_ENCODINGS];
     CmapFormat4 cmap;
     u32 glyphIndices[CHAR_COUNT];
-    i64 glyphOffsetTableOffset;// loca
-    i64 glyphTableOffset;// glyf
+    i64 glyphOffsetTableOffset; // loca
+    i64 glyphTableOffset;       // glyf
 } TTFData;

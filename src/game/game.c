@@ -54,7 +54,7 @@ GameState* gameState = nullptr;
 
 #define QUAD_VERT_COUNT 4
 #define QUAD_INDEX_COUNT 6
-#define MAX_INSTANCE_COUNT 200
+#define MAX_INSTANCE_COUNT 2000
 
 bool OnWindowResize(EventCode type, EventData data)
 {
@@ -66,8 +66,9 @@ bool OnWindowResize(EventCode type, EventData data)
 
 void GameInit()
 {
-    GlyphData glyphData = LoadFont("Roboto-Black.ttf");
-
+    GlyphData* glyphData = LoadFont("Roboto-Black.ttf");
+    const char* testString = "Hello_World";
+    u32 testStringLength = 11;
 
     gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
 
@@ -114,14 +115,32 @@ void GameInit()
         scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
         scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
 
-        scene->instanceCount = glyphData.pointCount;
+        // Text rendering test
+        u32 textPointCount = 0;
         mat4 instanceData[MAX_INSTANCE_COUNT] = {};
-        for (int i = 0; i < scene->instanceCount; i++)
+        u32 pointIndex = 0;
+        f32 currentCharacterOffset = 0;
+
+        for (int i = 0; i < testStringLength; i++)
         {
-            mat4 translation = mat4_2Dtranslate(vec2_add_vec2(vec2_mul_f32(glyphData.points[i], 15), (vec2){0, 10}));
-            mat4 scale = mat4_3Dscale(vec3_create(0.3f, 0.3f, 0.3f));
-            instanceData[i] = mat4_mul_mat4(translation, scale);
+            u32 c = testString[i];
+
+            textPointCount += glyphData->pointCounts[c];
+
+            for (int point = 0; point < glyphData->pointCounts[c]; point++)
+            {
+                mat4 translation = mat4_2Dtranslate(vec2_add_vec2(vec2_mul_f32(glyphData->pointsArrays[c][point], 20), (vec2){currentCharacterOffset * 20, 10}));
+                mat4 scale = mat4_3Dscale(vec3_create(0.3f, 0.3f, 0.3f));
+                instanceData[pointIndex] = mat4_mul_mat4(translation, scale);
+
+                pointIndex++;
+            }
+
+            currentCharacterOffset += glyphData->advanceWidths[c];
+            _DEBUG("aw: %f", glyphData->advanceWidths[c]);
         }
+
+        scene->instanceCount = textPointCount;
         scene->instancedVB = VertexBufferCreate(instanceData, sizeof(instanceData));
     }
 
