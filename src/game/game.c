@@ -54,7 +54,7 @@ GameState* gameState = nullptr;
 
 #define QUAD_VERT_COUNT 4
 #define QUAD_INDEX_COUNT 6
-#define MAX_INSTANCE_COUNT 2000
+#define MAX_INSTANCE_COUNT 20000
 
 bool OnWindowResize(EventCode type, EventData data)
 {
@@ -66,9 +66,11 @@ bool OnWindowResize(EventCode type, EventData data)
 
 void GameInit()
 {
-    GlyphData* glyphData = LoadFont("Roboto-Black.ttf");
-    const char* testString = "Hello_World";
-    u32 testStringLength = 11;
+    //GlyphData* glyphData = LoadFont("Roboto-Black.ttf");
+    //GlyphData* glyphData = LoadFont("Adorable Handmade.ttf");
+    GlyphData* glyphData = LoadFont("Nicolast.ttf");
+    const char* testString = "Beefy text testing!?.";
+    u32 testStringLength = 21;
 
     gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
 
@@ -125,11 +127,18 @@ void GameInit()
         {
             u32 c = testString[i];
 
+            if (c == ' ')
+            {
+                currentCharacterOffset += glyphData->advanceWidths[c];
+                continue;
+            }
+
             textPointCount += glyphData->pointCounts[c];
+            GRASSERT(textPointCount < MAX_INSTANCE_COUNT);
 
             for (int point = 0; point < glyphData->pointCounts[c]; point++)
             {
-                mat4 translation = mat4_2Dtranslate(vec2_add_vec2(vec2_mul_f32(glyphData->pointsArrays[c][point], 20), (vec2){currentCharacterOffset * 20, 10}));
+                mat4 translation = mat4_2Dtranslate(vec2_add_vec2(vec2_mul_f32(glyphData->pointsArrays[c][point], 5), (vec2){currentCharacterOffset * 5, 10}));
                 mat4 scale = mat4_3Dscale(vec3_create(0.3f, 0.3f, 0.3f));
                 instanceData[pointIndex] = mat4_mul_mat4(translation, scale);
 

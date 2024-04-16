@@ -121,11 +121,14 @@ GlyphData* LoadFont(const char* filename)
 
                     // Find all indices for charcodes we care about
                     for (u32 charCode = 0; charCode < CHAR_COUNT; charCode++)
-                    {
+                    {                         
                         for (int segment = 0; segment < segCount; segment++)
                         {
                             if (charCode <= endCode[segment])
                             {
+                                if (charCode == 32 || charCode == 95)
+                                    _DEBUG("test");
+
                                 // This means the font doesn't have this character
                                 if (charCode < startCode[segment])
                                 {
@@ -140,14 +143,14 @@ GlyphData* LoadFont(const char* filename)
                                 else
                                 {
                                     u32 glyphId = *(idRangeOffset[segment] / 2 + (charCode - startCode[segment]) + &idRangeOffset[segment]);
-                                    if (glyphId == 0)
-                                    {
-                                        ttfData.glyphIndices[charCode] = 0;
-                                    }
-                                    else
-                                    {
+                                    //if (glyphId == 0)
+                                    //{
+                                    //    ttfData.glyphIndices[charCode] = 0;
+                                    //}
+                                    //else
+                                    //{
                                         ttfData.glyphIndices[charCode] = (glyphId + idDelta[segment]) % ID_DELTA_MOD;
-                                    }
+                                    //}
                                 }
 
                                 break;
@@ -170,6 +173,8 @@ GlyphData* LoadFont(const char* filename)
     {
         if (charCode == 9) // TODO: check why this one (tab) doesn't work
             continue;
+        if (charCode == 32)
+            _DEBUG("test");
         u32 glyphID = ttfData.glyphIndices[charCode];
 
         // Filling in advance widths and left side bearings
