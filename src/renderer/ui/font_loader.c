@@ -9,6 +9,14 @@
 
 #define FORMAT_4_MAX_SEGMENTS 200
 
+typedef struct RawGlyphData
+{
+    u32 pointCounts[255];           // Amount of points in the glyph, index from 0 - 255
+    u32 endPointsOfContours[255][MAX_CONTOURS]; // Arrays of indices of contour ends, amount of contours per glyph found in GlyphData struct
+    vec2* pointsArrays[255];        // Array of points in the glyph, index from 0 - 255
+    bool* onCurveArrays[255];        // Array of booleans that say whether the point is on curve or not, index from 0 - 255
+} RawGlyphData;
+
 GlyphData* LoadFont(const char* filename)
 {
     TTFData ttfData = {};
@@ -143,14 +151,14 @@ GlyphData* LoadFont(const char* filename)
                                 else
                                 {
                                     u32 glyphId = *(idRangeOffset[segment] / 2 + (charCode - startCode[segment]) + &idRangeOffset[segment]);
-                                    //if (glyphId == 0)
-                                    //{
-                                    //    ttfData.glyphIndices[charCode] = 0;
-                                    //}
-                                    //else
-                                    //{
+                                    if (glyphId == 0)
+                                    {
+                                        ttfData.glyphIndices[charCode] = 0;
+                                    }
+                                    else
+                                    {
                                         ttfData.glyphIndices[charCode] = (glyphId + idDelta[segment]) % ID_DELTA_MOD;
-                                    //}
+                                    }
                                 }
 
                                 break;
@@ -166,8 +174,11 @@ GlyphData* LoadFont(const char* filename)
         GRASSERT(0 == fseek(file, nextRecordStreamPos, SEEK_SET));
     }
 
-    // Filling in the glyph data by looping through all the required char codes
+    // Filling in the raw glyph data by looping through all the required char codes
     GlyphData* glyphData = Alloc(GetGlobalAllocator(), sizeof(*glyphData), MEM_TAG_RENDERER_SUBSYS);
+    RawGlyphData* rawGlyphData = Alloc(GetGlobalAllocator(), sizeof(*rawGlyphData), MEM_TAG_RENDERER_SUBSYS);
+    MemoryZero(glyphData, sizeof(*glyphData));
+    MemoryZero(rawGlyphData, sizeof(*rawGlyphData));
 
     for (u32 charCode = 0; charCode < CHAR_COUNT; charCode++)
     {
@@ -206,7 +217,13 @@ GlyphData* LoadFont(const char* filename)
             readU16Array(file, endPtsOfContours, glyphHeader.numberOfContours);
             u32 totalPoints = endPtsOfContours[glyphHeader.numberOfContours - 1] + 1;
             GRASSERT(totalPoints < MAX_POINTS);
-            glyphData->pointCounts[charCode] = totalPoints;
+            glyphData->contourCounts[charCode] = glyphHeader.numberOfContours;
+            // Manually copying contour end points into array because the datatypes are different
+            for (int contourIdx = 0; contourIdx < glyphHeader.numberOfContours; contourIdx++)
+            {
+                rawGlyphData->endPointsOfContours[charCode][contourIdx] = endPtsOfContours[contourIdx];
+            }
+            rawGlyphData->pointCounts[charCode] = totalPoints;
 
             u16 instructionLength = readU16(file);
             GRASSERT(0 == fseek(file, instructionLength, SEEK_CUR));
@@ -237,14 +254,14 @@ GlyphData* LoadFont(const char* filename)
 
             GRASSERT(flagIndex == totalPoints);
 
-            glyphData->pointsArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(vec2) * totalPoints, MEM_TAG_LOGGING_SUBSYS);
-            glyphData->onCurveArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(bool) * totalPoints, MEM_TAG_LOGGING_SUBSYS);
+            rawGlyphData->pointsArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(vec2) * totalPoints, MEM_TAG_RENDERER_SUBSYS);
+            rawGlyphData->onCurveArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(bool) * totalPoints, MEM_TAG_RENDERER_SUBSYS);
 
             // Reading x coordinates
             i32 relativePosition = 0;
             for (int pointIndex = 0; pointIndex < totalPoints; pointIndex++)
             {
-                glyphData->onCurveArrays[charCode][pointIndex] = processedFlags[pointIndex] & POINT_FLAG_ON_CURVE_POINT;
+                rawGlyphData->onCurveArrays[charCode][pointIndex] = processedFlags[pointIndex] & POINT_FLAG_ON_CURVE_POINT;
                 if (processedFlags[pointIndex] & POINT_FLAG_X_SHORT_VECTOR)
                 {
                     i32 xOffset = readU8(file);
@@ -258,7 +275,7 @@ GlyphData* LoadFont(const char* filename)
                     relativePosition += readI16(file);
                 }
 
-                glyphData->pointsArrays[charCode][pointIndex].x = (f32)relativePosition / (f32)ttfData.fontHeaderTable.unitsPerEm;
+                rawGlyphData->pointsArrays[charCode][pointIndex].x = (f32)relativePosition / (f32)ttfData.fontHeaderTable.unitsPerEm;
             }
 
             // Reading y coordinates
@@ -278,14 +295,14 @@ GlyphData* LoadFont(const char* filename)
                     relativePosition += readI16(file);
                 }
 
-                glyphData->pointsArrays[charCode][pointIndex].y = (f32)relativePosition / (f32)ttfData.fontHeaderTable.unitsPerEm;
+                rawGlyphData->pointsArrays[charCode][pointIndex].y = (f32)relativePosition / (f32)ttfData.fontHeaderTable.unitsPerEm;
             }
 
             // Debug printing
             u32 contourIndex = 0;
             for (int pointIndex = 0; pointIndex < totalPoints; pointIndex++)
             {
-                //_DEBUG("x: %f, y: %f", glyphData->pointsArrays[charCode][pointIndex].x, glyphData->pointsArrays[charCode][pointIndex].y);
+                //_DEBUG("x: %f, y: %f", rawGlyphData->pointsArrays[charCode][pointIndex].x, rawGlyphData->pointsArrays[charCode][pointIndex].y);
                 if (endPtsOfContours[contourIndex] == pointIndex)
                 {
                     //_DEBUG("End of contour");
@@ -298,6 +315,66 @@ GlyphData* LoadFont(const char* filename)
 
         }
     }
+
+    // Processing the raw glyph data by filling in the implicit points
+    for (u32 charCode = 0; charCode < CHAR_COUNT; charCode++)
+    {
+        if (rawGlyphData->pointsArrays[charCode] == nullptr)
+            continue;
+
+        u32 contourCount = glyphData->contourCounts[charCode];
+        u32* endPointsOfContours = rawGlyphData->endPointsOfContours[charCode];
+        vec2 tempPoints[MAX_POINTS] = {};
+        u32 newPointCount = 0; // Keeps track of the amount of points after implicit points are added 
+
+
+        // Calculating the total number of points after adding implicit points while putting all of them in an array on the stack
+        // The stack array will be copied to a heap array which will be created once the number of points - and thus the size of the array - is known.
+        for (int i = 0; i < contourCount; i++)
+        {
+
+            u32 previousContourEnd;
+            if (i == 0) 
+                previousContourEnd = -1;// -1 because 0 is the start of the current contour
+            else 
+                previousContourEnd = endPointsOfContours[i-1];
+            u32 currentContourStart = previousContourEnd + 1;
+            u32 contourPointCount = endPointsOfContours[i] - previousContourEnd;
+
+            glyphData->firstPointOnCurve[charCode][i] = rawGlyphData->onCurveArrays[charCode][currentContourStart];
+
+            for (int j = 0; j < contourPointCount; j++)
+            {
+                u32 currentPointIndex = j + currentContourStart;
+                u32 nextPointIndex = ((j + 1) % contourPointCount) + currentContourStart;
+
+                tempPoints[newPointCount] = rawGlyphData->pointsArrays[charCode][currentPointIndex];
+                newPointCount++;
+
+                // If the current point and the next point are either both on curve or both off curve, add an implicit point between them
+                if (rawGlyphData->onCurveArrays[charCode][currentPointIndex] == rawGlyphData->onCurveArrays[charCode][nextPointIndex])
+                {
+                    vec2 implicitPoint = vec2_mul_f32(vec2_add_vec2(rawGlyphData->pointsArrays[charCode][currentPointIndex], rawGlyphData->pointsArrays[charCode][nextPointIndex]), 0.5f);
+                    tempPoints[newPointCount] = implicitPoint;
+                    newPointCount++;
+                }
+            }
+
+            glyphData->endPointsOfContours[charCode][i] = newPointCount - 1;
+        }
+
+        GRASSERT(newPointCount < MAX_POINTS);
+
+        glyphData->pointCounts[charCode] = newPointCount;
+        glyphData->pointArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(vec2) * newPointCount, MEM_TAG_RENDERER_SUBSYS);
+        MemoryCopy(glyphData->pointArrays[charCode], tempPoints, sizeof(vec2) * newPointCount);
+
+        // Free the raw glyph data for the current character
+        Free(GetGlobalAllocator(), rawGlyphData->pointsArrays[charCode]);
+        Free(GetGlobalAllocator(), rawGlyphData->onCurveArrays[charCode]);
+    }
+
+    Free(GetGlobalAllocator(), rawGlyphData);
 
     return glyphData;
 }

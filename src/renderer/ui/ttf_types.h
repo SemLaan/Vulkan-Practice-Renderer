@@ -1,5 +1,6 @@
 #pragma once
 #include "core/asserts.h"
+#include "font_loader.h"
 #include "defines.h"
 #include <stdio.h>
 
@@ -326,7 +327,6 @@ static inline GlyphHeader readGlyphHeader(FILE* file)
 #define MAX_CMAP_ENCODINGS 10
 #define CHAR_COUNT 255
 #define ID_DELTA_MOD 65536
-#define MAX_CONTOURS 10
 #define MAX_POINTS 1000
 
 typedef struct TTFData

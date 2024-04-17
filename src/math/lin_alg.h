@@ -45,6 +45,11 @@ static vec2 vec2_sub_vec2(vec2 a, vec2 b)
 	return (vec2){a.x - b.x, a.y - b.y};
 }
 
+static vec2 vec2_div_float(vec2 vec, f32 value)
+{
+	return (vec2){ vec.x / value, vec.y / value };
+}
+
 static f32 vec2_magnitude(vec2 a)
 {
 	return sqrtf(a.x * a.x + a.y * a.y);
@@ -75,7 +80,7 @@ static vec3 vec3_add_vec3(vec3 v1, vec3 v2)
 	return (vec3){ v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
 }
 
-static vec3 vec3_min_vec3(vec3 v1, vec3 v2)
+static vec3 vec3_sub_vec3(vec3 v1, vec3 v2)
 {
 	return (vec3){ v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
 }

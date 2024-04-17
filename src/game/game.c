@@ -293,11 +293,11 @@ void GameUpdateAndRender()
     if (GetKeyDown(KEY_A))
         frameMovement = vec3_add_vec3(frameMovement, rightVector);
     if (GetKeyDown(KEY_D))
-        frameMovement = vec3_min_vec3(frameMovement, rightVector);
+        frameMovement = vec3_sub_vec3(frameMovement, rightVector);
     if (GetKeyDown(KEY_S))
         frameMovement = vec3_add_vec3(frameMovement, forwardVector);
     if (GetKeyDown(KEY_W))
-        frameMovement = vec3_min_vec3(frameMovement, forwardVector);
+        frameMovement = vec3_sub_vec3(frameMovement, forwardVector);
     if (GetKeyDown(KEY_SHIFT))
         frameMovement.y += 1;
     if (GetKeyDown(KEY_SPACE))
