@@ -22,8 +22,12 @@ typedef struct Scene
     VertexBuffer instancedVB;
     VertexBuffer* vertexBufferDarray;
     IndexBuffer* indexBufferDarray;
+    VertexBuffer bezierVB;
+    IndexBuffer bezierIB;
+    VertexBuffer instancedBezierVB;
     mat4* modelMatrixDarray;
     u32 instanceCount;
+    u32 bezierCount;
 } Scene;
 
 typedef struct GameState
@@ -36,6 +40,8 @@ typedef struct GameState
     Shader uiTextureShader;
     Shader shadowShader;
     Shader instancedShadowShader;
+    Shader bezierShader;
+    Material bezierMaterial;
     Material instancedShadowMaterial;
     Material shadowMaterial;
     Material lightingMaterial;
@@ -52,6 +58,8 @@ typedef struct GameState
 
 GameState* gameState = nullptr;
 
+static bool bezierText = true;
+
 #define QUAD_VERT_COUNT 4
 #define QUAD_INDEX_COUNT 6
 #define MAX_INSTANCE_COUNT 20000
@@ -66,9 +74,9 @@ bool OnWindowResize(EventCode type, EventData data)
 
 void GameInit()
 {
-    //GlyphData* glyphData = LoadFont("Roboto-Black.ttf");
-    //GlyphData* glyphData = LoadFont("Adorable Handmade.ttf");
-    GlyphData* glyphData = LoadFont("Nicolast.ttf");
+     GlyphData* glyphData = LoadFont("Roboto-Black.ttf");
+    //  GlyphData* glyphData = LoadFont("Adorable Handmade.ttf");
+    //GlyphData* glyphData = LoadFont("Nicolast.ttf");
     const char* testString = "Beefy text testing!?.";
     u32 testStringLength = 21;
 
@@ -105,9 +113,9 @@ void GameInit()
         modelMatrix = mat4_3Dtranslate(vec3_create(0, 10, 10));
         LoadObj("models/sphere.obj", &scene->sphereVB, &scene->sphereIB, false);
 
-        //scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
-        //scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
-        //scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
+        // scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
+        // scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
+        // scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
 
         // Loading cube
         modelMatrix = mat4_3Dtranslate(vec3_create(10, 1, -5));
@@ -118,39 +126,127 @@ void GameInit()
         scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
 
         // Text rendering test
-        u32 textPointCount = 0;
-        mat4 instanceData[MAX_INSTANCE_COUNT] = {};
-        u32 pointIndex = 0;
-        f32 currentCharacterOffset = 0;
-
-        for (int i = 0; i < testStringLength; i++)
+        if (bezierText)
         {
-            u32 c = testString[i];
+            const int bezierResolution = 10;
+            vec2 bezierVBData[bezierResolution * 2] = {};
+            u32 bezierIBData[(bezierResolution - 1) * 2 * 3]; // bezierresolution -1 is amount of quads x2 is amount of tri's x3 is amount of indices
 
-            if (c == ' ')
+            for (int i = 0; i < bezierResolution; i++)
             {
+                f32 t = (f32)i / (f32)(bezierResolution - 1);
+
+                i32 vbIndex = i * 2;
+                bezierVBData[vbIndex] = vec2_create(t, 1);
+                bezierVBData[vbIndex + 1] = vec2_create(t, -1);
+
+                if (i != bezierResolution - 1)
+                {
+                    i32 ibIndex = i * 6;
+                    bezierIBData[ibIndex + 0] = i * 2;
+                    bezierIBData[ibIndex + 1] = (i * 2) + 1;
+                    bezierIBData[ibIndex + 2] = (i * 2) + 2;
+                    bezierIBData[ibIndex + 3] = (i * 2) + 1;
+                    bezierIBData[ibIndex + 4] = (i * 2) + 3;
+                    bezierIBData[ibIndex + 5] = (i * 2) + 2;
+                }
+            }
+
+            scene->bezierVB = VertexBufferCreate(bezierVBData, sizeof(vec2) * bezierResolution * 2);
+            scene->bezierIB = IndexBufferCreate(bezierIBData, (bezierResolution - 1) * 2 * 3);
+
+            // Bezier instances
+            typedef struct BezierInstance
+            {
+                vec4 beginEndPoints;
+                vec2 midPoint;
+            } BezierInstance;
+
+            BezierInstance instanceData[MAX_INSTANCE_COUNT] = {};
+            u32 bezierIndex = 0;
+            f32 currentCharacterOffset = 0;
+
+            for (int i = 0; i < testStringLength; i++)
+            {
+                u32 c = testString[i];
+
+                if (c == ' ')
+                {
+                    currentCharacterOffset += glyphData->advanceWidths[c];
+                    continue;
+                }
+
+                for (int contour = 0; contour < glyphData->contourCounts[c]; contour++)
+                {
+                    u32 previousContourEnd;
+                    if (contour == 0)
+                        previousContourEnd = -1; // -1 because 0 is the start of the current contour
+                    else
+                        previousContourEnd = glyphData->endPointsOfContours[c][contour - 1];
+                    u32 currentContourStart = previousContourEnd + 1;
+                    u32 contourPointCount = glyphData->endPointsOfContours[c][contour] - previousContourEnd;
+
+                    // If the first point is on curve then the first off curve point is point 1 and otherwise point 0 is the first off curve point
+                    i32 firstOffCurvePoint = glyphData->firstPointOnCurve[c][contour] ? 1 : 0;
+
+                    for (int point = firstOffCurvePoint; point < contourPointCount; point += 2)
+                    {
+                        int previousPointIndex = ((point + contourPointCount - 1) % contourPointCount) + currentContourStart;
+                        int currentPoint = point + currentContourStart;
+                        int nextPointIndex = ((point + 1) % contourPointCount) + currentContourStart;
+
+                        instanceData[bezierIndex].beginEndPoints.x = glyphData->pointArrays[c][previousPointIndex].x + currentCharacterOffset;
+                        instanceData[bezierIndex].beginEndPoints.y = glyphData->pointArrays[c][previousPointIndex].y;
+                        instanceData[bezierIndex].beginEndPoints.z = glyphData->pointArrays[c][nextPointIndex].x + currentCharacterOffset;
+                        instanceData[bezierIndex].beginEndPoints.w = glyphData->pointArrays[c][nextPointIndex].y;
+                        instanceData[bezierIndex].midPoint = glyphData->pointArrays[c][currentPoint];
+                        instanceData[bezierIndex].midPoint.x += currentCharacterOffset;
+                        bezierIndex++;
+                    }
+                }
+
                 currentCharacterOffset += glyphData->advanceWidths[c];
-                continue;
             }
 
-            textPointCount += glyphData->pointCounts[c];
-            GRASSERT(textPointCount < MAX_INSTANCE_COUNT);
-
-            for (int point = 0; point < glyphData->pointCounts[c]; point++)
-            {
-                mat4 translation = mat4_2Dtranslate(vec2_add_vec2(vec2_mul_f32(glyphData->pointsArrays[c][point], 5), (vec2){currentCharacterOffset * 5, 10}));
-                mat4 scale = mat4_3Dscale(vec3_create(0.3f, 0.3f, 0.3f));
-                instanceData[pointIndex] = mat4_mul_mat4(translation, scale);
-
-                pointIndex++;
-            }
-
-            currentCharacterOffset += glyphData->advanceWidths[c];
-            _DEBUG("aw: %f", glyphData->advanceWidths[c]);
+            scene->bezierCount = bezierIndex;
+            scene->instancedBezierVB = VertexBufferCreate(instanceData, sizeof(instanceData));
         }
+        else
+        {
+            u32 textPointCount = 0;
+            mat4 instanceData[MAX_INSTANCE_COUNT] = {};
+            u32 pointIndex = 0;
+            f32 currentCharacterOffset = 0;
 
-        scene->instanceCount = textPointCount;
-        scene->instancedVB = VertexBufferCreate(instanceData, sizeof(instanceData));
+            for (int i = 0; i < testStringLength; i++)
+            {
+                u32 c = testString[i];
+
+                if (c == ' ')
+                {
+                    currentCharacterOffset += glyphData->advanceWidths[c];
+                    continue;
+                }
+
+                textPointCount += glyphData->pointCounts[c];
+                GRASSERT(textPointCount < MAX_INSTANCE_COUNT);
+
+                for (int point = 0; point < glyphData->pointCounts[c]; point++)
+                {
+                    mat4 translation = mat4_2Dtranslate(vec2_add_vec2(vec2_mul_f32(glyphData->pointArrays[c][point], 5), (vec2){currentCharacterOffset * 5, 10}));
+                    mat4 scale = mat4_3Dscale(vec3_create(0.1f, 0.1f, 0.1f));
+                    instanceData[pointIndex] = mat4_mul_mat4(translation, scale);
+
+                    pointIndex++;
+                }
+
+                currentCharacterOffset += glyphData->advanceWidths[c];
+                //_DEBUG("aw: %f", glyphData->advanceWidths[c]);
+            }
+
+            scene->instanceCount = textPointCount;
+            scene->instancedVB = VertexBufferCreate(instanceData, sizeof(instanceData));
+        }
     }
 
     // Initializing rendering state
@@ -194,6 +290,17 @@ void GameInit()
 
     gameState->instancedLightingShader = ShaderCreate(&shaderCreateInfo);
 
+    shaderCreateInfo.vertexShaderName = "bezier";
+    shaderCreateInfo.fragmentShaderName = "bezier";
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 1;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC2;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 2;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC2;
+
+    gameState->bezierShader = ShaderCreate(&shaderCreateInfo);
+
+    gameState->bezierMaterial = MaterialCreate(gameState->bezierShader);
     gameState->shadowMaterial = MaterialCreate(gameState->shadowShader);
     gameState->instancedShadowMaterial = MaterialCreate(gameState->instancedShadowShader);
     gameState->instancedLightingMaterial = MaterialCreate(gameState->instancedLightingShader);
@@ -237,6 +344,8 @@ void GameShutdown()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
+    MaterialDestroy(gameState->bezierMaterial);
+    ShaderDestroy(gameState->bezierShader);
     MaterialDestroy(gameState->instancedLightingMaterial);
     MaterialDestroy(gameState->instancedShadowMaterial);
     ShaderDestroy(gameState->instancedLightingShader);
@@ -256,9 +365,18 @@ void GameShutdown()
         IndexBufferDestroy(gameState->scene.indexBufferDarray[i]);
     }
 
-    VertexBufferDestroy(gameState->scene.sphereVB);
-    VertexBufferDestroy(gameState->scene.instancedVB);
-    IndexBufferDestroy(gameState->scene.sphereIB);
+    if (bezierText)
+    {
+        VertexBufferDestroy(gameState->scene.bezierVB);
+        VertexBufferDestroy(gameState->scene.instancedBezierVB);
+        IndexBufferDestroy(gameState->scene.bezierIB);
+    }
+    else
+    {
+        VertexBufferDestroy(gameState->scene.sphereVB);
+        VertexBufferDestroy(gameState->scene.instancedVB);
+        IndexBufferDestroy(gameState->scene.sphereIB);
+    }
 
     DarrayDestroy(gameState->scene.vertexBufferDarray);
     DarrayDestroy(gameState->scene.indexBufferDarray);
@@ -322,15 +440,15 @@ void GameUpdateAndRender()
     MaterialUpdateProperty(gameState->lightingMaterial, "roughness", &roughness);
     MaterialUpdateProperty(gameState->instancedLightingMaterial, "color", &testColor);
     MaterialUpdateProperty(gameState->instancedLightingMaterial, "roughness", &roughness);
-    
 
     vec2i windowSize = GetPlatformWindowSize();
     f32 windowAspectRatio = windowSize.x / (float)windowSize.y;
     mat4 uiProj = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
     MaterialUpdateProperty(gameState->uiTextureMaterial, "uiProjection", &uiProj);
+    MaterialUpdateProperty(gameState->bezierMaterial, "uiProjection", &uiProj);
 
-    //vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
-    vec3 lightRotationVec = vec3_create(0.5f, PI/2, 0);
+    // vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
+    vec3 lightRotationVec = vec3_create(0.5f, PI / 2, 0);
     mat4 shadowRotation = mat4_rotate_xyz(vec3_invert_sign(lightRotationVec));
 
     vec3 directionalLight = {shadowRotation.values[2 + COL4(0)], shadowRotation.values[2 + COL4(1)], shadowRotation.values[2 + COL4(2)]};
@@ -369,8 +487,11 @@ void GameUpdateAndRender()
     }
 
     VertexBuffer instancedVBPair[2] = {gameState->scene.sphereVB, gameState->scene.instancedVB};
-    MaterialBind(gameState->instancedShadowMaterial);
-    Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, gameState->scene.instanceCount);
+    if (!bezierText)
+    {
+        MaterialBind(gameState->instancedShadowMaterial);
+        Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, gameState->scene.instanceCount);
+    }
 
     RenderTargetStopRendering(gameState->shadowMapRenderTarget);
 
@@ -384,8 +505,18 @@ void GameUpdateAndRender()
         Draw(1, &gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i], 1);
     }
 
-    MaterialBind(gameState->instancedLightingMaterial);
-    Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, gameState->scene.instanceCount);
+    if (!bezierText)
+    {
+        MaterialBind(gameState->instancedLightingMaterial);
+        Draw(2, instancedVBPair, gameState->scene.sphereIB, nullptr, gameState->scene.instanceCount);
+    }
+    else
+    {
+        VertexBuffer instancedBezierVBPair[2] = {gameState->scene.bezierVB, gameState->scene.instancedBezierVB};
+        MaterialBind(gameState->bezierMaterial);
+        mat4 bezierModel = mat4_2Dtranslate(vec2_create(0, 4));
+        Draw(2, instancedBezierVBPair, gameState->scene.bezierIB, &bezierModel, gameState->scene.bezierCount);
+    }
 
     MaterialBind(gameState->uiTextureMaterial);
 

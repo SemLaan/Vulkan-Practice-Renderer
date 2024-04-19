@@ -35,6 +35,11 @@
 #define M3i 8
 
 
+static vec2 vec2_create(f32 x, f32 y)
+{
+	return (vec2){x, y};
+}
+
 static vec2 vec2_add_vec2(vec2 a, vec2 b)
 {
 	return (vec2){a.x + b.x, a.y + b.y};
@@ -90,7 +95,7 @@ static vec3 vec3_div_float(vec3 vec, f32 value)
 	return (vec3){ vec.x / value, vec.y / value, vec.z / value };
 }
 
-static vec3 vec3_create(float x, float y, float z)
+static vec3 vec3_create(f32 x, f32 y, f32 z)
 {
 	vec3 out;
 	out.x = x;
@@ -99,7 +104,7 @@ static vec3 vec3_create(float x, float y, float z)
 	return out;
 }
 
-static vec4 vec4_create(float x, float y, float z, float w)
+static vec4 vec4_create(f32 x, f32 y, f32 z, f32 w)
 {
 	vec4 out;
 	out.x = x;
