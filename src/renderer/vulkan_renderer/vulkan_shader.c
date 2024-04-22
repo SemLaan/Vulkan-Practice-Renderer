@@ -1,4 +1,5 @@
 #include "../shader.h"
+#include "vulkan_shader.h"
 
 #include "core/asserts.h"
 #include "vulkan_buffer.h"
@@ -10,7 +11,7 @@
 
 #define MAX_FILEPATH_SIZE 100
 
-Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
+void ShaderCreate(const char* shaderName, ShaderCreateInfo* pCreateInfo)
 {
     Shader clientShader;
     clientShader.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanShader), MEM_TAG_RENDERER_SUBSYS);
@@ -479,12 +480,12 @@ Shader ShaderCreate(ShaderCreateInfo* pCreateInfo)
 
     _DEBUG("Shader created successfully");
 
-    return clientShader;
+    SimpleMapInsert(vk_state->shaderMap, shaderName, clientShader.internalState);
 }
 
-void ShaderDestroy(Shader clientShader)
+void ShaderDestroy(const char* shaderName)
 {
-    VulkanShader* shader = clientShader.internalState;
+    VulkanShader* shader = SimpleMapDelete(vk_state->shaderMap, shaderName);
 
     FreeUniformData(&shader->vertUniformPropertiesData, &shader->vertUniformTexturesData);
     FreeUniformData(&shader->fragUniformPropertiesData, &shader->fragUniformTexturesData);
@@ -498,3 +499,26 @@ void ShaderDestroy(Shader clientShader)
 
     Free(vk_state->rendererAllocator, shader);
 }
+
+Shader ShaderGetRef(const char* shaderName)
+{
+    VulkanShader* shader = SimpleMapLookup(vk_state->shaderMap, shaderName);
+    Shader clientShader = {shader};
+    return clientShader;
+}
+
+void ShaderDestroyInternal(VulkanShader* shader)
+{
+    FreeUniformData(&shader->vertUniformPropertiesData, &shader->vertUniformTexturesData);
+    FreeUniformData(&shader->fragUniformPropertiesData, &shader->fragUniformTexturesData);
+
+    if (shader->pipelineObject)
+        vkDestroyPipeline(vk_state->device, shader->pipelineObject, vk_state->vkAllocator);
+    if (shader->pipelineLayout)
+        vkDestroyPipelineLayout(vk_state->device, shader->pipelineLayout, vk_state->vkAllocator);
+    if (shader->descriptorSetLayout)
+        vkDestroyDescriptorSetLayout(vk_state->device, shader->descriptorSetLayout, vk_state->vkAllocator);
+
+    Free(vk_state->rendererAllocator, shader);
+}
+

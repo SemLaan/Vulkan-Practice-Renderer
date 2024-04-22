@@ -16,6 +16,7 @@
 #include "vulkan_swapchain.h"
 #include "vulkan_types.h"
 #include "vulkan_utils.h"
+#include "vulkan_shader.h"
 
 RendererState* vk_state = nullptr;
 
@@ -701,8 +702,10 @@ bool InitializeRenderer()
     }
 
     // ============================================================================================================================================================
-    // ============================ Creating default shader and material ======================================================================================================
+    // ============================ Creating shader map and default shader and material ======================================================================================================
     // ============================================================================================================================================================
+    vk_state->shaderMap = SimpleMapCreate(vk_state->rendererAllocator, MAX_SHADERS);
+
     ShaderCreateInfo shaderCreateInfo = {};
     shaderCreateInfo.vertexShaderName = DEFAULT_SHADER_NAME;
     shaderCreateInfo.fragmentShaderName = DEFAULT_SHADER_NAME;
@@ -713,8 +716,8 @@ bool InitializeRenderer()
     shaderCreateInfo.renderTargetColor = true;
     shaderCreateInfo.renderTargetDepth = true;
     shaderCreateInfo.renderTargetStencil = false;
-    vk_state->defaultShader = ShaderCreate(&shaderCreateInfo);
-    vk_state->defaultMaterial = MaterialCreate(vk_state->defaultShader);
+    ShaderCreate(DEFAULT_SHADER_NAME, &shaderCreateInfo);
+    vk_state->defaultMaterial = MaterialCreate(ShaderGetRef(DEFAULT_SHADER_NAME));
     vec4 defaultColor = vec4_create(1, 0.5f, 1, 1);
     MaterialUpdateProperty(vk_state->defaultMaterial, "color", &defaultColor);
 
@@ -748,10 +751,21 @@ void ShutdownRenderer()
         DarrayDestroy(vk_state->requestedQueueAcquisitionOperationsDarray);
 
     // ============================================================================================================================================================
-    // ============================ Destroying default shader and material ======================================================================================================
+    // ============================ Destroying material, left over shaders and shader map ======================================================================================================
     // ============================================================================================================================================================
-    ShaderDestroy(vk_state->defaultShader);
     MaterialDestroy(vk_state->defaultMaterial);
+
+    u32 shaderArraySize;
+    void** shaderArray = SimpleMapGetBackingArrayRef(vk_state->shaderMap, &shaderArraySize);
+
+    for (int i = 0; i < shaderArraySize; i++)
+    {
+        VulkanShader* shader = shaderArray[i];
+        if (shader)
+            ShaderDestroyInternal(shader);
+    }
+
+    SimpleMapDestroy(vk_state->shaderMap);
 
     // ============================================================================================================================================================
     // ============================ Destroying default texture ======================================================================================================
@@ -954,7 +968,7 @@ bool BeginRendering()
     DarraySetSize(vk_state->requestedQueueAcquisitionOperationsDarray, 0);
 
     // Binding global ubo
-    VulkanShader* defaultShader = vk_state->defaultShader.internalState;
+    VulkanShader* defaultShader = SimpleMapLookup(vk_state->shaderMap, DEFAULT_SHADER_NAME);
     vkCmdBindDescriptorSets(currentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, defaultShader->pipelineLayout, 0, 1, &vk_state->globalDescriptorSetArray[vk_state->currentInFlightFrameIndex], 0, nullptr);
 
     return true;

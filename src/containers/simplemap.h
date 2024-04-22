@@ -37,6 +37,7 @@ void* SimpleMapLookup(SimpleMap* map, const char* key);
 void* SimpleMapDelete(SimpleMap* map, const char* key);
 
 /// @brief Gets the backing array that stores the items from a SimpleMap. Can be used to iterate over all elements of the map, the map has nullptr's where there is no item.
+/// The backing array that is returned is owned by the SimpleMap and destroyed when the simple map is.
 /// @param map Pointer to a SimpleMap to get the backing array from.
 /// @param elementCount Pointer to an integer that gets filled in with the size of the array.
 /// @return void** to the array.

@@ -4,10 +4,12 @@
 #include "containers/darray.h"
 #include "../buffer.h"
 #include "../render_target.h"
+#include "containers/simplemap.h"
 
 typedef struct RendererState RendererState;
 extern RendererState* vk_state;
 
+#define MAX_SHADERS 256
 #define MAX_FRAMES_IN_FLIGHT 2
 #define RENDER_POOL_BLOCK_SIZE_32 32
 #define QUEUE_ACQUISITION_POOL_BLOCK_SIZE 160 // 160 bytes (2.5 cache lines) 32 byte aligned, enough to store VkDependencyInfo + (VkImageMemoryBarrier2 or VkBufferMemoryBarrier2)
@@ -188,9 +190,9 @@ typedef struct RendererState
 	VkDependencyInfo** requestedQueueAcquisitionOperationsDarray;	// For transfering queue ownership from transfer to graphics after a resource has been uploaded
 	VkAllocationCallbacks* vkAllocator;								// Vulkan API allocator, only for reading vulkan allocations not for taking over allocation from vulkan //TODO: this is currently just nullptr
 	VkDescriptorPool descriptorPool;								// Pool used to allocate descriptor sets for all materials
-	Shader defaultShader;											// Fallback shader that is very simple, this shaders pipeline layout is used to bind the global ubo
 	Material defaultMaterial;										// Material based on default shader
 	VulkanSamplers* samplers;										// All the different texture samplers
+	SimpleMap* shaderMap;											// String hashmap that maps shader names to shader references.
 
 	// Data that is only used on startup/shutdown
 	VkFormat renderTargetColorFormat;								// Image format used for render target color textures

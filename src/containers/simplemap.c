@@ -12,7 +12,7 @@ u32 HashString_djb2(const char* str, u32 moduloValue)
     i32 c;
 
 	// The bit shift trick works because bit shifting by 5 multiplies the number by 32, then adding the hash is the 33d time, bit shifting can be a fast way of multiplying by a power of two.
-    while (c = *str++)
+    while ((c = *str++))
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
 
     return hash % moduloValue;
@@ -41,6 +41,8 @@ SimpleMap* SimpleMapCreate(Allocator* allocator, u32 maxEntries)
 
 	// Creating a pool allocator for the key strings.
     CreatePoolAllocator("Simple Map keyPool", allocator, SIMPLEMAP_MAX_KEY_LEN, maxEntries, &map->keyPool);
+
+	return map;
 }
 
 void SimpleMapDestroy(SimpleMap* map)
@@ -56,12 +58,20 @@ void SimpleMapDestroy(SimpleMap* map)
 
 void SimpleMapInsert(SimpleMap* map, const char* key, void* value)
 {
-	GRASSERT_DEBUG(map && key && value);
+	GRASSERT_DEBUG(map && key && value && map->keyPool && map->keys && map->values);
 
 	u32 hash = HashString_djb2(key, map->backingArraySize);
 
 	// Making sure that there are no collisions
-	GRASSERT(map->values[hash] == nullptr);
+	if (map->values[hash] != nullptr)
+	{
+		if (0 == strncmp(key, map->keys[hash], SIMPLEMAP_MAX_KEY_LEN))
+			_ERROR("Key with name: \"%s\" already exists.", key);
+		else
+			_ERROR("Key with name: \"%s\" collides with key: \"%s\", simple map can't have collisions so change one of their names.", key, map->keys[hash]);
+
+		GRASSERT(false);
+	}
 
 	u32 keyStringLength = strlen(key);
 	GRASSERT_DEBUG(keyStringLength < SIMPLEMAP_MAX_KEY_LEN);
@@ -77,7 +87,7 @@ void SimpleMapInsert(SimpleMap* map, const char* key, void* value)
 
 void* SimpleMapLookup(SimpleMap* map, const char* key)
 {
-	GRASSERT_DEBUG(map && key);
+	GRASSERT_DEBUG(map && key && map->keyPool && map->keys && map->values);
 
 	u32 hash = HashString_djb2(key, map->backingArraySize);
 
@@ -88,7 +98,7 @@ void* SimpleMapLookup(SimpleMap* map, const char* key)
 
 void* SimpleMapDelete(SimpleMap* map, const char* key)
 {
-	GRASSERT_DEBUG(map && key);
+	GRASSERT_DEBUG(map && key && map->keyPool && map->keys && map->values);
 
 	u32 hash = HashString_djb2(key, map->backingArraySize);
 
@@ -106,7 +116,7 @@ void* SimpleMapDelete(SimpleMap* map, const char* key)
 
 void** SimpleMapGetBackingArrayRef(SimpleMap* map, u32* elementCount)
 {
-	GRASSERT_DEBUG(map && elementCount);
+	GRASSERT_DEBUG(map && elementCount && map->keyPool && map->keys && map->values);
 	*elementCount = map->backingArraySize;
 	return map->values;	
 }
