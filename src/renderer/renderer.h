@@ -5,6 +5,12 @@
 #include "shader.h"
 
 
+typedef enum UpdateFrequency
+{
+    UPDATE_FREQUENCY_STATIC,
+    UPDATE_FREQUENCY_DYNAMIC,
+} UpdateFrequency;
+
 // ============================================= Engine functions ====================================================
 bool InitializeRenderer();
 void ShutdownRenderer();

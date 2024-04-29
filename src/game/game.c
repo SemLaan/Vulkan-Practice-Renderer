@@ -75,7 +75,7 @@ bool OnWindowResize(EventCode type, EventData data)
 
 void GameInit()
 {
-	 GlyphData* glyphData = LoadFont("Roboto-Black.ttf");
+	GlyphData* glyphData = LoadFont("Roboto-Black.ttf");
 	//  GlyphData* glyphData = LoadFont("Adorable Handmade.ttf");
 	//GlyphData* glyphData = LoadFont("Nicolast.ttf");
 	const char* testString = "Beefy text testing!?.";

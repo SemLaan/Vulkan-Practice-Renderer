@@ -20,4 +20,4 @@ typedef struct GlyphData
 
 
 GlyphData* LoadFont(const char* filename);
-void FreeGlyphArray(GlyphData* glyphArray);//TODO: implement
+void FreeGlyphData(GlyphData* glyphData);//TODO: implement

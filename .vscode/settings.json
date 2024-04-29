@@ -19,6 +19,7 @@
         "vulkan_command_buffer.h": "c",
         "font_loader.h": "c",
         "stdint.h": "c",
-        "mem_utils.h": "c"
+        "mem_utils.h": "c",
+        "text_renderer.h": "c"
     }
 }
