@@ -7,7 +7,6 @@ layout(location = 2) in vec2 i_midPoint;
 
 layout(BIND 0) uniform UniformBufferObject
 {
-	mat4 uiProjection;
     float lineThickness;
 } ubo;
 
@@ -24,5 +23,5 @@ void main() {
     vec2 bezierTangent = normalize(bezierPositionPlus - bezierPosition);
     vec2 bezierNormal = vec2(-bezierTangent.y, bezierTangent.x);
     bezierPosition += bezierNormal * v_bezierPosition.y * 0.015;// TODO: multiply with line thickness
-	gl_Position = ubo.uiProjection * pc.model * vec4(bezierPosition, 0, 1);
+	gl_Position = pc.model * vec4(bezierPosition, 0, 1);
 }

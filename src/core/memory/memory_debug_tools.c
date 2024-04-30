@@ -10,6 +10,9 @@
 #include <stdlib.h>
 
 
+#define ALLOCATIONS_MAP_SIZE 50000
+#define ALLOCATIONS_MAP_MAX_COLLISIONS 1000
+
 // Can turn a memory tag into a string, used for printing/logging
 static const char* memTagToText[MAX_MEMORY_TAGS] = {
     "ALLOCATOR STATE    ",
@@ -96,8 +99,8 @@ void _StartMemoryDebugSubsys()
     // Allocating and creating the memory debug state
     state = Alloc(memoryDebugAllocator, sizeof(*state), MEM_TAG_MEMORY_DEBUG);
     MemoryZero(state, sizeof(*state));
-    state->allocationsMap = MapU64Create(memoryDebugAllocator, MEM_TAG_MEMORY_DEBUG, 4000, 100, Hash6432Shift);
-    CreatePoolAllocator("Alloc info pool", memoryDebugAllocator, sizeof(AllocInfo), 4100, &state->allocInfoPool);
+    state->allocationsMap = MapU64Create(memoryDebugAllocator, MEM_TAG_MEMORY_DEBUG, ALLOCATIONS_MAP_SIZE, ALLOCATIONS_MAP_MAX_COLLISIONS, Hash6432Shift);
+    CreatePoolAllocator("Alloc info pool", memoryDebugAllocator, sizeof(AllocInfo), ALLOCATIONS_MAP_SIZE + ALLOCATIONS_MAP_MAX_COLLISIONS, &state->allocInfoPool);
     state->totalUserAllocated = 0;
     state->totalUserAllocationCount = 0;
     state->arenaStart = memoryDebugArenaStart;

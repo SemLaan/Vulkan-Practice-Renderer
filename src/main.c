@@ -7,6 +7,7 @@
 #include "core/input.h"
 #include "core/platform.h"
 #include "renderer/renderer.h"
+#include "renderer/ui/text_renderer.h"
 #include "game/game.h"
 
 static bool appRunning;
@@ -25,6 +26,7 @@ int main()
     InitializeInput();
     InitializePlatform("Beef", 200, 100);
     InitializeRenderer();
+	InitializeTextRenderer();
 
     appRunning = true;
     appSuspended = false;
@@ -65,6 +67,7 @@ int main()
     UnregisterEventListener(EVCODE_QUIT, OnQuit);
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
 
+	ShutdownTextRenderer();
     ShutdownRenderer();
     ShutdownPlatform();
     ShutdownInput();

@@ -7,10 +7,11 @@
 
 // For determining the size of the allocations in the text pool allocator.
 // It is asserted on text renderer startup that this is bigger than the text struct.
-#define TEXT_BLOCK_SIZE 32
+#define TEXT_BLOCK_SIZE 128
 #define MAX_TEXT_OBJECTS 500
 #define TEXT_STRING_ARENA_SIZE (KiB * 10)
 #define MAX_BEZIER_INSTANCE_COUNT 20000
+#define BEZIER_SHADER_NAME "bezier"
 
 typedef struct Text
 {
@@ -18,9 +19,17 @@ typedef struct Text
     char* string;                    // TODO: remove if not used
     VertexBuffer instanceVB;         //
     UpdateFrequency updateFrequency; // TODO: use this
+    u32 bezierInstanceCount;         //
     u32 id;                          // TODO: remove if not used
     bool enabled;
 } Text;
+
+/// @brief Struct of the per instance data for the bezier shader
+typedef struct BezierInstance
+{
+    vec4 beginEndPoints;
+    vec2 midPoint;
+} BezierInstance;
 
 /// @brief Struct with all the data necessary to render text with a font.
 typedef struct Font
@@ -29,12 +38,6 @@ typedef struct Font
     BezierInstance* characterBeziers[255]; // Array of arrays with bezier curve data for each of the glyphs.
     u32 characterBezierCounts[255];        // Array of amount of bezier's for each character.
 } Font;
-
-typedef struct BezierInstance
-{
-    vec4 beginEndPoints;
-    vec2 midPoint;
-} BezierInstance;
 
 typedef struct TextRendererState
 {
@@ -55,6 +58,8 @@ bool InitializeTextRenderer()
     GRASSERT_DEBUG(state == nullptr); // If this fails init text renderer was called twice
     GRASSERT_DEBUG(TEXT_BLOCK_SIZE >= sizeof(Text));
     _INFO("Initializing text renderer subsystem...");
+
+    // Creating the text renderer state struct and creating the basic data structures in it.
     state = Alloc(GetGlobalAllocator(), sizeof(*state), MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(state, sizeof(*state));
 
@@ -63,6 +68,22 @@ bool InitializeTextRenderer()
     CreatePoolAllocator("text renderer text pool", GetGlobalAllocator(), TEXT_BLOCK_SIZE, MAX_TEXT_OBJECTS, &state->textPool);
     CreateFreelistAllocator("Text renderer text strings", GetGlobalAllocator(), TEXT_STRING_ARENA_SIZE, &state->textStringAllocator);
     state->nextTextId = 1;
+
+    // Creating the bezier shader and material
+    ShaderCreateInfo shaderCreateInfo = {};
+    shaderCreateInfo.renderTargetStencil = false;
+    shaderCreateInfo.renderTargetDepth = true;
+    shaderCreateInfo.renderTargetColor = true;
+    shaderCreateInfo.vertexShaderName = "bezier";
+    shaderCreateInfo.fragmentShaderName = "bezier";
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 1;
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC2;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 2;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC2;
+
+    ShaderCreate("bezier", &shaderCreateInfo);
+    state->bezierMaterial = MaterialCreate(ShaderGetRef("bezier"));
 
     // Generating the bezier strip mesh
     // The vertices in the strip are just vec2's, the x component indicates how far along in the bezier line the vertex is (between 0 and 1) and the y
@@ -93,11 +114,17 @@ bool InitializeTextRenderer()
 
     state->bezierVB = VertexBufferCreate(bezierVBData, sizeof(vec2) * bezierResolution * 2);
     state->bezierIB = IndexBufferCreate(bezierIBData, (bezierResolution - 1) * 2 * 3);
+
+    return true;
 }
 
 void ShutdownTextRenderer()
 {
+    DestroyPoolAllocator(state->textPool);
+    DestroyFreelistAllocator(state->textStringAllocator);
+    MaterialDestroy(state->bezierMaterial);
     SimpleMapDestroy(state->fontMap);
+    DarrayDestroy(state->textDarray);
 
     Free(GetGlobalAllocator(), state);
 }
@@ -116,6 +143,8 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     const char* renderableCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ<>,./\\?|_-=+1234567890!@#$&*()~`";
     u32 charCount = strlen(renderableCharacters);
 
+    // Looping over the amount of renderable characters.
+    // Getting the character at the index and making an array of its bezier curves.
     for (int i = 0; i < charCount; i++)
     {
         BezierInstance instanceData[MAX_BEZIER_INSTANCE_COUNT] = {};
@@ -160,6 +189,10 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
 Text* TextCreate(const char* textString, const char* fontName, mat4 transform, UpdateFrequency updateFrequency)
 {
+    // Getting the font object
+    Font* font = SimpleMapLookup(state->fontMap, fontName);
+
+    // Creating the text struct and filling in basic data about the text
     Text* text = Alloc(state->textPool, TEXT_BLOCK_SIZE, MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(text, TEXT_BLOCK_SIZE);
 
@@ -169,7 +202,97 @@ Text* TextCreate(const char* textString, const char* fontName, mat4 transform, U
     text->id = state->nextTextId;
     state->nextTextId++;
 
+    // Copying the string into the text struct
     u32 stringLength = strlen(textString);
     text->string = Alloc(state->textStringAllocator, stringLength, MEM_TAG_RENDERER_SUBSYS);
     MemoryCopy(text->string, textString, stringLength);
+
+    // Generating the instance vertex buffer data for the bezier curves of the entire string.
+    // First calculating the size of the buffer.
+    u32 totalBeziers = 0;
+    for (int i = 0; i < stringLength; i++)
+    {
+        u32 c = textString[i];
+
+        // If the character outline can't be found replace the character with a '?'.
+        if (c != ' ' && font->characterBeziers[c] == nullptr)
+            totalBeziers += font->characterBezierCounts['?'];
+        else // Otherwise just add the amount of beziers of the current character to the total bezier count.
+            totalBeziers += font->characterBezierCounts[c];
+    }
+
+    text->bezierInstanceCount = totalBeziers;
+
+    // Allocate memory for the array
+    u32 bezierCurvesArraySizeBytes = sizeof(BezierInstance) * totalBeziers;
+    BezierInstance* bezierCurves = Alloc(GetGlobalAllocator(), bezierCurvesArraySizeBytes, MEM_TAG_RENDERER_SUBSYS);
+    u32 bezierIndex = 0;
+    f32 currentWidthOffset = 0;
+
+    // Adding the bezier curves to the array and adjusting their positions based on the width offset of the character
+    for (int i = 0; i < stringLength; i++)
+    {
+        u32 c = textString[i];
+
+        // If the character outline can't be found replace the character with a '?'.
+        if (c != ' ' && font->characterBeziers[c] == nullptr)
+        {
+            c = '?';
+        }
+
+        u32 nextCharBezierIndex = bezierIndex + font->characterBezierCounts[c];
+
+        if (c != ' ')
+        {
+            MemoryCopy(&bezierCurves[bezierIndex], font->characterBeziers[c], font->characterBezierCounts[c] * sizeof(BezierInstance));
+
+            // Looping over the individual bezier curves in the current characters curves and adding the offset to them.
+            for (int j = bezierIndex; j < nextCharBezierIndex; j++)
+            {
+                bezierCurves[j].beginEndPoints.x += currentWidthOffset;
+                bezierCurves[j].beginEndPoints.z += currentWidthOffset;
+                bezierCurves[j].midPoint.x += currentWidthOffset;
+            }
+        }
+
+        bezierIndex = nextCharBezierIndex;
+        currentWidthOffset += font->glyphData->advanceWidths[c];
+    }
+
+    // Creating the vertex buffer
+    text->instanceVB = VertexBufferCreate(bezierCurves, bezierCurvesArraySizeBytes);
+    Free(GetGlobalAllocator(), bezierCurves);
+
+    // Adding the text to the text darray
+    state->textDarray = DarrayPushback(state->textDarray, &text);
+
+    return text;
+}
+
+void TextUpdateTransform(Text* text, mat4 transform)
+{
+    text->transform = transform;
+}
+
+void TextRender()
+{
+    // TODO: add a way to check with the renderer whether we are in an appropriate renderpass and assert that.
+
+    u32 textCount = DarrayGetSize(state->textDarray);
+
+    MaterialBind(state->bezierMaterial);
+
+    // Loop over all the text objects and render the active ones.
+    for (int i = 0; i < textCount; i++)
+    {
+        Text* text = state->textDarray[i];
+
+        // Skip this text if it's disabled
+        if (!text->enabled)
+            continue;
+
+        // Render the text
+        VertexBuffer instancedPair[2] = {state->bezierVB, text->instanceVB};
+        Draw(2, instancedPair, state->bezierIB, &text->transform, text->bezierInstanceCount);
+    }
 }
