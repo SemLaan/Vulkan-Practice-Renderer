@@ -8,6 +8,7 @@
 #include "core/platform.h"
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
+#include "renderer/ui/debug_ui.h"
 #include "game/game.h"
 
 static bool appRunning;
@@ -27,6 +28,7 @@ int main()
     InitializePlatform("Beef", 200, 100);
     InitializeRenderer();
 	InitializeTextRenderer();
+	InitializeDebugUI();
 
     appRunning = true;
     appSuspended = false;
@@ -49,6 +51,7 @@ int main()
             if (GetKeyDown(KEY_F11) && !GetKeyDownPrevious(KEY_F11))
                 ToggleFullscreen();
 
+			UpdateDebugUI();
             GameUpdateAndRender();
 
 			if (GetKeyDown(KEY_ESCAPE))
@@ -67,6 +70,7 @@ int main()
     UnregisterEventListener(EVCODE_QUIT, OnQuit);
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
 
+	ShutdownDebugUI();
 	ShutdownTextRenderer();
     ShutdownRenderer();
     ShutdownPlatform();

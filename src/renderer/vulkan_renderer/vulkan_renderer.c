@@ -6,6 +6,8 @@
 #include "core/logger.h"
 #include "core/meminc.h"
 #include "math/lin_alg.h"
+#include "renderer/obj_loader.h"
+#include "core/platform.h"
 
 #include "renderer/texture.h"
 #include "vulkan_buffer.h"
@@ -721,6 +723,21 @@ bool InitializeRenderer()
     vec4 defaultColor = vec4_create(1, 0.5f, 1, 1);
     MaterialUpdateProperty(vk_state->defaultMaterial, "color", &defaultColor);
 
+	// ============================================================================================================================================================
+    // ============================ Loading basic meshes ======================================================================================================
+    // ============================================================================================================================================================
+	vk_state->basicMeshMap = SimpleMapCreate(vk_state->rendererAllocator, BASIC_MESH_COUNT + 5/*making sure collisions don't occur*/);
+
+	MeshData* basicMeshDataArray = Alloc(vk_state->rendererAllocator, sizeof(*basicMeshDataArray) * BASIC_MESH_COUNT, MEM_TAG_RENDERER_SUBSYS);
+	LoadObj("models/quad.obj", &basicMeshDataArray[0].vertexBuffer, &basicMeshDataArray[0].indexBuffer, false);
+	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_QUAD, basicMeshDataArray + 0);
+
+	LoadObj("models/sphere.obj", &basicMeshDataArray[1].vertexBuffer, &basicMeshDataArray[1].indexBuffer, false);
+	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_SPHERE, basicMeshDataArray + 1);
+
+	LoadObj("models/cube.obj", &basicMeshDataArray[2].vertexBuffer, &basicMeshDataArray[2].indexBuffer, false);
+	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_CUBE, basicMeshDataArray + 2);
+
     return true;
 }
 
@@ -749,6 +766,21 @@ void ShutdownRenderer()
 
     if (vk_state->requestedQueueAcquisitionOperationsDarray)
         DarrayDestroy(vk_state->requestedQueueAcquisitionOperationsDarray);
+
+	// ============================================================================================================================================================
+    // ============================ Destroying basic meshes ======================================================================================================
+    // ============================================================================================================================================================
+	// See the creation of the basic meshes to understand why this works
+	MeshData* basicMeshDataArray = SimpleMapLookup(vk_state->basicMeshMap, BASIC_MESH_NAME_QUAD);
+
+	for (int i = 0; i < BASIC_MESH_COUNT; i++)
+	{
+		VertexBufferDestroy(basicMeshDataArray[i].vertexBuffer);
+		IndexBufferDestroy(basicMeshDataArray[i].indexBuffer);
+	}
+
+	SimpleMapDestroy(vk_state->basicMeshMap);
+	Free(vk_state->rendererAllocator, basicMeshDataArray);
 
     // ============================================================================================================================================================
     // ============================ Destroying material, left over shaders and shader map ======================================================================================================
@@ -1186,6 +1218,25 @@ void Draw(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer 
 RenderTarget GetMainRenderTarget()
 {
     return vk_state->mainRenderTarget;
+}
+
+MeshData* GetBasicMesh(const char* meshName)
+{
+	return SimpleMapLookup(vk_state->basicMeshMap, meshName);
+}
+
+vec4 ScreenToClipSpace(vec4 coordinates)
+{
+	vec2i windowSize = GetPlatformWindowSize();
+
+	coordinates.x = coordinates.x / (f32)windowSize.x;
+    coordinates.y = coordinates.y / (f32)windowSize.y;
+    coordinates.x = coordinates.x * 2;
+    coordinates.y = coordinates.y * 2;
+    coordinates.x -= 1;
+    coordinates.y -= 1;
+
+	return coordinates;
 }
 
 static bool OnWindowResize(EventCode type, EventData data)

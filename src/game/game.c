@@ -14,6 +14,7 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "renderer/ui/text_renderer.h"
+#include "renderer/ui/debug_ui.h"
 
 #define LIGHTING_SHADER_NAME "lighting"
 #define UI_TEXTURE_SHADER_NAME "uitexture"
@@ -45,7 +46,8 @@ typedef struct GameState
     Material lightingMaterial;
     Material instancedLightingMaterial;
     Material uiTextureMaterial;
-	Text* textTest;
+    Text* textTest;
+	DebugMenu* debugMenu;
     Texture texture;
     vec3 camPosition;
     vec3 camRotation;
@@ -61,7 +63,7 @@ GameState* gameState = nullptr;
 #define QUAD_VERT_COUNT 4
 #define QUAD_INDEX_COUNT 6
 
-bool OnWindowResize(EventCode type, EventData data)
+static bool OnWindowResize(EventCode type, EventData data)
 {
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
@@ -89,6 +91,7 @@ void GameInit()
         VertexBuffer vb;
         IndexBuffer ib;
         mat4 modelMatrix;
+        MeshData* tempMesh;
 
         // Loading gun
         modelMatrix = mat4_3Dtranslate(vec3_create(0, 3, 0));
@@ -100,10 +103,10 @@ void GameInit()
 
         // Loading quad
         modelMatrix = mat4_3Dscale(vec3_create(20, 1, 20));
-        LoadObj("models/quad.obj", &vb, &ib, false);
+        tempMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);
 
-        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
-        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
+        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &tempMesh->vertexBuffer);
+        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &tempMesh->indexBuffer);
         scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
 
         // Loading sphere
@@ -116,10 +119,10 @@ void GameInit()
 
         // Loading cube
         modelMatrix = mat4_3Dtranslate(vec3_create(10, 1, -5));
-        LoadObj("models/cube.obj", &vb, &ib, false);
+        tempMesh = GetBasicMesh(BASIC_MESH_NAME_CUBE);
 
-        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &vb);
-        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &ib);
+        scene->vertexBufferDarray = DarrayPushback(scene->vertexBufferDarray, &tempMesh->vertexBuffer);
+        scene->indexBufferDarray = DarrayPushback(scene->indexBufferDarray, &tempMesh->indexBuffer);
         scene->modelMatrixDarray = DarrayPushback(scene->modelMatrixDarray, &modelMatrix);
     }
 
@@ -209,6 +212,9 @@ void GameInit()
 
     gameState->textTest = TextCreate(testString, FONT_NAME_ROBOTO, gameState->uiViewProj, UPDATE_FREQUENCY_STATIC);
 
+	// Creating debug menu
+	gameState->debugMenu = DebugUICreateMenu();
+
     StartOrResetTimer(&gameState->timer);
 }
 
@@ -224,11 +230,9 @@ void GameShutdown()
     MaterialDestroy(gameState->lightingMaterial);
     TextureDestroy(gameState->texture);
 
-    for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
-    {
-        VertexBufferDestroy(gameState->scene.vertexBufferDarray[i]);
-        IndexBufferDestroy(gameState->scene.indexBufferDarray[i]);
-    }
+    // Destroying the tracker gan mesh because it is the only mesh actually created by this script
+    VertexBufferDestroy(gameState->scene.vertexBufferDarray[0]);
+    IndexBufferDestroy(gameState->scene.indexBufferDarray[0]);
 
     VertexBufferDestroy(gameState->scene.sphereVB);
     IndexBufferDestroy(gameState->scene.sphereIB);
@@ -283,8 +287,8 @@ void GameUpdateAndRender()
 
     if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN))
     {
-        gameState->mouseEnabled = !gameState->mouseEnabled;
-        InputSetMouseCentered(gameState->mouseEnabled);
+        //gameState->mouseEnabled = !gameState->mouseEnabled;
+        //InputSetMouseCentered(gameState->mouseEnabled);
     }
 
     // ============================ Rendering ===================================
@@ -349,10 +353,10 @@ void GameUpdateAndRender()
         Draw(1, &gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i], 1);
     }
 
-	// Text
-	mat4 bezierModel = mat4_2Dtranslate(vec2_create(0, 4));
-	//TextUpdateTransform(gameState->textTest, mat4_mul_mat4(gameState->uiViewProj, bezierModel));
-	TextUpdateTransform(gameState->textTest, mat4_mul_mat4(projView, bezierModel));
+    // Text
+    mat4 bezierModel = mat4_2Dtranslate(vec2_create(0, 4));
+    // TextUpdateTransform(gameState->textTest, mat4_mul_mat4(gameState->uiViewProj, bezierModel));
+    TextUpdateTransform(gameState->textTest, mat4_mul_mat4(projView, bezierModel));
     TextRender();
 
     MaterialBind(gameState->uiTextureMaterial);
@@ -364,6 +368,8 @@ void GameUpdateAndRender()
     mat4 scale = mat4_2Dscale((vec2){windowAspectRatio, 1});
     mat4 modelMatrix = mat4_mul_mat4(translation, mat4_mul_mat4(rotate, scale));
     Draw(1, &gameState->scene.vertexBufferDarray[1], gameState->scene.indexBufferDarray[1], &modelMatrix, 1);
+
+	DebugUIRenderMenu(gameState->debugMenu);
 
     RenderTargetStopRendering(GetMainRenderTarget());
 

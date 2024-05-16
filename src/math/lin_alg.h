@@ -119,6 +119,11 @@ static f32 vec4_dot(vec4 v1, vec4 v2)
 	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
 }
 
+static vec2 vec4_xy(vec4 v)
+{
+	return vec2_create(v.x, v.y);
+}
+
 static mat2 mat2_identity()
 {
 	mat2 mat = {};

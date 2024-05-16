@@ -10,6 +10,7 @@ typedef struct RendererState RendererState;
 extern RendererState* vk_state;
 
 #define MAX_SHADERS 256
+#define BASIC_MESH_COUNT 3
 #define MAX_FRAMES_IN_FLIGHT 2
 #define RENDER_POOL_BLOCK_SIZE_32 32
 #define QUEUE_ACQUISITION_POOL_BLOCK_SIZE 160 // 160 bytes (2.5 cache lines) 32 byte aligned, enough to store VkDependencyInfo + (VkImageMemoryBarrier2 or VkBufferMemoryBarrier2)
@@ -193,6 +194,7 @@ typedef struct RendererState
 	Material defaultMaterial;										// Material based on default shader
 	VulkanSamplers* samplers;										// All the different texture samplers
 	SimpleMap* shaderMap;											// String hashmap that maps shader names to shader references.
+	SimpleMap* basicMeshMap;										// MeshData hashmap that maps basic mesh names to meshes.
 
 	// Data that is only used on startup/shutdown
 	VkFormat renderTargetColorFormat;								// Image format used for render target color textures
