@@ -214,6 +214,7 @@ void GameInit()
 
 	// Creating debug menu
 	gameState->debugMenu = DebugUICreateMenu();
+	DebugUIAddButton(gameState->debugMenu, "test", &gameState->mouseEnabled);
 
     StartOrResetTimer(&gameState->timer);
 }

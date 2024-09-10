@@ -20,10 +20,10 @@ void TextLoadFont(const char* fontName, const char* fontFileString);// TODO: add
 /// @brief Creates a text object for rendering text, will be rendered if it is active when TextRender is called. Is active by default after it's created.
 /// @param textString char* to the string.
 /// @param fontName String of the name of the font to use.
-/// @param transformation Transformation matrix that should be applied when rendering this text (the user should combine the MVP on CPU as this matrix will be directly applied to the text).
+/// @param transform Transformation matrix that should be applied when rendering this text (the user should combine the MVP on CPU as this matrix will be directly applied to the text).
 /// @param updateFrequency How often the user expects the text of this object to be changed.
 /// @return Text* to the object.
-Text* TextCreate(const char* textString, const char* fontName, mat4 transformation, UpdateFrequency updateFrequency);
+Text* TextCreate(const char* textString, const char* fontName, mat4 transform, UpdateFrequency updateFrequency);
 
 
 void TextDestroy();// TODO:

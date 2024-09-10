@@ -1,6 +1,7 @@
 #version 450
 #include "defines.glsl"
 
+layout(location = 0) in vec4 f_color;
 
 layout(location = 0) out vec4 outColor;
 
@@ -12,5 +13,5 @@ layout(BIND 1) uniform UniformBufferObject
 
 
 void main() {
-    outColor = vec4(1, 1, 1, 1);
+    outColor = f_color;
 }

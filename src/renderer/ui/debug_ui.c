@@ -2,30 +2,41 @@
 
 #include "core/asserts.h"
 #include "core/event.h"
+#include "core/input.h"
 #include "core/meminc.h"
 #include "core/platform.h"
-#include "core/input.h"
 #include "math/lin_alg.h"
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
 
+#define MAX_DBG_MENU_QUADS 100
+
+typedef struct QuadInstanceData
+{
+	mat4 transform;
+	vec4 color;
+} QuadInstanceData;
 
 typedef struct DebugMenu
 {
-    mat4 menuTransform;           // Transform of the menu.
-    vec2 position;                // Position, anchor is bottom left of the menu.
-    vec2 size;                    // Vec 2 with the menu size, x is width y is height.
-    mat4* instanceData;           // Instance data on the CPU
-    VertexBuffer instancedQuadVB; // Vertex buffer with model matrices for quads
+    mat4 menuTransform;            // Transform of the menu.
+    vec2 position;                 // Position, anchor is bottom left of the menu.
+    vec2 size;                     // Vec 2 with the menu size, x is width y is height.
+    QuadInstanceData* quadsInstanceData;       // Instance data of the quads to render on the CPU.
+    VertexBuffer quadsInstancedVB; // Vertex buffer with model matrices for quads.
+    u32 maxQuads;                  // Max amount of quads
+    u32 quadCount;                 // Current amount of quads
+    u32 elements;                  // Amount of buttons, sliders or other elements in the menu.
 } DebugMenu;
 
+// Data about the state of the Debug ui system, only one instance of this struct should exist.
 typedef struct DebugUIState
 {
-    DebugMenu** debugMenuDarray;
-    Material roundedQuadMaterial;
-    MeshData* quadMesh;
-    mat4 uiProjView;
-    mat4 inverseProjView;
+    DebugMenu** debugMenuDarray;  // Dynamic array with all the debug menu instances that exist
+    Material roundedQuadMaterial; // Material to render quads with (may not actually create rounded quads yet).
+    MeshData* quadMesh;           // Mesh with the data to make quad instances.
+    mat4 uiProjView;              // Projection and view matrix for all debug menu's
+    mat4 inverseProjView;         // Inverted proj view matrix.
 } DebugUIState;
 
 static DebugUIState* state = nullptr;
@@ -43,11 +54,11 @@ static bool OnWindowResize(EventCode type, EventData data)
 static bool PointInRect(vec2 position, vec2 size, vec2 point)
 {
     bool left = point.x > position.x;
-	bool right = point.x < (position.x + size.x);
-	bool top = point.y < (position.y + size.y);
-	bool bottom = point.y > position.y;
+    bool right = point.x < (position.x + size.x);
+    bool top = point.y < (position.y + size.y);
+    bool bottom = point.y > position.y;
 
-	return (left && right && top && bottom);
+    return (left && right && top && bottom);
 }
 
 bool InitializeDebugUI()
@@ -68,8 +79,9 @@ bool InitializeDebugUI()
     shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
     shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
     shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;
-    shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 1;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 2;
     shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_MAT4;
+	shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC4;
 
     ShaderCreate("roundedQuad", &shaderCreateInfo);
     state->roundedQuadMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
@@ -111,17 +123,11 @@ void UpdateDebugUI()
         {
             vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1);
 
-			//_DEBUG("clip: x: %.2f, y: %.2f, z: %.2f", mouseScreenPos.x, mouseScreenPos.y, 0.f);
-
-			vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
+            vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
             vec4 mouseWorldPos = mat4_mul_vec4(state->inverseProjView, clipCoords);
-            //_DEBUG("world: x: %.2f, y: %.2f, z: %.2f", mouseWorldPos.x, mouseWorldPos.y, mouseWorldPos.z);
 
-            vec4 test = mat4_mul_vec4(state->uiProjView, mouseWorldPos);
-            //_DEBUG("clip test:  x: %.2f, y: %.2f, z: %.2f", test.x, test.y, test.z);
-
-			bool mouseInMenu = PointInRect(menu->position, menu->size, vec4_xy(mouseWorldPos));
-			_DEBUG("Menu clicked: %s", mouseInMenu ? "true" : "false");
+            bool mouseInMenu = PointInRect(menu->position, menu->size, vec4_xy(mouseWorldPos));
+            _DEBUG("Menu clicked: %s", mouseInMenu ? "true" : "false");
         }
     }
 }
@@ -130,15 +136,18 @@ DebugMenu* DebugUICreateMenu()
 {
     DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu), MEM_TAG_RENDERER_SUBSYS);
 
-    menu->position = vec2_create(1, 1);
-    menu->size = vec2_create(1, 1);
+    menu->position = vec2_create(0.3f, 0.3f);
+    menu->size = vec2_create(2.5f, 9.4f);
     mat4 rotate = mat4_rotate_x(0);
     menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_mul_mat4(rotate, mat4_2Dscale(menu->size)));
 
-    menu->instanceData = Alloc(GetGlobalAllocator(), sizeof(mat4) * 1, MEM_TAG_RENDERER_SUBSYS);
-    menu->instanceData[0] = menu->menuTransform;
+    menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
+    menu->quadsInstanceData[0].transform = menu->menuTransform;
+	menu->quadsInstanceData[0].color = vec4_create(1, 1, 1, 1);
+	menu->maxQuads = MAX_DBG_MENU_QUADS;
+	menu->quadCount = 1;
 
-    menu->instancedQuadVB = VertexBufferCreate(menu->instanceData, sizeof(mat4) * 1);
+    menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(mat4) * MAX_DBG_MENU_QUADS);
 
     state->debugMenuDarray = DarrayPushback(state->debugMenuDarray, &menu);
 
@@ -155,7 +164,22 @@ void DebugUIRenderMenu(DebugMenu* menu)
     MaterialUpdateProperty(state->roundedQuadMaterial, "menuView", &state->uiProjView);
     MaterialBind(state->roundedQuadMaterial);
 
-    VertexBuffer vertexBuffers[2] = {state->quadMesh->vertexBuffer, menu->instancedQuadVB};
+    VertexBuffer vertexBuffers[2] = {state->quadMesh->vertexBuffer, menu->quadsInstancedVB};
 
-    Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, 1);
+    Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
+}
+
+void DebugUIAddButton(DebugMenu* menu, const char* text, bool* boolPointer)
+{
+	vec2 buttonPosition = vec2_create(3, 0.3f);
+	vec2 buttonSize = vec2_create(12.5f, 9.4f);
+	mat4 rotate = mat4_rotate_x(0);
+	mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_mul_mat4(rotate, mat4_2Dscale(buttonSize)));
+	menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
+	menu->quadsInstanceData[menu->quadCount].color = vec4_create(1, 0, 0, 1);
+	menu->quadCount++;
+
+	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+
+	VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(mat4) * menu->quadCount);
 }
