@@ -11,6 +11,7 @@
 
 #define MAX_DBG_MENU_QUADS 100
 #define MAX_DBG_MENU_INTERACTABLES 20
+#define MAX_DBG_MENUS 1
 
 typedef struct QuadInstanceData
 {
@@ -35,6 +36,7 @@ typedef struct DebugMenu
     InteractableData* interactablesArray; // Array of interactables (buttons, sliders, text, etc.).
     QuadInstanceData* quadsInstanceData;  // Instance data of the quads to render on the CPU.
     VertexBuffer quadsInstancedVB;        // Vertex buffer with model matrices for quads.
+    Material menuElementMaterial;         // Material to render quads with.
     i32 activeInteractable;               // Index into interactables array, is -1 if no interactable is being interacted with. (If a button is being pressed or a slider is being dragged, this will indicate that.)
     u32 maxQuads;                         // Max amount of quads
     u32 quadCount;                        // Current amount of quads
@@ -44,11 +46,13 @@ typedef struct DebugMenu
 // Data about the state of the Debug ui system, only one instance of this struct should exist.
 typedef struct DebugUIState
 {
-    DebugMenu** debugMenuDarray;  // Dynamic array with all the debug menu instances that exist
-    Material roundedQuadMaterial; // Material to render quads with (may not actually create rounded quads yet).
-    MeshData* quadMesh;           // Mesh with the data to make quad instances.
-    mat4 uiProjView;              // Projection and view matrix for all debug menu's
-    mat4 inverseProjView;         // Inverted proj view matrix.
+    DebugMenu** debugMenuDarray;           // Dynamic array with all the debug menu instances that exist
+    Material menuBackgroundMaterial;       // Material to render quads with.
+    QuadInstanceData* menuBackgroundQuads; // Quad instances for all the menu backgrounds.
+    VertexBuffer menuBackgroundsVB;        // Vertex Buffer with the instances for menu background quads
+    MeshData* quadMesh;                    // Mesh with the data to make quad instances.
+    mat4 uiProjView;                       // Projection and view matrix for all debug menu's
+    mat4 inverseProjView;                  // Inverted proj view matrix.
 } DebugUIState;
 
 static DebugUIState* state = nullptr;
@@ -96,7 +100,7 @@ bool InitializeDebugUI()
     shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC4;
 
     ShaderCreate("roundedQuad", &shaderCreateInfo);
-    state->roundedQuadMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
+    state->menuBackgroundMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
 
     state->debugMenuDarray = DarrayCreate(sizeof(*state->debugMenuDarray), 2, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
 
@@ -109,6 +113,9 @@ bool InitializeDebugUI()
     state->uiProjView = mat4_mul_mat4(projection, view);
     state->inverseProjView = mat4_inverse(state->uiProjView);
 
+    state->menuBackgroundQuads = Alloc(GetGlobalAllocator(), sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS, MEM_TAG_RENDERER_SUBSYS);
+	state->menuBackgroundsVB = VertexBufferCreate(state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
+
     RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
     return true;
@@ -118,7 +125,7 @@ void ShutdownDebugUI()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
-    MaterialDestroy(state->roundedQuadMaterial);
+    MaterialDestroy(state->menuBackgroundMaterial);
     DarrayDestroy(state->debugMenuDarray);
     Free(GetGlobalAllocator(), state);
 }
@@ -131,15 +138,15 @@ void UpdateDebugUI()
     {
         DebugMenu* menu = state->debugMenuDarray[i];
 
-		if (menu->activeInteractable != -1) // If a button or slider is being interacted with already
-		{
-			if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
-			{
-				menu->quadsInstanceData[menu->interactablesArray[menu->activeInteractable].firstQuad].color	= vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
-				VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(mat4) * menu->quadCount);
-				menu->activeInteractable = -1;
-			}
-		}
+        if (menu->activeInteractable != -1) // If a button or slider is being interacted with already
+        {
+            if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
+            {
+                menu->quadsInstanceData[menu->interactablesArray[menu->activeInteractable].firstQuad].color = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
+                VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+                menu->activeInteractable = -1;
+            }
+        }
         else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN)) // If NO interactable in this menu is being interacted with and the button was pressed.
         {
             vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1);
@@ -159,7 +166,7 @@ void UpdateDebugUI()
                     menu->activeInteractable = j;
                 }
 
-                VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(mat4) * menu->quadCount);
+                VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
             }
         }
     }
@@ -174,19 +181,23 @@ DebugMenu* DebugUICreateMenu()
     mat4 rotate = mat4_rotate_x(0);
     menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_mul_mat4(rotate, mat4_2Dscale(menu->size)));
 
-    menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
-    menu->quadsInstanceData[0].transform = menu->menuTransform;
-    menu->quadsInstanceData[0].color = vec4_create(1, 1, 1, 1);
-    menu->maxQuads = MAX_DBG_MENU_QUADS;
-    menu->quadCount = 1;
+    state->menuBackgroundQuads[0].transform = menu->menuTransform;
+    state->menuBackgroundQuads[0].color = vec4_create(1, 1, 1, 1);
 
-    menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(mat4) * MAX_DBG_MENU_QUADS);
+	VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
+
+    menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
+    menu->maxQuads = MAX_DBG_MENU_QUADS;
+    menu->quadCount = 0;
+
+    menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
 
     state->debugMenuDarray = DarrayPushback(state->debugMenuDarray, &menu);
+    GRASSERT_DEBUG(DarrayGetSize(state->debugMenuDarray) <= MAX_DBG_MENUS);
 
     menu->interactablesArray = Alloc(GetGlobalAllocator(), sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES, MEM_TAG_RENDERER_SUBSYS);
     menu->interactablesCount = 0;
-	menu->activeInteractable = -1;
+    menu->activeInteractable = -1;
 
     return menu;
 }
@@ -198,8 +209,15 @@ void DebugUIDestroyMenu(DebugMenu* menu)
 
 void DebugUIRenderMenu(DebugMenu* menu)
 {
-    MaterialUpdateProperty(state->roundedQuadMaterial, "menuView", &state->uiProjView);
-    MaterialBind(state->roundedQuadMaterial);
+    MaterialUpdateProperty(state->menuBackgroundMaterial, "menuView", &state->uiProjView);
+    MaterialBind(state->menuBackgroundMaterial);
+
+    VertexBuffer menuVertexBuffers[2] = {state->quadMesh->vertexBuffer, state->menuBackgroundsVB};
+
+    Draw(2, menuVertexBuffers, state->quadMesh->indexBuffer, nullptr, DarrayGetSize(state->debugMenuDarray));
+
+    MaterialUpdateProperty(state->menuBackgroundMaterial, "menuView", &state->uiProjView);
+    MaterialBind(state->menuBackgroundMaterial);
 
     VertexBuffer vertexBuffers[2] = {state->quadMesh->vertexBuffer, menu->quadsInstancedVB};
 
@@ -218,7 +236,7 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* boolPointer)
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
-    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(mat4) * menu->quadCount);
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
     menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1;
     menu->interactablesArray[menu->interactablesCount].quadCount = 1;
