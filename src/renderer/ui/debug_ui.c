@@ -10,23 +10,35 @@
 #include "renderer/ui/text_renderer.h"
 
 #define MAX_DBG_MENU_QUADS 100
+#define MAX_DBG_MENU_INTERACTABLES 20
 
 typedef struct QuadInstanceData
 {
-	mat4 transform;
-	vec4 color;
+    mat4 transform;
+    vec4 color;
 } QuadInstanceData;
+
+typedef struct InteractableData
+{
+    vec2 position;
+    vec2 size;
+    u32 firstQuad;
+    u32 quadCount;
+    void* internalData;
+} InteractableData;
 
 typedef struct DebugMenu
 {
-    mat4 menuTransform;            // Transform of the menu.
-    vec2 position;                 // Position, anchor is bottom left of the menu.
-    vec2 size;                     // Vec 2 with the menu size, x is width y is height.
-    QuadInstanceData* quadsInstanceData;       // Instance data of the quads to render on the CPU.
-    VertexBuffer quadsInstancedVB; // Vertex buffer with model matrices for quads.
-    u32 maxQuads;                  // Max amount of quads
-    u32 quadCount;                 // Current amount of quads
-    u32 elements;                  // Amount of buttons, sliders or other elements in the menu.
+    mat4 menuTransform;                   // Transform of the menu.
+    vec2 position;                        // Position, anchor is bottom left of the menu.
+    vec2 size;                            // Vec 2 with the menu size, x is width y is height.
+    InteractableData* interactablesArray; // Array of interactables (buttons, sliders, text, etc.).
+    QuadInstanceData* quadsInstanceData;  // Instance data of the quads to render on the CPU.
+    VertexBuffer quadsInstancedVB;        // Vertex buffer with model matrices for quads.
+    i32 activeInteractable;               // Index into interactables array, is -1 if no interactable is being interacted with. (If a button is being pressed or a slider is being dragged, this will indicate that.)
+    u32 maxQuads;                         // Max amount of quads
+    u32 quadCount;                        // Current amount of quads
+    u32 interactablesCount;               // Amount of buttons, sliders or other elements in the menu.
 } DebugMenu;
 
 // Data about the state of the Debug ui system, only one instance of this struct should exist.
@@ -81,7 +93,7 @@ bool InitializeDebugUI()
     shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;
     shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 2;
     shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_MAT4;
-	shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC4;
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC4;
 
     ShaderCreate("roundedQuad", &shaderCreateInfo);
     state->roundedQuadMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
@@ -119,7 +131,16 @@ void UpdateDebugUI()
     {
         DebugMenu* menu = state->debugMenuDarray[i];
 
-        if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN))
+		if (menu->activeInteractable != -1) // If a button or slider is being interacted with already
+		{
+			if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
+			{
+				menu->quadsInstanceData[menu->interactablesArray[menu->activeInteractable].firstQuad].color	= vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
+				VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(mat4) * menu->quadCount);
+				menu->activeInteractable = -1;
+			}
+		}
+        else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN)) // If NO interactable in this menu is being interacted with and the button was pressed.
         {
             vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1);
 
@@ -128,6 +149,18 @@ void UpdateDebugUI()
 
             bool mouseInMenu = PointInRect(menu->position, menu->size, vec4_xy(mouseWorldPos));
             _DEBUG("Menu clicked: %s", mouseInMenu ? "true" : "false");
+
+            if (mouseInMenu)
+            {
+                // TODO: remove this as it is only for testing changing color of rects.
+                for (int j = 0; j < menu->interactablesCount; j++)
+                {
+                    menu->quadsInstanceData[menu->interactablesArray[j].firstQuad].color = vec4_create(0.0f, 0.0f, 1.0f, 1.0f);
+                    menu->activeInteractable = j;
+                }
+
+                VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(mat4) * menu->quadCount);
+            }
         }
     }
 }
@@ -143,13 +176,17 @@ DebugMenu* DebugUICreateMenu()
 
     menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
     menu->quadsInstanceData[0].transform = menu->menuTransform;
-	menu->quadsInstanceData[0].color = vec4_create(1, 1, 1, 1);
-	menu->maxQuads = MAX_DBG_MENU_QUADS;
-	menu->quadCount = 1;
+    menu->quadsInstanceData[0].color = vec4_create(1, 1, 1, 1);
+    menu->maxQuads = MAX_DBG_MENU_QUADS;
+    menu->quadCount = 1;
 
     menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(mat4) * MAX_DBG_MENU_QUADS);
 
     state->debugMenuDarray = DarrayPushback(state->debugMenuDarray, &menu);
+
+    menu->interactablesArray = Alloc(GetGlobalAllocator(), sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES, MEM_TAG_RENDERER_SUBSYS);
+    menu->interactablesCount = 0;
+	menu->activeInteractable = -1;
 
     return menu;
 }
@@ -171,15 +208,23 @@ void DebugUIRenderMenu(DebugMenu* menu)
 
 void DebugUIAddButton(DebugMenu* menu, const char* text, bool* boolPointer)
 {
-	vec2 buttonPosition = vec2_create(3, 0.3f);
-	vec2 buttonSize = vec2_create(12.5f, 9.4f);
-	mat4 rotate = mat4_rotate_x(0);
-	mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_mul_mat4(rotate, mat4_2Dscale(buttonSize)));
-	menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
-	menu->quadsInstanceData[menu->quadCount].color = vec4_create(1, 0, 0, 1);
-	menu->quadCount++;
+    vec2 buttonPosition = vec2_create(3, 0.3f);
+    vec2 buttonSize = vec2_create(12.5f, 9.4f);
+    mat4 rotate = mat4_rotate_x(0);
+    mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_mul_mat4(rotate, mat4_2Dscale(buttonSize)));
+    menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
+    menu->quadsInstanceData[menu->quadCount].color = vec4_create(1, 0, 0, 1);
+    menu->quadCount++;
 
-	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+    GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
-	VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(mat4) * menu->quadCount);
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(mat4) * menu->quadCount);
+
+    menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1;
+    menu->interactablesArray[menu->interactablesCount].quadCount = 1;
+    menu->interactablesArray[menu->interactablesCount].position = buttonPosition;
+    menu->interactablesArray[menu->interactablesCount].size = buttonSize;
+
+    menu->interactablesCount++;
+    GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
 }
