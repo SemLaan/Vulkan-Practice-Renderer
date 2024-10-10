@@ -19,12 +19,28 @@ typedef struct QuadInstanceData
     vec4 color;
 } QuadInstanceData;
 
+typedef enum InteractableType
+{
+    INTERACTABLE_TYPE_BUTTON,
+    INTERACTABLE_TYPE_NONE
+} InteractableType;
+
+#define INTERACTABLE_TYPE_COUNT 1
+
+// Interactable data internal data for a button
+typedef struct ButtonInteractableData
+{
+    bool* pStateBool;
+    bool* pSignalBool;
+} ButtonInteractableData;
+
 typedef struct InteractableData
 {
     vec2 position;
     vec2 size;
     u32 firstQuad;
     u32 quadCount;
+    InteractableType interactableType;
     void* internalData;
 } InteractableData;
 
@@ -46,16 +62,22 @@ typedef struct DebugMenu
 // Data about the state of the Debug ui system, only one instance of this struct should exist.
 typedef struct DebugUIState
 {
-    DebugMenu** debugMenuDarray;           // Dynamic array with all the debug menu instances that exist
-    Material menuBackgroundMaterial;       // Material to render quads with.
-    QuadInstanceData* menuBackgroundQuads; // Quad instances for all the menu backgrounds.
-    VertexBuffer menuBackgroundsVB;        // Vertex Buffer with the instances for menu background quads
-    MeshData* quadMesh;                    // Mesh with the data to make quad instances.
-    mat4 uiProjView;                       // Projection and view matrix for all debug menu's
-    mat4 inverseProjView;                  // Inverted proj view matrix.
+    DebugMenu** debugMenuDarray;                  // Dynamic array with all the debug menu instances that exist
+    Material menuBackgroundMaterial;              // Material to render quads with.
+    QuadInstanceData* menuBackgroundQuads;        // Quad instances for all the menu backgrounds.
+    VertexBuffer menuBackgroundsVB;               // Vertex Buffer with the instances for menu background quads
+    MeshData* quadMesh;                           // Mesh with the data to make quad instances.
+    mat4 uiProjView;                              // Projection and view matrix for all debug menu's
+    mat4 inverseProjView;                         // Inverted proj view matrix.
+    Allocator* interactableInternalDataAllocator; // Allocator for allocating interactable internal data.
 } DebugUIState;
 
 static DebugUIState* state = nullptr;
+
+// Function prototypes for interactable handling functions, full functions are at the bottom of this file.
+void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData);
+void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData);
+void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData);
 
 static bool OnWindowResize(EventCode type, EventData data)
 {
@@ -83,6 +105,9 @@ bool InitializeDebugUI()
 
     state = Alloc(GetGlobalAllocator(), sizeof(*state), MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(state, sizeof(*state));
+
+    // Creating interactable internal data allocator
+    CreateFreelistAllocator("DebugUI interactable internal data", GetGlobalAllocator(), KiB * 5, &state->interactableInternalDataAllocator);
 
     // Creating the quad shader and material
     ShaderCreateInfo shaderCreateInfo = {};
@@ -125,6 +150,7 @@ void ShutdownDebugUI()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
+    DestroyFreelistAllocator(state->interactableInternalDataAllocator);
     MaterialDestroy(state->menuBackgroundMaterial);
     DarrayDestroy(state->debugMenuDarray);
     Free(GetGlobalAllocator(), state);
@@ -142,36 +168,57 @@ void UpdateDebugUI()
         // If a button or slider is being interacted with already
         if (menu->activeInteractable != -1)
         {
-			// If the user let go of their mouse button then letting go of the active button will be handled.
+            // If the user let go of their mouse button then interaction end will be called for the active interactable.
             if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
             {
-				// Changing the color of the interactable back to the non-pressed color
-                menu->quadsInstanceData[menu->interactablesArray[menu->activeInteractable].firstQuad].color = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
-                VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+                // TODO:
+                void (*interaction_end_func_ptr_arr[])(DebugMenu*, InteractableData*) = {HandleButtonInteractionEnd};
+
+				GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractable].interactableType < INTERACTABLE_TYPE_COUNT);
+
+				// Calling the correct InteractionEnd function
+                (*interaction_end_func_ptr_arr[menu->interactablesArray[menu->activeInteractable].interactableType])(menu, &menu->interactablesArray[menu->activeInteractable]);
+
                 menu->activeInteractable = -1; // Indicating that nothing is being interacted with anymore
             }
+            else // If the user is still holding the mouse down, give the interaction update call to the active interactable.
+            {
+                void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*) = {HandleButtonInteractionUpdate};
+
+				GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractable].interactableType < INTERACTABLE_TYPE_COUNT);
+
+				// Calling the correct InteractionUpdate function
+                (*interaction_update_func_ptr_arr[menu->interactablesArray[menu->activeInteractable].interactableType])(menu, &menu->interactablesArray[menu->activeInteractable]);
+            }
         }
-		// If NO interactable in this menu is being interacted with and the mouse button was pressed.
-        else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN)) 
+        // If NO interactable in this menu is being interacted with and the mouse button was pressed.
+        else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN))
         {
-			// Getting the mouse position in world space.
+            // Getting the mouse position in world space.
             vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1);
             vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
             vec4 mouseWorldPos = mat4_mul_vec4(state->inverseProjView, clipCoords);
 
-			// Checking if the mouse is even in this menu
+            // Checking if the mouse is even in this menu
             bool mouseInMenu = PointInRect(menu->position, menu->size, vec4_xy(mouseWorldPos));
             _DEBUG("Menu clicked: %s", mouseInMenu ? "true" : "false");
 
-			// If the mouse is in this menu, loop through all the elements in this menu to see which one needs to be interacted with.
+            // If the mouse is in this menu, loop through all the elements in this menu to see which one needs to be interacted with.
             if (mouseInMenu)
             {
                 for (int j = 0; j < menu->interactablesCount; j++)
                 {
-					// If the mouse is on element j, handle the press action and set it as the active interactable.
+                    // If the mouse is on element j, handle the interaction start and set it as the active interactable.
                     if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
                     {
-                        menu->quadsInstanceData[menu->interactablesArray[j].firstQuad].color = vec4_create(0.0f, 0.0f, 1.0f, 1.0f);
+						// Array of all interaction start functions
+                        void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*) = {HandleButtonInteractionStart};
+
+                        GRASSERT_DEBUG(menu->interactablesArray[j].interactableType < INTERACTABLE_TYPE_COUNT);
+
+                        // Calling the correct InteractionStart function
+                        (*interaction_start_func_ptr_arr[menu->interactablesArray[j].interactableType])(menu, &menu->interactablesArray[j]);
+
                         menu->activeInteractable = j;
                         break;
                     }
@@ -237,7 +284,7 @@ void DebugUIRenderMenu(DebugMenu* menu)
     Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
 }
 
-void DebugUIAddButton(DebugMenu* menu, const char* text, bool* boolPointer)
+void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool* pSignalBool)
 {
     vec2 buttonPosition = vec2_create(0.3f, 0.3f + 1 * menu->interactablesCount);
     vec2 buttonSize = vec2_create(1, 1);
@@ -251,11 +298,37 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* boolPointer)
 
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
+    ButtonInteractableData* buttonData = Alloc(state->interactableInternalDataAllocator, sizeof(*buttonData), MEM_TAG_RENDERER_SUBSYS);
+    buttonData->pStateBool = pStateBool;
+    buttonData->pSignalBool = pSignalBool;
+
     menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1;
     menu->interactablesArray[menu->interactablesCount].quadCount = 1;
     menu->interactablesArray[menu->interactablesCount].position = buttonPosition;
     menu->interactablesArray[menu->interactablesCount].size = buttonSize;
+    menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_BUTTON;
+    menu->interactablesArray[menu->interactablesCount].internalData = buttonData;
 
     menu->interactablesCount++;
     GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
+}
+
+// =========================================================================================================================================
+// Interaction start/update/end functions
+// =========================================================================================================================================
+
+void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData)
+{
+    menu->quadsInstanceData[interactableData->firstQuad].color = vec4_create(0.0f, 0.0f, 1.0f, 1.0f);
+}
+
+void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData)
+{
+}
+
+void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData)
+{
+    // Changing the color of the button back to the non-pressed color
+    menu->quadsInstanceData[interactableData->firstQuad].color = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 }

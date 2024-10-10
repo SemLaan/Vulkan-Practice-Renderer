@@ -55,6 +55,7 @@ typedef struct GameState
     mat4 view;
     mat4 proj;
     bool mouseEnabled;
+	bool mouseEnableButtonPressed;
     bool perspectiveEnabled;
 } GameState;
 
@@ -199,6 +200,7 @@ void GameInit()
     gameState->camRotation = (vec3){0, 0, 0};
 
     gameState->mouseEnabled = false;
+	gameState->mouseEnableButtonPressed = false;
     gameState->perspectiveEnabled = true;
 
     // Calculating UI projection
@@ -214,8 +216,8 @@ void GameInit()
 
 	// Creating debug menu
 	gameState->debugMenu = DebugUICreateMenu();
-	DebugUIAddButton(gameState->debugMenu, "test", &gameState->mouseEnabled);
-	DebugUIAddButton(gameState->debugMenu, "test2", &gameState->mouseEnabled);
+	DebugUIAddButton(gameState->debugMenu, "test", nullptr, &gameState->mouseEnableButtonPressed);
+	DebugUIAddButton(gameState->debugMenu, "test2", nullptr, nullptr);
 
     StartOrResetTimer(&gameState->timer);
 }
@@ -287,10 +289,13 @@ void GameUpdateAndRender()
 
     gameState->view = mat4_mul_mat4(rotation, translate);
 
-    if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN))
+	// If the mouse button enable button is pressed or if the mouse is enabled and the player presses it.
+    if ((gameState->mouseEnableButtonPressed) ||
+		(gameState->mouseEnabled && GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN)))
     {
-        //gameState->mouseEnabled = !gameState->mouseEnabled;
-        //InputSetMouseCentered(gameState->mouseEnabled);
+        gameState->mouseEnabled = !gameState->mouseEnabled;
+        InputSetMouseCentered(gameState->mouseEnabled);
+		gameState->mouseEnableButtonPressed = false;
     }
 
     // ============================ Rendering ===================================
