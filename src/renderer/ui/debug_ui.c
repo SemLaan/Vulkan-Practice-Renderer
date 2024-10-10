@@ -114,7 +114,7 @@ bool InitializeDebugUI()
     state->inverseProjView = mat4_inverse(state->uiProjView);
 
     state->menuBackgroundQuads = Alloc(GetGlobalAllocator(), sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS, MEM_TAG_RENDERER_SUBSYS);
-	state->menuBackgroundsVB = VertexBufferCreate(state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
+    state->menuBackgroundsVB = VertexBufferCreate(state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
 
     RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
@@ -134,36 +134,47 @@ void UpdateDebugUI()
 {
     u32 menuCount = DarrayGetSize(state->debugMenuDarray);
 
+    // Looping through all the menu's to handle user interaction for each one.
     for (int i = 0; i < menuCount; i++)
     {
         DebugMenu* menu = state->debugMenuDarray[i];
 
-        if (menu->activeInteractable != -1) // If a button or slider is being interacted with already
+        // If a button or slider is being interacted with already
+        if (menu->activeInteractable != -1)
         {
+			// If the user let go of their mouse button then letting go of the active button will be handled.
             if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
             {
+				// Changing the color of the interactable back to the non-pressed color
                 menu->quadsInstanceData[menu->interactablesArray[menu->activeInteractable].firstQuad].color = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
                 VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
-                menu->activeInteractable = -1;
+                menu->activeInteractable = -1; // Indicating that nothing is being interacted with anymore
             }
         }
-        else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN)) // If NO interactable in this menu is being interacted with and the button was pressed.
+		// If NO interactable in this menu is being interacted with and the mouse button was pressed.
+        else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN)) 
         {
+			// Getting the mouse position in world space.
             vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1);
-
             vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
             vec4 mouseWorldPos = mat4_mul_vec4(state->inverseProjView, clipCoords);
 
+			// Checking if the mouse is even in this menu
             bool mouseInMenu = PointInRect(menu->position, menu->size, vec4_xy(mouseWorldPos));
             _DEBUG("Menu clicked: %s", mouseInMenu ? "true" : "false");
 
+			// If the mouse is in this menu, loop through all the elements in this menu to see which one needs to be interacted with.
             if (mouseInMenu)
             {
-                // TODO: remove this as it is only for testing changing color of rects.
                 for (int j = 0; j < menu->interactablesCount; j++)
                 {
-                    menu->quadsInstanceData[menu->interactablesArray[j].firstQuad].color = vec4_create(0.0f, 0.0f, 1.0f, 1.0f);
-                    menu->activeInteractable = j;
+					// If the mouse is on element j, handle the press action and set it as the active interactable.
+                    if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
+                    {
+                        menu->quadsInstanceData[menu->interactablesArray[j].firstQuad].color = vec4_create(0.0f, 0.0f, 1.0f, 1.0f);
+                        menu->activeInteractable = j;
+                        break;
+                    }
                 }
 
                 VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
@@ -184,11 +195,12 @@ DebugMenu* DebugUICreateMenu()
     state->menuBackgroundQuads[0].transform = menu->menuTransform;
     state->menuBackgroundQuads[0].color = vec4_create(1, 1, 1, 1);
 
-	VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
+    VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
 
     menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
     menu->maxQuads = MAX_DBG_MENU_QUADS;
     menu->quadCount = 0;
+    menu->menuElementMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
 
     menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
 
@@ -216,8 +228,9 @@ void DebugUIRenderMenu(DebugMenu* menu)
 
     Draw(2, menuVertexBuffers, state->quadMesh->indexBuffer, nullptr, DarrayGetSize(state->debugMenuDarray));
 
-    MaterialUpdateProperty(state->menuBackgroundMaterial, "menuView", &state->uiProjView);
-    MaterialBind(state->menuBackgroundMaterial);
+    mat4 menuElementsView = mat4_mul_mat4(state->uiProjView, mat4_3Dtranslate(vec3_create(menu->position.x, menu->position.y, 0.5f)));
+    MaterialUpdateProperty(menu->menuElementMaterial, "menuView", &menuElementsView);
+    MaterialBind(menu->menuElementMaterial);
 
     VertexBuffer vertexBuffers[2] = {state->quadMesh->vertexBuffer, menu->quadsInstancedVB};
 
@@ -226,8 +239,8 @@ void DebugUIRenderMenu(DebugMenu* menu)
 
 void DebugUIAddButton(DebugMenu* menu, const char* text, bool* boolPointer)
 {
-    vec2 buttonPosition = vec2_create(3, 0.3f);
-    vec2 buttonSize = vec2_create(12.5f, 9.4f);
+    vec2 buttonPosition = vec2_create(0.3f, 0.3f + 1 * menu->interactablesCount);
+    vec2 buttonSize = vec2_create(1, 1);
     mat4 rotate = mat4_rotate_x(0);
     mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_mul_mat4(rotate, mat4_2Dscale(buttonSize)));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;

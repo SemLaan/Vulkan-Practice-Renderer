@@ -13,6 +13,7 @@ bool InitializeDebugUI();
 void ShutdownDebugUI();
 
 /// @brief Should only be called by the engine, during the update loop, just before control is passed to the game code.
+/// Handles user interaction with the menu.
 void UpdateDebugUI();
 
 
