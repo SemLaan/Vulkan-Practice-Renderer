@@ -75,9 +75,9 @@ typedef struct DebugUIState
 static DebugUIState* state = nullptr;
 
 // Function prototypes for interactable handling functions, full functions are at the bottom of this file.
-void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData);
-void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData);
-void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData);
+void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
 static bool OnWindowResize(EventCode type, EventData data)
 {
@@ -158,6 +158,11 @@ void ShutdownDebugUI()
 
 void UpdateDebugUI()
 {
+    // Getting the mouse position in world space.
+    vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1);
+    vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
+    vec4 mouseWorldPos = mat4_mul_vec4(state->inverseProjView, clipCoords);
+
     u32 menuCount = DarrayGetSize(state->debugMenuDarray);
 
     // Looping through all the menu's to handle user interaction for each one.
@@ -172,33 +177,28 @@ void UpdateDebugUI()
             if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
             {
                 // TODO:
-                void (*interaction_end_func_ptr_arr[])(DebugMenu*, InteractableData*) = {HandleButtonInteractionEnd};
+                void (*interaction_end_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionEnd};
 
-				GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractable].interactableType < INTERACTABLE_TYPE_COUNT);
+                GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractable].interactableType < INTERACTABLE_TYPE_COUNT);
 
-				// Calling the correct InteractionEnd function
-                (*interaction_end_func_ptr_arr[menu->interactablesArray[menu->activeInteractable].interactableType])(menu, &menu->interactablesArray[menu->activeInteractable]);
+                // Calling the correct InteractionEnd function
+                (*interaction_end_func_ptr_arr[menu->interactablesArray[menu->activeInteractable].interactableType])(menu, &menu->interactablesArray[menu->activeInteractable], mouseWorldPos);
 
                 menu->activeInteractable = -1; // Indicating that nothing is being interacted with anymore
             }
             else // If the user is still holding the mouse down, give the interaction update call to the active interactable.
             {
-                void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*) = {HandleButtonInteractionUpdate};
+                void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionUpdate};
 
-				GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractable].interactableType < INTERACTABLE_TYPE_COUNT);
+                GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractable].interactableType < INTERACTABLE_TYPE_COUNT);
 
-				// Calling the correct InteractionUpdate function
-                (*interaction_update_func_ptr_arr[menu->interactablesArray[menu->activeInteractable].interactableType])(menu, &menu->interactablesArray[menu->activeInteractable]);
+                // Calling the correct InteractionUpdate function
+                (*interaction_update_func_ptr_arr[menu->interactablesArray[menu->activeInteractable].interactableType])(menu, &menu->interactablesArray[menu->activeInteractable], mouseWorldPos);
             }
         }
         // If NO interactable in this menu is being interacted with and the mouse button was pressed.
         else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN))
         {
-            // Getting the mouse position in world space.
-            vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1);
-            vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
-            vec4 mouseWorldPos = mat4_mul_vec4(state->inverseProjView, clipCoords);
-
             // Checking if the mouse is even in this menu
             bool mouseInMenu = PointInRect(menu->position, menu->size, vec4_xy(mouseWorldPos));
             _DEBUG("Menu clicked: %s", mouseInMenu ? "true" : "false");
@@ -211,20 +211,18 @@ void UpdateDebugUI()
                     // If the mouse is on element j, handle the interaction start and set it as the active interactable.
                     if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
                     {
-						// Array of all interaction start functions
-                        void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*) = {HandleButtonInteractionStart};
+                        // Array of all interaction start functions
+                        void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionStart};
 
                         GRASSERT_DEBUG(menu->interactablesArray[j].interactableType < INTERACTABLE_TYPE_COUNT);
 
                         // Calling the correct InteractionStart function
-                        (*interaction_start_func_ptr_arr[menu->interactablesArray[j].interactableType])(menu, &menu->interactablesArray[j]);
+                        (*interaction_start_func_ptr_arr[menu->interactablesArray[j].interactableType])(menu, &menu->interactablesArray[j], mouseWorldPos);
 
                         menu->activeInteractable = j;
                         break;
                     }
                 }
-
-                VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
             }
         }
     }
@@ -317,18 +315,36 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
 // Interaction start/update/end functions
 // =========================================================================================================================================
 
-void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData)
+void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
+    // Set the button to the pressed color
     menu->quadsInstanceData[interactableData->firstQuad].color = vec4_create(0.0f, 0.0f, 1.0f, 1.0f);
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Set the state of the button to being pressed
+    ButtonInteractableData* buttonData = interactableData->internalData;
+	if (buttonData->pStateBool)
+    	*buttonData->pStateBool = true;
 }
 
-void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData)
+void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 }
 
-void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData)
+void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
     // Changing the color of the button back to the non-pressed color
     menu->quadsInstanceData[interactableData->firstQuad].color = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+	// Set the state of the button to not being pressed
+    ButtonInteractableData* buttonData = interactableData->internalData;
+	if (buttonData->pStateBool)
+    	*buttonData->pStateBool = false;
+
+	// If the player was still hovering over the button when they released it send a signal that the button was pressed.
+    if (buttonData->pSignalBool && PointInRect(vec2_add_vec2(interactableData->position, menu->position), interactableData->size, vec4_xy(mouseWorldPosition)))
+    {
+		*buttonData->pSignalBool = true;
+    }
 }

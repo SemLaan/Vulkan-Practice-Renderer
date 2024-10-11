@@ -33,6 +33,7 @@ void DebugUIRenderMenu(DebugMenu* menu);
 /// @param menu Pointer to the menu that the button should be added to.
 /// @param text Text that should be displayed in the button.
 /// @param pStateBool Pointer to a client bool where the state of the button will be stored, the Debug UI menu will update the bool in this location whenever the button is pressed or released. (Can be nullptr if not needed)
-/// @param pSignalBool Pointer to a client bool that will be set to true the frame that the button is pressed, note: the client is expected to set it to false again the same frame otherwise new presses won't be signalled (releasing the button counts as a press). (Can be nullptr if not needed)
+/// @param pSignalBool Pointer to a client bool that will be set to true the frame that the button is pressed, note: the client is expected to set it to false 
+//  again the same frame otherwise new presses won't be signalled (releasing the button while still hovering over it counts as a press). (Can be nullptr if not needed)
 void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool* pSignalBool);
 
