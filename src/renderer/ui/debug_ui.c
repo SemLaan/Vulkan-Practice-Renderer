@@ -13,6 +13,8 @@
 #define MAX_DBG_MENU_INTERACTABLES 20
 #define MAX_DBG_MENUS 1
 
+#define MENU_HANDLEBAR_VERTICAL_SIZE 0.5f
+
 typedef struct QuadInstanceData
 {
     mat4 transform;
@@ -22,17 +24,26 @@ typedef struct QuadInstanceData
 typedef enum InteractableType
 {
     INTERACTABLE_TYPE_BUTTON,
+	INTERACTABLE_TYPE_MENU_HANDLEBAR,
     INTERACTABLE_TYPE_NONE
 } InteractableType;
 
-#define INTERACTABLE_TYPE_COUNT 1
+#define INTERACTABLE_TYPE_COUNT 2
 
-// Interactable data internal data for a button
+// Interactable internal data for a button
 typedef struct ButtonInteractableData
 {
     bool* pStateBool;
     bool* pSignalBool;
 } ButtonInteractableData;
+
+// Interactable internal data for the menu handlebar
+typedef struct MenuHandlebarInteractableData
+{
+	vec4 mouseStartWorldPosition;
+	vec2 menuStartPosition;
+} MenuHandlebarInteractableData;
+
 
 typedef struct InteractableData
 {
@@ -74,10 +85,16 @@ typedef struct DebugUIState
 
 static DebugUIState* state = nullptr;
 
+static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text);
+
 // Function prototypes for interactable handling functions, full functions are at the bottom of this file.
 void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+
+void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
 static bool OnWindowResize(EventCode type, EventData data)
 {
@@ -176,8 +193,7 @@ void UpdateDebugUI()
             // If the user let go of their mouse button then interaction end will be called for the active interactable.
             if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
             {
-                // TODO:
-                void (*interaction_end_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionEnd};
+                void (*interaction_end_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionEnd, HandleMenuHandlebarInteractionEnd};
 
                 GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractable].interactableType < INTERACTABLE_TYPE_COUNT);
 
@@ -188,7 +204,7 @@ void UpdateDebugUI()
             }
             else // If the user is still holding the mouse down, give the interaction update call to the active interactable.
             {
-                void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionUpdate};
+                void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionUpdate, HandleMenuHandlebarInteractionUpdate};
 
                 GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractable].interactableType < INTERACTABLE_TYPE_COUNT);
 
@@ -212,7 +228,7 @@ void UpdateDebugUI()
                     if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
                     {
                         // Array of all interaction start functions
-                        void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionStart};
+                        void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionStart, HandleMenuHandlebarInteractionStart};
 
                         GRASSERT_DEBUG(menu->interactablesArray[j].interactableType < INTERACTABLE_TYPE_COUNT);
 
@@ -230,18 +246,21 @@ void UpdateDebugUI()
 
 DebugMenu* DebugUICreateMenu()
 {
+	// Allocating the DebugMenu struct
     DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu), MEM_TAG_RENDERER_SUBSYS);
 
+	// Positioning the menu
     menu->position = vec2_create(0.3f, 0.3f);
     menu->size = vec2_create(2.5f, 9.4f);
-    mat4 rotate = mat4_rotate_x(0);
-    menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_mul_mat4(rotate, mat4_2Dscale(menu->size)));
+    menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
 
+	// Creating a quad for the menu in the menuBackgrounds instanced vertex buffer (the base menu is basically just a quad with a color)
     state->menuBackgroundQuads[0].transform = menu->menuTransform;
     state->menuBackgroundQuads[0].color = vec4_create(1, 1, 1, 1);
 
     VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
 
+	// Creating an instanced vertex buffer for all the quads that will be rendered in the menu.
     menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
     menu->maxQuads = MAX_DBG_MENU_QUADS;
     menu->quadCount = 0;
@@ -249,12 +268,17 @@ DebugMenu* DebugUICreateMenu()
 
     menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
 
+	// Putting the menu struct in the menu d array
     state->debugMenuDarray = DarrayPushback(state->debugMenuDarray, &menu);
     GRASSERT_DEBUG(DarrayGetSize(state->debugMenuDarray) <= MAX_DBG_MENUS);
 
+	// Creating an array for keeping track of all the interactable elements in the menu
     menu->interactablesArray = Alloc(GetGlobalAllocator(), sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES, MEM_TAG_RENDERER_SUBSYS);
     menu->interactablesCount = 0;
     menu->activeInteractable = -1;
+
+	// Adding the menu handlebar
+	DebugUIAddMenuHandlebar(menu, "placeholder text (TODO: make user adjustable)");
 
     return menu;
 }
@@ -282,12 +306,38 @@ void DebugUIRenderMenu(DebugMenu* menu)
     Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
 }
 
+static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
+{
+	vec2 handlebarPosition = vec2_create(0, menu->size.y - MENU_HANDLEBAR_VERTICAL_SIZE);
+	vec2 handlebarSize = vec2_create(menu->size.x, MENU_HANDLEBAR_VERTICAL_SIZE);
+	mat4 handlebarTransform = mat4_mul_mat4(mat4_2Dtranslate(handlebarPosition), mat4_2Dscale(handlebarSize));
+	menu->quadsInstanceData[menu->quadCount].transform = handlebarTransform;
+    menu->quadsInstanceData[menu->quadCount].color = vec4_create(0.2f, 0.2f, 0.8f, 1);
+    menu->quadCount++;
+
+	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+
+	VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+	MenuHandlebarInteractableData* handlebarData = Alloc(state->interactableInternalDataAllocator, sizeof(*handlebarData), MEM_TAG_RENDERER_SUBSYS);
+	handlebarData->mouseStartWorldPosition = vec4_create(0, 0, 0, 0);
+
+	menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1;
+    menu->interactablesArray[menu->interactablesCount].quadCount = 1;
+    menu->interactablesArray[menu->interactablesCount].position = handlebarPosition;
+    menu->interactablesArray[menu->interactablesCount].size = handlebarSize;
+    menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_MENU_HANDLEBAR;
+    menu->interactablesArray[menu->interactablesCount].internalData = handlebarData;
+
+    menu->interactablesCount++;
+    GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
+}
+
 void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool* pSignalBool)
 {
     vec2 buttonPosition = vec2_create(0.3f, 0.3f + 1 * menu->interactablesCount);
     vec2 buttonSize = vec2_create(1, 1);
-    mat4 rotate = mat4_rotate_x(0);
-    mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_mul_mat4(rotate, mat4_2Dscale(buttonSize)));
+    mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
     menu->quadsInstanceData[menu->quadCount].color = vec4_create(1, 0, 0, 1);
     menu->quadCount++;
@@ -348,3 +398,46 @@ void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableD
 		*buttonData->pSignalBool = true;
     }
 }
+
+void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+	// Set the handlebar to the pressed color
+    menu->quadsInstanceData[interactableData->firstQuad].color = vec4_create(0.1f, 0.1f, 0.7f, 1.0f);
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Set the position of the mouse when the user first clicked on the handlebar
+    MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
+	handlebarData->mouseStartWorldPosition = mouseWorldPosition;
+	handlebarData->menuStartPosition = menu->position;
+}
+
+void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+	// Moving the menu based on how the mouse has moved
+	MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
+	vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
+	menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
+
+	// Updating the menu backround vertex buffer
+	menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
+    state->menuBackgroundQuads[0].transform = menu->menuTransform;
+    VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
+}
+
+void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+	// Changing the color of the handlebar back to the non-pressed color
+    menu->quadsInstanceData[interactableData->firstQuad].color = vec4_create(0.2f, 0.2f, 0.8f, 1.0f);
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+	// Moving the menu based on how the mouse has moved
+	MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
+	vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
+	menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
+
+	// Updating the menu backround vertex buffer
+	menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
+    state->menuBackgroundQuads[0].transform = menu->menuTransform;
+    VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
+}
+
