@@ -37,3 +37,10 @@ void DebugUIRenderMenu(DebugMenu* menu);
 //  again the same frame otherwise new presses won't be signalled (releasing the button while still hovering over it counts as a press). (Can be nullptr if not needed)
 void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool* pSignalBool);
 
+/// @brief Adds a slider to the bottom of the Debug UI menu with some text.
+/// @param menu Pointer to the menu that the button should be added to.
+/// @param text Text that should be displayed in the button.
+/// @param minValue Minimum value of the slider.
+/// @param maxValue Maximum value of the slider.
+/// @param pSliderValue Pointer to where the current value of the slider should be stored. If the value being stored in this position is between minValue and maxValue the slider will start at this value, otherwise the slider will start at minValue.
+void DebugUIAddSlider(DebugMenu* menu, const char* text, f32 minValue, f32 maxValue, f32* pSliderValue);

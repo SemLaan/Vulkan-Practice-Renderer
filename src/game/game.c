@@ -54,6 +54,7 @@ typedef struct GameState
     mat4 uiViewProj;
     mat4 view;
     mat4 proj;
+	f32 mouseMoveSpeed;
     bool mouseEnabled;
 	bool mouseEnableButtonPressed;
     bool perspectiveEnabled;
@@ -218,6 +219,7 @@ void GameInit()
 	gameState->debugMenu = DebugUICreateMenu();
 	DebugUIAddButton(gameState->debugMenu, "test", nullptr, &gameState->mouseEnableButtonPressed);
 	DebugUIAddButton(gameState->debugMenu, "test2", nullptr, nullptr);
+	DebugUIAddSlider(gameState->debugMenu, "mouse move speed", 1, 10000, &gameState->mouseMoveSpeed);
 
     StartOrResetTimer(&gameState->timer);
 }
@@ -251,12 +253,10 @@ void GameShutdown()
 void GameUpdateAndRender()
 {
     // =========================== Update ===================================
-    f32 mouseMoveSpeed = 3500;
-
     if (gameState->mouseEnabled)
     {
-        gameState->camRotation.y -= GetMouseDistanceFromCenter().x / mouseMoveSpeed;
-        gameState->camRotation.x -= GetMouseDistanceFromCenter().y / mouseMoveSpeed;
+        gameState->camRotation.y -= GetMouseDistanceFromCenter().x / gameState->mouseMoveSpeed;
+        gameState->camRotation.x -= GetMouseDistanceFromCenter().y / gameState->mouseMoveSpeed;
     }
     if (gameState->camRotation.x > 1.5f)
         gameState->camRotation.x = 1.5f;
