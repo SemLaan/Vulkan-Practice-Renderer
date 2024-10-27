@@ -17,11 +17,11 @@
 
 
 // ====================== Debug menu visual constant values =====================================
-#define MENU_HANDLEBAR_VERTICAL_SIZE 0.5f
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
 #define MENU_START_POSITION vec2_create(0.3f, 0.3f)
 #define MENU_START_SIZE vec2_create(2.5f, 9.4f)
 #define MENU_BACKGROUND_COLOR vec4_create(1, 1, 1, 1)
+#define HANDLEBAR_VERTICAL_SIZE 0.5f
 #define HANDLEBAR_COLOR vec4_create(0.2f, 0.2f, 0.8f, 1)
 #define HANDLEBAR_PRESSED_COLOR vec4_create(0.1f, 0.1f, 0.7f, 1.0f)
 #define MENU_ELEMENTS_OFFSET 0.3f
@@ -98,6 +98,7 @@ typedef struct DebugMenu
     u32 maxQuads;                         // Max amount of quads
     u32 quadCount;                        // Current amount of quads
     u32 interactablesCount;               // Amount of buttons, sliders or other elements in the menu.
+	f32 nextElementYOffset;				  // Y offset that the next element needs to have to not overlap with everything else in the menu.
 } DebugMenu;
 
 // Data about the state of the Debug ui system, only one instance of this struct should exist.
@@ -287,6 +288,7 @@ DebugMenu* DebugUICreateMenu()
     menu->position = MENU_START_POSITION;
     menu->size = MENU_START_SIZE;
     menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
+	menu->nextElementYOffset = MENU_ELEMENTS_OFFSET;	// Making sure that the first element that gets added to the menu has the correct offset from the edge of the menu.
 
 	// Creating a quad for the menu in the menuBackgrounds instanced vertex buffer (the base menu is basically just a quad with a color)
     state->menuBackgroundQuads[0].transform = menu->menuTransform;
@@ -343,12 +345,14 @@ void DebugUIRenderMenu(DebugMenu* menu)
 
 static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 {
-	vec2 handlebarPosition = vec2_create(0, menu->size.y - MENU_HANDLEBAR_VERTICAL_SIZE);
-	vec2 handlebarSize = vec2_create(menu->size.x, MENU_HANDLEBAR_VERTICAL_SIZE);
+	vec2 handlebarPosition = vec2_create(0, menu->size.y - HANDLEBAR_VERTICAL_SIZE);
+	vec2 handlebarSize = vec2_create(menu->size.x, HANDLEBAR_VERTICAL_SIZE);
 	mat4 handlebarTransform = mat4_mul_mat4(mat4_2Dtranslate(handlebarPosition), mat4_2Dscale(handlebarSize));
 	menu->quadsInstanceData[menu->quadCount].transform = handlebarTransform;
     menu->quadsInstanceData[menu->quadCount].color = HANDLEBAR_COLOR;
     menu->quadCount++;
+	
+	menu->nextElementYOffset += HANDLEBAR_VERTICAL_SIZE;
 
 	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -375,12 +379,14 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
     buttonData->pStateBool = pStateBool;
     buttonData->pSignalBool = pSignalBool;
 
-    vec2 buttonPosition = vec2_create(MENU_ELEMENTS_OFFSET, 0.3f + 1.5f * menu->interactablesCount);
+	menu->nextElementYOffset += BUTTON_SIZE.y;
+    vec2 buttonPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset);
     vec2 buttonSize = BUTTON_SIZE;
     mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
     menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
     menu->quadCount++;
+	menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -414,20 +420,22 @@ void DebugUIAddSlider(DebugMenu* menu, const char* text, f32 minValue, f32 maxVa
 	f32 sliderProgress = (*pSliderValue - minValue) / sliderData->valueRange;
 
 	// Adding a quad for the slider bar and a quad for the slider dot.
-	vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, 0.2f + 1.5f * menu->interactablesCount);
+	menu->nextElementYOffset += SLIDER_DOT_SIZE.y;
+	vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->size.y - menu->nextElementYOffset);
 	vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-	vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, 0.3f + 1.5f * menu->interactablesCount);
+	vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4));// Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
     vec2 sliderBarSize = SLIDER_BAR_SIZE;
     mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-	vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * 2.f, 0.2f + 1.5f * menu->interactablesCount, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+	vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->size.y - menu->nextElementYOffset, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
 	vec2 sliderDotSize = SLIDER_DOT_SIZE;
 	mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
 	menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
     menu->quadCount++;
+	menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
 
 	sliderData->sliderDotHeight	= sliderDotPosition.y;
 
