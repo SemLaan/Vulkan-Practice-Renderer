@@ -226,6 +226,8 @@ void GameInit()
 
 void GameShutdown()
 {
+	DebugUIDestroyMenu(gameState->debugMenu);
+
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
     MaterialDestroy(gameState->instancedLightingMaterial);

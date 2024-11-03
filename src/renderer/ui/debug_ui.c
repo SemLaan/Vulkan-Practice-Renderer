@@ -310,6 +310,7 @@ DebugMenu* DebugUICreateMenu()
 
 	// Creating an array for keeping track of all the interactable elements in the menu
     menu->interactablesArray = Alloc(GetGlobalAllocator(), sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES, MEM_TAG_RENDERER_SUBSYS);
+	MemoryZero(menu->interactablesArray, sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES);
     menu->interactablesCount = 0;
     menu->activeInteractableIndex = NO_INTERACTABLE_ACTIVE_VALUE;
 
@@ -321,7 +322,25 @@ DebugMenu* DebugUICreateMenu()
 
 void DebugUIDestroyMenu(DebugMenu* menu)
 {
-    // TODO:
+	// Destroying graphics resources
+	VertexBufferDestroy(menu->quadsInstancedVB);
+	MaterialDestroy(menu->menuElementMaterial);
+
+	// Freeing simple allocations
+	Free(GetGlobalAllocator(), menu->quadsInstanceData);
+
+	// Freeing interactables
+	for (int i = 0; i < MAX_DBG_MENU_INTERACTABLES; i++)
+	{
+		if (menu->interactablesArray[i].internalData)
+			Free(state->interactableInternalDataAllocator, menu->interactablesArray[i].internalData);
+	}
+	Free(GetGlobalAllocator(), menu->interactablesArray);
+
+	// TODO: remove the menu from the debugMenuArray
+
+	// Freeing the menu itself
+	Free(GetGlobalAllocator(), menu);
 }
 
 void DebugUIRenderMenu(DebugMenu* menu)
