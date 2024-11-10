@@ -20,6 +20,10 @@
 #include "vulkan_utils.h"
 #include "vulkan_shader.h"
 
+#define RENDERER_POOL_ALLOCATOR_32b_SIZE 200
+#define RENDERER_RESOURCE_ACQUISITION_SIZE 200
+
+
 RendererState* vk_state = nullptr;
 
 static bool OnWindowResize(EventCode type, EventData data);
@@ -33,8 +37,8 @@ bool InitializeRenderer()
     MemoryZero(vk_state, sizeof(*vk_state));
     CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), MiB * 5, &vk_state->rendererAllocator);
     CreateBumpAllocator("renderer bump allocator", vk_state->rendererAllocator, KiB * 5, &vk_state->rendererBumpAllocator);
-    CreatePoolAllocator("renderer resource destructor pool", vk_state->rendererAllocator, RENDER_POOL_BLOCK_SIZE_32, 30, &vk_state->poolAllocator32B);
-    CreatePoolAllocator("Renderer resource acquisition pool", vk_state->rendererAllocator, QUEUE_ACQUISITION_POOL_BLOCK_SIZE, 30, &vk_state->resourceAcquisitionPool);
+    CreatePoolAllocator("renderer resource destructor pool", vk_state->rendererAllocator, RENDER_POOL_BLOCK_SIZE_32, RENDERER_POOL_ALLOCATOR_32b_SIZE, &vk_state->poolAllocator32B);
+    CreatePoolAllocator("Renderer resource acquisition pool", vk_state->rendererAllocator, QUEUE_ACQUISITION_POOL_BLOCK_SIZE, RENDERER_RESOURCE_ACQUISITION_SIZE, &vk_state->resourceAcquisitionPool);
 
     vk_state->vkAllocator = nullptr; // TODO: add something that tracks vulkan API allocations in debug mode
 

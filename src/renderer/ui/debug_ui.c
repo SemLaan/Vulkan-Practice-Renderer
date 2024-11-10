@@ -9,9 +9,9 @@
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
 
-#define MAX_DBG_MENU_QUADS 100
-#define MAX_DBG_MENU_INTERACTABLES 20
-#define MAX_DBG_MENUS 1
+#define MAX_DBG_MENU_QUADS 100 // Change if you need more
+#define MAX_DBG_MENU_INTERACTABLES 20 // Change if you need more
+#define MAX_DBG_MENUS 3	// Change if you need more
 #define ITERACTABLE_INTERNAL_DATA_ALLOCATOR_SIZE (KiB * 5) // This size is arbitrary :)
 #define NO_INTERACTABLE_ACTIVE_VALUE -1
 
@@ -179,7 +179,7 @@ bool InitializeDebugUI()
     ShaderCreate("roundedQuad", &shaderCreateInfo);
     state->menuBackgroundMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
 
-    state->debugMenuDarray = DarrayCreate(sizeof(*state->debugMenuDarray), 1, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
+    state->debugMenuDarray = DarrayCreate(sizeof(*state->debugMenuDarray), MAX_DBG_MENUS, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
 
     state->quadMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);
 
@@ -246,6 +246,9 @@ void UpdateDebugUI()
                 // Calling the correct InteractionUpdate function
                 (*interaction_update_func_ptr_arr[menu->interactablesArray[menu->activeInteractableIndex].interactableType])(menu, &menu->interactablesArray[menu->activeInteractableIndex], mouseWorldPos);
             }
+
+			// Breaking out of the menu loop so that only one menu can be interacted with at a time
+			break;
         }
         // If NO interactable in this menu is being interacted with and the mouse button was pressed.
         else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN))
@@ -257,6 +260,9 @@ void UpdateDebugUI()
             // If the mouse is in this menu, loop through all the elements in this menu to see which one needs to be interacted with.
             if (mouseInMenu)
             {
+				// Gets set to true if an element is found to be interacted with so we can break out of the menu loop
+				bool elementInteractedWith = false;
+
                 for (int j = 0; j < menu->interactablesCount; j++)
                 {
                     // If the mouse is on element j, handle the interaction start and set it as the active interactable.
@@ -271,9 +277,14 @@ void UpdateDebugUI()
                         (*interaction_start_func_ptr_arr[menu->interactablesArray[j].interactableType])(menu, &menu->interactablesArray[j], mouseWorldPos);
 
                         menu->activeInteractableIndex = j; // Here j is the index of the interactable that is now being interacted with.
+						elementInteractedWith = true;
                         break;
                     }
                 }
+
+				// Breaking out of the menu loop if an element was clicked so that only one menu can be interacted with at a time
+				if (elementInteractedWith)
+					break;
             }
         }
     }
@@ -291,8 +302,9 @@ DebugMenu* DebugUICreateMenu()
 	menu->nextElementYOffset = MENU_ELEMENTS_OFFSET;	// Making sure that the first element that gets added to the menu has the correct offset from the edge of the menu.
 
 	// Creating a quad for the menu in the menuBackgrounds instanced vertex buffer (the base menu is basically just a quad with a color)
-    state->menuBackgroundQuads[0].transform = menu->menuTransform;
-    state->menuBackgroundQuads[0].color = MENU_BACKGROUND_COLOR;
+	u32 menuIndex = DarrayGetSize(state->debugMenuDarray);
+    state->menuBackgroundQuads[menuIndex].transform = menu->menuTransform;
+    state->menuBackgroundQuads[menuIndex].color = MENU_BACKGROUND_COLOR;
 
     VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
 
@@ -337,7 +349,21 @@ void DebugUIDestroyMenu(DebugMenu* menu)
 	}
 	Free(GetGlobalAllocator(), menu->interactablesArray);
 
-	// TODO: remove the menu from the debugMenuArray
+	// remove the menu from the debugMenuArray and remove the menu quad from the quads darray
+	for (int i = 0; i < MAX_DBG_MENUS; i++)
+	{
+		if (state->debugMenuDarray[i] == menu)
+		{
+			// Removing the menu quad from the menu background quads
+			u32 menuQuadsToCopy = MAX_DBG_MENUS - i;
+			if (menuQuadsToCopy > 0)
+				MemoryCopy(&state->menuBackgroundQuads[i], &state->menuBackgroundQuads[i + 1], menuQuadsToCopy * sizeof(*state->menuBackgroundQuads));
+
+			// Removing the menu from the debug menu darray
+			DarrayPopAt(state->debugMenuDarray, i);
+			break;
+		}
+	}
 
 	// Freeing the menu itself
 	Free(GetGlobalAllocator(), menu);
@@ -534,7 +560,16 @@ void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* int
 
 	// Updating the menu backround vertex buffer
 	menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
-    state->menuBackgroundQuads[0].transform = menu->menuTransform;
+	u32 menuIndex = 0;
+	for (u32 i = 0; i < MAX_DBG_MENUS; i++)
+	{
+		if (state->debugMenuDarray[i] == menu)
+		{
+			menuIndex = i;
+			break;
+		}
+	}
+    state->menuBackgroundQuads[menuIndex].transform = menu->menuTransform;
     VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
 }
 
@@ -551,7 +586,16 @@ void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* intera
 
 	// Updating the menu backround vertex buffer
 	menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
-    state->menuBackgroundQuads[0].transform = menu->menuTransform;
+    u32 menuIndex = 0;
+	for (u32 i = 0; i < MAX_DBG_MENUS; i++)
+	{
+		if (state->debugMenuDarray[i] == menu)
+		{
+			menuIndex = i;
+			break;
+		}
+	}
+    state->menuBackgroundQuads[menuIndex].transform = menu->menuTransform;
     VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
 }
 

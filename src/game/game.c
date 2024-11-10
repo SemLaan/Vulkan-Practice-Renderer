@@ -48,6 +48,7 @@ typedef struct GameState
     Material uiTextureMaterial;
     Text* textTest;
 	DebugMenu* debugMenu;
+	DebugMenu* debugMenu2;
     Texture texture;
     vec3 camPosition;
     vec3 camRotation;
@@ -58,6 +59,7 @@ typedef struct GameState
     bool mouseEnabled;
 	bool mouseEnableButtonPressed;
     bool perspectiveEnabled;
+	bool destroyDebugMenu2;
 } GameState;
 
 GameState* gameState = nullptr;
@@ -203,6 +205,7 @@ void GameInit()
     gameState->mouseEnabled = false;
 	gameState->mouseEnableButtonPressed = false;
     gameState->perspectiveEnabled = true;
+	gameState->destroyDebugMenu2 = false;
 
     // Calculating UI projection
     gameState->uiViewProj = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
@@ -221,11 +224,19 @@ void GameInit()
 	DebugUIAddButton(gameState->debugMenu, "test2", nullptr, nullptr);
 	DebugUIAddSlider(gameState->debugMenu, "mouse move speed", 1, 10000, &gameState->mouseMoveSpeed);
 
+	// Testing multiple debug menus
+	gameState->debugMenu2 = DebugUICreateMenu();
+	DebugUIAddButton(gameState->debugMenu2, "test", nullptr, &gameState->mouseEnableButtonPressed);
+	DebugUIAddButton(gameState->debugMenu2, "test2", nullptr, &gameState->destroyDebugMenu2);
+	DebugUIAddSlider(gameState->debugMenu2, "mouse move speed", 1, 10000, &gameState->mouseMoveSpeed);
+
     StartOrResetTimer(&gameState->timer);
 }
 
 void GameShutdown()
 {
+	if (gameState->debugMenu2)
+		DebugUIDestroyMenu(gameState->debugMenu2);
 	DebugUIDestroyMenu(gameState->debugMenu);
 
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
@@ -255,6 +266,12 @@ void GameShutdown()
 void GameUpdateAndRender()
 {
     // =========================== Update ===================================
+	if (gameState->destroyDebugMenu2 && gameState->debugMenu2)
+	{
+		DebugUIDestroyMenu(gameState->debugMenu2);
+		gameState->debugMenu2 = nullptr;
+	}
+
     if (gameState->mouseEnabled)
     {
         gameState->camRotation.y -= GetMouseDistanceFromCenter().x / gameState->mouseMoveSpeed;
@@ -379,6 +396,8 @@ void GameUpdateAndRender()
     Draw(1, &gameState->scene.vertexBufferDarray[1], gameState->scene.indexBufferDarray[1], &modelMatrix, 1);
 
 	DebugUIRenderMenu(gameState->debugMenu);
+	if (gameState->debugMenu2)
+		DebugUIRenderMenu(gameState->debugMenu2);
 
     RenderTargetStopRendering(GetMainRenderTarget());
 
