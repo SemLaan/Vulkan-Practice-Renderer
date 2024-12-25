@@ -95,6 +95,11 @@ static vec3 vec3_div_float(vec3 vec, f32 value)
 	return (vec3){ vec.x / value, vec.y / value, vec.z / value };
 }
 
+static vec3 vec3_cross_vec3(vec3 v1, vec3 v2)
+{
+	return (vec3){ v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x };
+}
+
 static vec3 vec3_create(f32 x, f32 y, f32 z)
 {
 	vec3 out;
