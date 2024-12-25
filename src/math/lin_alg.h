@@ -100,6 +100,21 @@ static vec3 vec3_cross_vec3(vec3 v1, vec3 v2)
 	return (vec3){ v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x };
 }
 
+static float vec2_distance(vec2 v1, vec2 v2)
+{
+	f32 deltaX = v1.x - v2.x;
+	f32 deltaY = v1.y - v2.y;
+	return sqrt(deltaX * deltaX + deltaY * deltaY);
+}
+
+static float vec3_distance(vec3 v1, vec3 v2)
+{
+	f32 deltaX = v1.x - v2.x;
+	f32 deltaY = v1.y - v2.y;
+	f32 deltaZ = v1.z - v2.z;
+	return sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+}
+
 static vec3 vec3_create(f32 x, f32 y, f32 z)
 {
 	vec3 out;
