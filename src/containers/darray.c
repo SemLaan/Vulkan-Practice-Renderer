@@ -108,6 +108,25 @@ void DarraySetSize(void* elements, u32 size)
 	state->size = size;
 }
 
+void DarrayFitExact(void* elements)
+{
+	Darray* state = (Darray*)elements - 1;
+
+	if (state->size != state->capacity)
+	{
+		state->capacity = state->size;
+		void* memoryBlock = state->memoryBlock;
+		void* temp = Realloc(state->allocator, state->memoryBlock, (state->stride * state->size) + DARRAY_MIN_ALIGNMENT);
+
+		if (temp != memoryBlock)
+		{
+			elements = (u8*)temp + DARRAY_MIN_ALIGNMENT;
+			state = (Darray*)elements - 1;
+			state->memoryBlock = temp;
+		}
+	}
+}
+
 bool DarrayContains(void* elements, void* element)
 {
 	Darray* state = (Darray*)elements - 1;

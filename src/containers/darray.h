@@ -31,6 +31,9 @@ void DarrayDestroy(void* elements);
 u32 DarrayGetSize(void* elements);
 void DarraySetSize(void* elements, u32 size);
 
+// Fits the memory allocation exactly to the size of the elements
+void DarrayFitExact(void* elements);
+
 // Does a linear search through the array to find the element
 // Only use on small arrays because performance is poor, consider a hash map
 bool DarrayContains(void* elements, void* element);
