@@ -13,14 +13,16 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include "renderer/ui/text_renderer.h"
 #include "renderer/ui/debug_ui.h"
+#include "renderer/ui/text_renderer.h"
+#include "marching_cubes.h"
 
 #define LIGHTING_SHADER_NAME "lighting"
 #define UI_TEXTURE_SHADER_NAME "uitexture"
 #define SHADOW_SHADER_NAME "shadow"
 #define INSTANCED_SHADOW_SHADER_NAME "instanced shadow"
 #define INSTANCED_LIGHTING_SHADER_NAME "instanced lighting"
+#define MARCHING_CUBES_SHADER_NAME "marchingCubes"
 #define FONT_NAME_ROBOTO "roboto"
 #define FONT_NAME_ADORABLE_HANDMADE "adorable"
 #define FONT_NAME_NICOLAST "nicolast"
@@ -46,20 +48,21 @@ typedef struct GameState
     Material lightingMaterial;
     Material instancedLightingMaterial;
     Material uiTextureMaterial;
+    Material marchingCubesMaterial;
     Text* textTest;
-	DebugMenu* debugMenu;
-	DebugMenu* debugMenu2;
+    DebugMenu* debugMenu;
+    DebugMenu* debugMenu2;
     Texture texture;
     vec3 camPosition;
     vec3 camRotation;
     mat4 uiViewProj;
     mat4 view;
     mat4 proj;
-	f32 mouseMoveSpeed;
+    f32 mouseMoveSpeed;
     bool mouseEnabled;
-	bool mouseEnableButtonPressed;
+    bool mouseEnableButtonPressed;
     bool perspectiveEnabled;
-	bool destroyDebugMenu2;
+    bool destroyDebugMenu2;
 } GameState;
 
 GameState* gameState = nullptr;
@@ -133,49 +136,65 @@ void GameInit()
     // Initializing rendering state
     gameState->shadowMapRenderTarget = RenderTargetCreate(4000, 4000, RENDER_TARGET_USAGE_NONE, RENDER_TARGET_USAGE_TEXTURE);
 
-    ShaderCreateInfo shaderCreateInfo = {};
-    shaderCreateInfo.renderTargetStencil = false;
-    shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 3;
-    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
-    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
-    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;
+    {
+        ShaderCreateInfo shaderCreateInfo = {};
+        shaderCreateInfo.renderTargetStencil = false;
+        shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 3;
+        shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+        shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+        shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;
 
-    shaderCreateInfo.vertexShaderName = "simple_shader";
-    shaderCreateInfo.fragmentShaderName = "simple_shader";
-    shaderCreateInfo.renderTargetColor = true;
-    shaderCreateInfo.renderTargetDepth = true;
-    ShaderCreate(LIGHTING_SHADER_NAME, &shaderCreateInfo);
+        shaderCreateInfo.vertexShaderName = "simple_shader";
+        shaderCreateInfo.fragmentShaderName = "simple_shader";
+        shaderCreateInfo.renderTargetColor = true;
+        shaderCreateInfo.renderTargetDepth = true;
+        ShaderCreate(LIGHTING_SHADER_NAME, &shaderCreateInfo);
 
-    shaderCreateInfo.vertexShaderName = "ui_texture";
-    shaderCreateInfo.fragmentShaderName = "ui_texture";
-    shaderCreateInfo.renderTargetColor = true;
-    shaderCreateInfo.renderTargetDepth = false;
-    ShaderCreate(UI_TEXTURE_SHADER_NAME, &shaderCreateInfo);
+        shaderCreateInfo.vertexShaderName = "ui_texture";
+        shaderCreateInfo.fragmentShaderName = "ui_texture";
+        shaderCreateInfo.renderTargetColor = true;
+        shaderCreateInfo.renderTargetDepth = false;
+        ShaderCreate(UI_TEXTURE_SHADER_NAME, &shaderCreateInfo);
 
-    shaderCreateInfo.vertexShaderName = "shadow";
-    shaderCreateInfo.fragmentShaderName = nullptr;
-    shaderCreateInfo.renderTargetColor = false;
-    shaderCreateInfo.renderTargetDepth = true;
-    ShaderCreate(SHADOW_SHADER_NAME, &shaderCreateInfo);
+        shaderCreateInfo.vertexShaderName = "shadow";
+        shaderCreateInfo.fragmentShaderName = nullptr;
+        shaderCreateInfo.renderTargetColor = false;
+        shaderCreateInfo.renderTargetDepth = true;
+        ShaderCreate(SHADOW_SHADER_NAME, &shaderCreateInfo);
 
-    shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 1;
-    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_MAT4;
-    shaderCreateInfo.vertexShaderName = "shadow_instanced";
+        shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 1;
+        shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_MAT4;
+        shaderCreateInfo.vertexShaderName = "shadow_instanced";
 
-    ShaderCreate(INSTANCED_SHADOW_SHADER_NAME, &shaderCreateInfo);
+        ShaderCreate(INSTANCED_SHADOW_SHADER_NAME, &shaderCreateInfo);
 
-    shaderCreateInfo.vertexShaderName = "simple_shader_instanced";
-    shaderCreateInfo.fragmentShaderName = "simple_shader";
-    shaderCreateInfo.renderTargetColor = true;
-    shaderCreateInfo.renderTargetDepth = true;
+        shaderCreateInfo.vertexShaderName = "simple_shader_instanced";
+        shaderCreateInfo.fragmentShaderName = "simple_shader";
+        shaderCreateInfo.renderTargetColor = true;
+        shaderCreateInfo.renderTargetDepth = true;
 
-    ShaderCreate(INSTANCED_LIGHTING_SHADER_NAME, &shaderCreateInfo);
+        ShaderCreate(INSTANCED_LIGHTING_SHADER_NAME, &shaderCreateInfo);
+    }
+    {
+        ShaderCreateInfo shaderCreateInfo = {};
+        shaderCreateInfo.renderTargetStencil = false;
+        shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 2;
+        shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+        shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+
+        shaderCreateInfo.vertexShaderName = "marchingCubes";
+        shaderCreateInfo.fragmentShaderName = "marchingCubes";
+        shaderCreateInfo.renderTargetColor = true;
+        shaderCreateInfo.renderTargetDepth = true;
+        ShaderCreate(MARCHING_CUBES_SHADER_NAME, &shaderCreateInfo);
+    }
 
     gameState->shadowMaterial = MaterialCreate(ShaderGetRef(SHADOW_SHADER_NAME));
     gameState->instancedShadowMaterial = MaterialCreate(ShaderGetRef(INSTANCED_SHADOW_SHADER_NAME));
     gameState->instancedLightingMaterial = MaterialCreate(ShaderGetRef(INSTANCED_LIGHTING_SHADER_NAME));
     gameState->lightingMaterial = MaterialCreate(ShaderGetRef(LIGHTING_SHADER_NAME));
     gameState->uiTextureMaterial = MaterialCreate(ShaderGetRef(UI_TEXTURE_SHADER_NAME));
+	gameState->marchingCubesMaterial = MaterialCreate(ShaderGetRef(MARCHING_CUBES_SHADER_NAME));
     MaterialUpdateTexture(gameState->uiTextureMaterial, "tex", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
     MaterialUpdateTexture(gameState->lightingMaterial, "shadowMap", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
     MaterialUpdateTexture(gameState->lightingMaterial, "shadowMapCompare", GetDepthAsTexture(gameState->shadowMapRenderTarget), SAMPLER_TYPE_SHADOW);
@@ -203,9 +222,9 @@ void GameInit()
     gameState->camRotation = (vec3){0, 0, 0};
 
     gameState->mouseEnabled = false;
-	gameState->mouseEnableButtonPressed = false;
+    gameState->mouseEnableButtonPressed = false;
     gameState->perspectiveEnabled = true;
-	gameState->destroyDebugMenu2 = false;
+    gameState->destroyDebugMenu2 = false;
 
     // Calculating UI projection
     gameState->uiViewProj = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
@@ -218,26 +237,31 @@ void GameInit()
 
     gameState->textTest = TextCreate(testString, FONT_NAME_ROBOTO, gameState->uiViewProj, UPDATE_FREQUENCY_STATIC);
 
-	// Creating debug menu
-	gameState->debugMenu = DebugUICreateMenu();
-	DebugUIAddButton(gameState->debugMenu, "test", nullptr, &gameState->mouseEnableButtonPressed);
-	DebugUIAddButton(gameState->debugMenu, "test2", nullptr, nullptr);
-	DebugUIAddSlider(gameState->debugMenu, "mouse move speed", 1, 10000, &gameState->mouseMoveSpeed);
+    // Creating debug menu
+    gameState->debugMenu = DebugUICreateMenu();
+    DebugUIAddButton(gameState->debugMenu, "test", nullptr, &gameState->mouseEnableButtonPressed);
+    DebugUIAddButton(gameState->debugMenu, "test2", nullptr, nullptr);
+    DebugUIAddSlider(gameState->debugMenu, "mouse move speed", 1, 10000, &gameState->mouseMoveSpeed);
 
-	// Testing multiple debug menus
-	gameState->debugMenu2 = DebugUICreateMenu();
-	DebugUIAddButton(gameState->debugMenu2, "test", nullptr, &gameState->mouseEnableButtonPressed);
-	DebugUIAddButton(gameState->debugMenu2, "test2", nullptr, &gameState->destroyDebugMenu2);
-	DebugUIAddSlider(gameState->debugMenu2, "mouse move speed", 1, 10000, &gameState->mouseMoveSpeed);
+    // Testing multiple debug menus
+    gameState->debugMenu2 = DebugUICreateMenu();
+    DebugUIAddButton(gameState->debugMenu2, "test", nullptr, &gameState->mouseEnableButtonPressed);
+    DebugUIAddButton(gameState->debugMenu2, "test2", nullptr, &gameState->destroyDebugMenu2);
+    DebugUIAddSlider(gameState->debugMenu2, "mouse move speed", 1, 10000, &gameState->mouseMoveSpeed);
+
+	MCGenerateDensityMap();
+	MCGenerateMesh();
 
     StartOrResetTimer(&gameState->timer);
 }
 
 void GameShutdown()
 {
-	if (gameState->debugMenu2)
-		DebugUIDestroyMenu(gameState->debugMenu2);
-	DebugUIDestroyMenu(gameState->debugMenu);
+	MCDestroyMeshAndDensityMap();
+
+    if (gameState->debugMenu2)
+        DebugUIDestroyMenu(gameState->debugMenu2);
+    DebugUIDestroyMenu(gameState->debugMenu);
 
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
@@ -266,11 +290,11 @@ void GameShutdown()
 void GameUpdateAndRender()
 {
     // =========================== Update ===================================
-	if (gameState->destroyDebugMenu2 && gameState->debugMenu2)
-	{
-		DebugUIDestroyMenu(gameState->debugMenu2);
-		gameState->debugMenu2 = nullptr;
-	}
+    if (gameState->destroyDebugMenu2 && gameState->debugMenu2)
+    {
+        DebugUIDestroyMenu(gameState->debugMenu2);
+        gameState->debugMenu2 = nullptr;
+    }
 
     if (gameState->mouseEnabled)
     {
@@ -308,13 +332,13 @@ void GameUpdateAndRender()
 
     gameState->view = mat4_mul_mat4(rotation, translate);
 
-	// If the mouse button enable button is pressed or if the mouse is enabled and the player presses it.
+    // If the mouse button enable button is pressed or if the mouse is enabled and the player presses it.
     if ((gameState->mouseEnableButtonPressed) ||
-		(gameState->mouseEnabled && GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN)))
+        (gameState->mouseEnabled && GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN)))
     {
         gameState->mouseEnabled = !gameState->mouseEnabled;
         InputSetMouseCentered(gameState->mouseEnabled);
-		gameState->mouseEnableButtonPressed = false;
+        gameState->mouseEnableButtonPressed = false;
     }
 
     // ============================ Rendering ===================================
@@ -325,6 +349,8 @@ void GameUpdateAndRender()
     MaterialUpdateProperty(gameState->lightingMaterial, "roughness", &roughness);
     MaterialUpdateProperty(gameState->instancedLightingMaterial, "color", &testColor);
     MaterialUpdateProperty(gameState->instancedLightingMaterial, "roughness", &roughness);
+	MaterialUpdateProperty(gameState->marchingCubesMaterial, "color", &testColor);
+    MaterialUpdateProperty(gameState->marchingCubesMaterial, "roughness", &roughness);
 
     MaterialUpdateProperty(gameState->uiTextureMaterial, "uiProjection", &gameState->uiViewProj);
 
@@ -376,7 +402,7 @@ void GameUpdateAndRender()
 
     for (int i = 0; i < DarrayGetSize(gameState->scene.vertexBufferDarray); i++)
     {
-        Draw(1, &gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i], 1);
+        //Draw(1, &gameState->scene.vertexBufferDarray[i], gameState->scene.indexBufferDarray[i], &gameState->scene.modelMatrixDarray[i], 1);
     }
 
     // Text
@@ -393,11 +419,14 @@ void GameUpdateAndRender()
     mat4 rotate = mat4_rotate_x(-PI / 2);
     mat4 scale = mat4_2Dscale((vec2){windowAspectRatio, 1});
     mat4 modelMatrix = mat4_mul_mat4(translation, mat4_mul_mat4(rotate, scale));
-    Draw(1, &gameState->scene.vertexBufferDarray[1], gameState->scene.indexBufferDarray[1], &modelMatrix, 1);
+    //Draw(1, &gameState->scene.vertexBufferDarray[1], gameState->scene.indexBufferDarray[1], &modelMatrix, 1);
 
-	DebugUIRenderMenu(gameState->debugMenu);
-	if (gameState->debugMenu2)
-		DebugUIRenderMenu(gameState->debugMenu2);
+	MaterialBind(gameState->marchingCubesMaterial);
+	MCRenderWorld();
+
+    DebugUIRenderMenu(gameState->debugMenu);
+    if (gameState->debugMenu2)
+        DebugUIRenderMenu(gameState->debugMenu2);
 
     RenderTargetStopRendering(GetMainRenderTarget());
 
