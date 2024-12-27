@@ -354,8 +354,8 @@ void GameUpdateAndRender()
 
     MaterialUpdateProperty(gameState->uiTextureMaterial, "uiProjection", &gameState->uiViewProj);
 
-    // vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
-    vec3 lightRotationVec = vec3_create(0.5f, PI / 2, 0);
+    vec3 lightRotationVec = vec3_create(0.5f + sin(TimerSecondsSinceStart(gameState->timer))/2, TimerSecondsSinceStart(gameState->timer), 0);
+    //vec3 lightRotationVec = vec3_create(0.5f, PI / 2, 0);
     mat4 shadowRotation = mat4_rotate_xyz(vec3_invert_sign(lightRotationVec));
 
     vec3 directionalLight = {shadowRotation.values[2 + COL4(0)], shadowRotation.values[2 + COL4(1)], shadowRotation.values[2 + COL4(2)]};

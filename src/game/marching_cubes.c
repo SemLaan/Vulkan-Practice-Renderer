@@ -55,8 +55,11 @@ void MCGenerateDensityMap()
 
     mcdata->densityMap = Alloc(GetGlobalAllocator(), mcdata->densityMapValueCount * sizeof(*mcdata->densityMap), MEM_TAG_TEST);
 
-	vec3 sphereCenter = vec3_from_float(DENSITY_MAP_SIZE / 2);
-	f32 sphereRadius = 20;
+	vec3 sphere1Center = vec3_from_float(DENSITY_MAP_SIZE / 2);
+	f32 sphere1Radius = 20;
+	vec3 sphere2Center = vec3_from_float(DENSITY_MAP_SIZE / 2);
+	sphere2Center.x -= 13;
+	f32 sphere2Radius = 8;
 
     for (u32 x = 0; x < mcdata->densityMapWidth; x++)
     {
@@ -64,8 +67,19 @@ void MCGenerateDensityMap()
         {
             for (u32 z = 0; z < mcdata->densityMapDepth; z++)
             {
-                //*GetDensityValueRef(x, y, z) = y > 1 ? 1 : -1;
-				*GetDensityValueRef(x, y, z) = vec3_distance(vec3_create(x, y, z), sphereCenter) > sphereRadius ? 1 : -1;
+				f32 sphereValue = vec3_distance(vec3_create(x, y, z), sphere1Center) - sphere1Radius;
+				f32 sphereHoleValue = vec3_distance(vec3_create(x, y, z), sphere2Center) - sphere2Radius;
+				if (sphereHoleValue >= 0)
+					sphereHoleValue = 0;
+				else if (sphereHoleValue <= -1)
+					sphereValue = 0;
+				else
+				{
+					f32 t = -sphereHoleValue;
+					sphereValue = sphereValue + (sphereHoleValue - sphereValue) * t;
+					sphereHoleValue = 0;
+				}
+				*GetDensityValueRef(x, y, z) = sphereValue - sphereHoleValue;
             }
         }
     }
