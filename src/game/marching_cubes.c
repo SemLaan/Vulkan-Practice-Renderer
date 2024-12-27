@@ -17,7 +17,7 @@ typedef struct MCVert
 
 typedef struct MCData
 {
-    i32* densityMap;
+    f32* densityMap;
     u32 densityMapWidth;
     u32 densityMapHeigth;
     u32 densityMapDepth;
@@ -28,7 +28,7 @@ typedef struct MCData
 
 static MCData* mcdata = nullptr;
 
-static inline i32* GetDensityValueRef(u32 x, u32 y, u32 z)
+static inline f32* GetDensityValueRef(u32 x, u32 y, u32 z)
 {
     GRASSERT_DEBUG(mcdata);
     GRASSERT_DEBUG(mcdata->densityMap);
@@ -36,7 +36,7 @@ static inline i32* GetDensityValueRef(u32 x, u32 y, u32 z)
     return &mcdata->densityMap[x * mcdata->densityMapHeigth * mcdata->densityMapDepth + y * mcdata->densityMapDepth + z];
 }
 
-static inline i32 GetDensityValueRaw(u32 x, u32 y, u32 z)
+static inline f32 GetDensityValueRaw(u32 x, u32 y, u32 z)
 {
     GRASSERT_DEBUG(mcdata);
     GRASSERT_DEBUG(mcdata->densityMap);
@@ -82,7 +82,7 @@ void MCGenerateMesh()
         {
             for (u32 z = 0; z < mcdata->densityMapDepth - 1; z++)
             {
-                i32 cubeValues[8];
+                f32 cubeValues[8];
 
                 cubeValues[0] = GetDensityValueRaw(x, y, z);
                 cubeValues[1] = GetDensityValueRaw(x + 1, y, z);
@@ -103,15 +103,25 @@ void MCGenerateMesh()
 
                 if (!(cubeIndex == 0 || cubeIndex == 255))
                 {
-
-                    // Vector3[] adjustedEdgePositions = CalculateSurfaceLevels(LookupTables.edgeTable[cubeIndex], cubeValues);
-
                     for (i32 i = 0; triTable[cubeIndex][i] != -1; i++)
                     {
                         i32 edgeIndex = triTable[cubeIndex][i];
 						MCVert vert = {};
                         vert.pos = edgeIndexToPositionTable[edgeIndex];
-                        // Vector3 localPosition = adjustedEdgePositions[LookupTables.triTable[cubeIndex, i]];
+
+						// Interpolating the vertex position based on the two density points connected to the edge that this vertex is on
+						f32 value1 = cubeValues[edgeToCornerTable[edgeIndex][0]];
+                		f32 value2 = cubeValues[edgeToCornerTable[edgeIndex][1]] - value1;
+                		f32 surfaceLevel = -value1;
+                		surfaceLevel /= value2;
+
+						if (vert.pos.x == 0.5f)
+                    		vert.pos.x = surfaceLevel;
+                		if (vert.pos.y == 0.5f)
+                    		vert.pos.y = surfaceLevel;
+                		if (vert.pos.z == 0.5f)
+                    		vert.pos.z = surfaceLevel;
+
                         vert.pos.x += x;
                         vert.pos.y += y;
                         vert.pos.z += z;
