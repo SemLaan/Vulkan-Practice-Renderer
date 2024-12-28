@@ -68,18 +68,17 @@ void MCGenerateDensityMap()
             for (u32 z = 0; z < mcdata->densityMapDepth; z++)
             {
 				f32 sphereValue = vec3_distance(vec3_create(x, y, z), sphere1Center) - sphere1Radius;
+				if (sphereValue <= -2)
+					sphereValue = -2;
+				if (sphereValue >= 0)
+					sphereValue = 0;
 				f32 sphereHoleValue = vec3_distance(vec3_create(x, y, z), sphere2Center) - sphere2Radius;
+				if (sphereHoleValue <= -2)
+					sphereHoleValue = -2;
 				if (sphereHoleValue >= 0)
 					sphereHoleValue = 0;
-				else if (sphereHoleValue <= -1)
-					sphereValue = 0;
-				else
-				{
-					f32 t = -sphereHoleValue;
-					sphereValue = sphereValue + (sphereHoleValue - sphereValue) * t;
-					sphereHoleValue = 0;
-				}
-				*GetDensityValueRef(x, y, z) = sphereValue - sphereHoleValue;
+				
+				*GetDensityValueRef(x, y, z) = 1 + sphereValue - sphereHoleValue;
             }
         }
     }
