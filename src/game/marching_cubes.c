@@ -3,6 +3,7 @@
 #include "core/asserts.h"
 #include "core/meminc.h"
 #include "marching_cubes_lut.h"
+#include "marching_cubes_density_functions.h"
 #include "math/lin_alg.h"
 #include "renderer/renderer.h"
 
@@ -34,23 +35,6 @@ typedef struct MCData
 // Marching cubes data
 static MCData* mcdata = nullptr;
 
-// Indexes into the densityMap
-static inline f32* GetDensityValueRef(u32 x, u32 y, u32 z)
-{
-    GRASSERT_DEBUG(mcdata);
-    GRASSERT_DEBUG(mcdata->densityMap);
-
-    return &mcdata->densityMap[x * mcdata->densityMapHeightTimesDepth + y * mcdata->densityMapDepth + z];
-}
-
-// Indexes into the densityMap
-static inline f32 GetDensityValueRaw(u32 x, u32 y, u32 z)
-{
-    GRASSERT_DEBUG(mcdata);
-    GRASSERT_DEBUG(mcdata->densityMap);
-
-    return mcdata->densityMap[x * mcdata->densityMapHeightTimesDepth + y * mcdata->densityMapDepth + z];
-}
 
 void MCGenerateDensityMap()
 {
@@ -66,38 +50,8 @@ void MCGenerateDensityMap()
     mcdata->densityMap = Alloc(GetGlobalAllocator(), mcdata->densityMapValueCount * sizeof(*mcdata->densityMap), MEM_TAG_TEST);
 
     // ======================== Calculating the density values and filling in the density map
-
-    // Spheres for calculating density
-    vec3 sphere1Center = vec3_from_float(DENSITY_MAP_SIZE / 2);
-    f32 sphere1Radius = 20;
-    vec3 sphere2Center = vec3_from_float(DENSITY_MAP_SIZE / 2);
-    sphere2Center.x -= 13;
-    f32 sphere2Radius = 8;
-
-    // Looping over every density point and calculating the density.
-    for (u32 x = 0; x < mcdata->densityMapWidth; x++)
-    {
-        for (u32 y = 0; y < mcdata->densityMapHeigth; y++)
-        {
-            for (u32 z = 0; z < mcdata->densityMapDepth; z++)
-            {
-                // Calculating whether the current point is in the sphere or in the hole sphere
-                f32 sphereValue = vec3_distance(vec3_create(x, y, z), sphere1Center) - sphere1Radius;
-                if (sphereValue <= -2)
-                    sphereValue = -2;
-                if (sphereValue >= 0)
-                    sphereValue = 0;
-                f32 sphereHoleValue = vec3_distance(vec3_create(x, y, z), sphere2Center) - sphere2Radius;
-                if (sphereHoleValue <= -2)
-                    sphereHoleValue = -2;
-                if (sphereHoleValue >= 0)
-                    sphereHoleValue = 0;
-
-                // Calculating the density value
-                *GetDensityValueRef(x, y, z) = 1 + sphereValue - sphereHoleValue;
-            }
-        }
-    }
+	DensityFuncSphereHole(mcdata->densityMap, mcdata->densityMapWidth, mcdata->densityMapHeigth, mcdata->densityMapDepth);
+    
 
     // Bluring the density map
     u32 kernelSize = 3;
@@ -161,7 +115,7 @@ void MCGenerateDensityMap()
                         }
                     }
 
-                    *GetDensityValueRef(x, y, z) = sum / kernelTotal;
+                    *GetDensityValueRef(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x, y, z) = sum / kernelTotal;
                 }
             }
         }
@@ -199,14 +153,14 @@ void MCGenerateMesh()
                 // Putting the values of the current cube in a small array because in the big array they are not contiguous in memory
                 f32 cubeValues[8];
 
-                cubeValues[0] = GetDensityValueRaw(x, y, z);
-                cubeValues[1] = GetDensityValueRaw(x + 1, y, z);
-                cubeValues[2] = GetDensityValueRaw(x + 1, y, z + 1);
-                cubeValues[3] = GetDensityValueRaw(x, y, z + 1);
-                cubeValues[4] = GetDensityValueRaw(x, y + 1, z);
-                cubeValues[5] = GetDensityValueRaw(x + 1, y + 1, z);
-                cubeValues[6] = GetDensityValueRaw(x + 1, y + 1, z + 1);
-                cubeValues[7] = GetDensityValueRaw(x, y + 1, z + 1);
+                cubeValues[0] = GetDensityValueRaw(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x, y, z);
+                cubeValues[1] = GetDensityValueRaw(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x + 1, y, z);
+                cubeValues[2] = GetDensityValueRaw(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x + 1, y, z + 1);
+                cubeValues[3] = GetDensityValueRaw(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x, y, z + 1);
+                cubeValues[4] = GetDensityValueRaw(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x, y + 1, z);
+                cubeValues[5] = GetDensityValueRaw(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x + 1, y + 1, z);
+                cubeValues[6] = GetDensityValueRaw(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x + 1, y + 1, z + 1);
+                cubeValues[7] = GetDensityValueRaw(mcdata->densityMap, mcdata->densityMapHeightTimesDepth, mcdata->densityMapDepth, x, y + 1, z + 1);
 
                 u32 cubeIndex = 0;
 
