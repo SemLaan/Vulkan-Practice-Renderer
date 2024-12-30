@@ -9,7 +9,6 @@
 
 // !!!!!!!!!!!!!!! Matrices are stored column-wise ==========================================================
 
-#define PI 3.14159265358979323846f
 #define COL4(col_z) (col_z * 4)
 #define COL3(col_z) (col_z * 3)
 #define COL2(col_z) (col_z * 2)
@@ -100,11 +99,23 @@ static vec3 vec3_cross_vec3(vec3 v1, vec3 v2)
 	return (vec3){ v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x };
 }
 
+static vec3 vec3_mul_f32(vec3 a, f32 b)
+{
+	return (vec3){a.x * b, a.y * b, a.z * b};
+}
+
 static float vec2_distance(vec2 v1, vec2 v2)
 {
 	f32 deltaX = v1.x - v2.x;
 	f32 deltaY = v1.y - v2.y;
 	return sqrt(deltaX * deltaX + deltaY * deltaY);
+}
+
+static float vec2_distance_squared(vec2 v1, vec2 v2)
+{
+	f32 deltaX = v1.x - v2.x;
+	f32 deltaY = v1.y - v2.y;
+	return deltaX * deltaX + deltaY * deltaY;
 }
 
 static float vec3_distance(vec3 v1, vec3 v2)
@@ -113,6 +124,14 @@ static float vec3_distance(vec3 v1, vec3 v2)
 	f32 deltaY = v1.y - v2.y;
 	f32 deltaZ = v1.z - v2.z;
 	return sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+}
+
+static float vec3_distance_squared(vec3 v1, vec3 v2)
+{
+	f32 deltaX = v1.x - v2.x;
+	f32 deltaY = v1.y - v2.y;
+	f32 deltaZ = v1.z - v2.z;
+	return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
 }
 
 static vec3 vec3_create(f32 x, f32 y, f32 z)
