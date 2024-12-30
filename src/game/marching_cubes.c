@@ -19,10 +19,11 @@ typedef struct MCVert
 /// @brief Struct to store all the data the marching cubes algorithm generates
 typedef struct MCData
 {
-    f32* densityMap;           // 3d array of density values
-    u32 densityMapWidth;       //
-    u32 densityMapHeigth;      //
-    u32 densityMapDepth;       //
+    f32* densityMap;      // 3d array of density values
+    u32 densityMapWidth;  //
+    u32 densityMapHeigth; //
+    u32 densityMapDepth;  //
+    u32 densityMapHeightTimesDepth;
     u32 densityMapValueCount;  // Total number of values in the densityMap
     MCVert* verticesDarray;    // Darray with all the vertices
     u32* indices;              // Array with all the indices
@@ -39,7 +40,7 @@ static inline f32* GetDensityValueRef(u32 x, u32 y, u32 z)
     GRASSERT_DEBUG(mcdata);
     GRASSERT_DEBUG(mcdata->densityMap);
 
-    return &mcdata->densityMap[x * mcdata->densityMapHeigth * mcdata->densityMapDepth + y * mcdata->densityMapDepth + z];
+    return &mcdata->densityMap[x * mcdata->densityMapHeightTimesDepth + y * mcdata->densityMapDepth + z];
 }
 
 // Indexes into the densityMap
@@ -48,7 +49,7 @@ static inline f32 GetDensityValueRaw(u32 x, u32 y, u32 z)
     GRASSERT_DEBUG(mcdata);
     GRASSERT_DEBUG(mcdata->densityMap);
 
-    return mcdata->densityMap[x * mcdata->densityMapHeigth * mcdata->densityMapDepth + y * mcdata->densityMapDepth + z];
+    return mcdata->densityMap[x * mcdata->densityMapHeightTimesDepth + y * mcdata->densityMapDepth + z];
 }
 
 void MCGenerateDensityMap()
@@ -58,6 +59,7 @@ void MCGenerateDensityMap()
     mcdata->densityMapWidth = DENSITY_MAP_SIZE;
     mcdata->densityMapHeigth = DENSITY_MAP_SIZE;
     mcdata->densityMapDepth = DENSITY_MAP_SIZE;
+    mcdata->densityMapHeightTimesDepth = mcdata->densityMapHeigth * mcdata->densityMapDepth;
     mcdata->densityMapValueCount = mcdata->densityMapWidth * mcdata->densityMapHeigth * mcdata->densityMapDepth;
 
     // Allocating the densityMap
@@ -98,7 +100,7 @@ void MCGenerateDensityMap()
     }
 
     // Bluring the density map
-    u32 kernelSize = 5;
+    u32 kernelSize = 3;
     u32 kernelSizeMinusOne = kernelSize - 1;
     u32 kernelSizeSquared = kernelSize * kernelSize;
     u32 kernelSizeCubed = kernelSize * kernelSize * kernelSize;
@@ -106,13 +108,21 @@ void MCGenerateDensityMap()
     f32* kernel = Alloc(GetGlobalAllocator(), kernelSizeCubed * sizeof(*kernel), MEM_TAG_TEST);
     f32 kernelTotal = 0;
 
+    vec3 kernelCenter = vec3_from_float(kernelSizeMinusOne / 2);
+    f32 maximumEuclideanDistanceSquaredPlusOne = 1 + vec3_distance_squared(vec3_from_float(0), kernelCenter);
+
     for (u32 x = 0; x < kernelSize; x++)
     {
         for (u32 y = 0; y < kernelSize; y++)
         {
             for (u32 z = 0; z < kernelSize; z++)
             {
-                u32 value = 1 << ((x < kernelSizeMinusOne - x ? x : kernelSizeMinusOne - x) + (y < kernelSizeMinusOne - y ? y : kernelSizeMinusOne - y) + (z < kernelSizeMinusOne - z ? z : kernelSizeMinusOne - z));
+                // ========= Kernel version one (kernel value is the maximum manhattan distance from the center of the kernel squared minus the manhattan distance of the current element from the center of the kernel squared)
+                // u32 value = 1 << ((x < kernelSizeMinusOne - x ? x : kernelSizeMinusOne - x) + (y < kernelSizeMinusOne - y ? y : kernelSizeMinusOne - y) + (z < kernelSizeMinusOne - z ? z : kernelSizeMinusOne - z));
+
+                // ========= Kernel version two (kernel value is one plus the maximum euclidean distance from the center of the kernel squared minus the euclidean distance of the current element from the center of the kernel squared)
+                f32 value = maximumEuclideanDistanceSquaredPlusOne - vec3_distance_squared(kernelCenter, vec3_create(x, y, z));
+
                 kernel[x * kernelSizeSquared + y * kernelSize + z] = value;
                 kernelTotal += value;
             }
@@ -121,32 +131,53 @@ void MCGenerateDensityMap()
 
     u32 padding = (kernelSize - 1) / 2;
 
-    // Looping over every kernel sized area in the density map
-    for (u32 x = padding; x < mcdata->densityMapWidth - padding; x++)
-    {
-        for (u32 y = padding; y < mcdata->densityMapHeigth - padding; y++)
-        {
-            for (u32 z = padding; z < mcdata->densityMapDepth - padding; z++)
-            {
-                f32 sum = 0;
+    u32 iterations = 10;
 
-				// Looping over the kernel and multiplying each element of the kernel with its respective element of the kernel sized area in the density map
-                for (u32 kx = 0; kx < kernelSize; kx++)
+    f32* nonBlurredDensityMap = mcdata->densityMap;
+    mcdata->densityMap = Alloc(GetGlobalAllocator(), mcdata->densityMapValueCount * sizeof(*mcdata->densityMap), MEM_TAG_TEST);
+
+    // Looping over every kernel sized area in the density map
+    for (u32 i = 0; i < iterations; i++)
+    {
+        for (u32 x = padding; x < mcdata->densityMapWidth - padding; x++)
+        {
+            for (u32 y = padding; y < mcdata->densityMapHeigth - padding; y++)
+            {
+                for (u32 z = padding; z < mcdata->densityMapDepth - padding; z++)
                 {
-                    for (u32 ky = 0; ky < kernelSize; ky++)
+                    f32 sum = 0;
+
+                    // Looping over the kernel and multiplying each element of the kernel with its respective element of the kernel sized area in the density map
+                    for (u32 kx = 0; kx < kernelSize; kx++)
                     {
-                        for (u32 kz = 0; kz < kernelSize; kz++)
+                        for (u32 ky = 0; ky < kernelSize; ky++)
                         {
-							sum += GetDensityValueRaw(x + kx - padding, y + ky - padding, z + ky - padding) * kernel[kx * kernelSizeSquared + ky * kernelSize + kz];
+                            for (u32 kz = 0; kz < kernelSize; kz++)
+                            {
+                                //                                        [                          x                          ]   [                    y                     ]   [       z        ]
+                                f32 preBlurDensity = nonBlurredDensityMap[(x + kx - padding) * mcdata->densityMapHeightTimesDepth + (y + ky - padding) * mcdata->densityMapDepth + (z + kz - padding)];
+                                sum += preBlurDensity * kernel[kx * kernelSizeSquared + ky * kernelSize + kz];
+                            }
                         }
                     }
-                }
 
-                *GetDensityValueRef(x, y, z) = sum / kernelTotal;
+                    *GetDensityValueRef(x, y, z) = sum / kernelTotal;
+                }
             }
+        }
+
+        // Switching the nonBlurredDensityMap and the density map if there is another blur iteration
+		// The data in the densityMap (after the switch) doesn't have to be changed because it will be entirely overwritten and not read.
+		// Because during the blurring process only the nonBlurredDensity map gets read, which has just gone through a blur iteration.
+        if (i != iterations - 1)
+        {
+            f32* temp = nonBlurredDensityMap;
+            nonBlurredDensityMap = mcdata->densityMap;
+            mcdata->densityMap = temp;
         }
     }
 
+    Free(GetGlobalAllocator(), nonBlurredDensityMap);
     Free(GetGlobalAllocator(), kernel);
 }
 
