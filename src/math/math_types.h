@@ -1,6 +1,9 @@
 #pragma once
 #include "defines.h"
 
+#define PI 3.14159265358979323846f
+
+
 typedef struct vec2i
 {
     i32 x;
