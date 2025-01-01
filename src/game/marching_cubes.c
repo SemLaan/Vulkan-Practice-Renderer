@@ -50,7 +50,8 @@ void MCGenerateDensityMap()
     mcdata->densityMap = Alloc(GetGlobalAllocator(), mcdata->densityMapValueCount * sizeof(*mcdata->densityMap), MEM_TAG_TEST);
 
     // ======================== Calculating the density values and filling in the density map
-	DensityFuncSphereHole(mcdata->densityMap, mcdata->densityMapWidth, mcdata->densityMapHeigth, mcdata->densityMapDepth);
+	//DensityFuncSphereHole(mcdata->densityMap, mcdata->densityMapWidth, mcdata->densityMapHeigth, mcdata->densityMapDepth);
+	DensityFuncRandomSpheres(mcdata->densityMap, mcdata->densityMapWidth, mcdata->densityMapHeigth, mcdata->densityMapDepth);
     
 
     // Bluring the density map
@@ -85,10 +86,11 @@ void MCGenerateDensityMap()
 
     u32 padding = (kernelSize - 1) / 2;
 
-    u32 iterations = 10;
+    u32 iterations = 0;
 
     f32* nonBlurredDensityMap = mcdata->densityMap;
-    mcdata->densityMap = Alloc(GetGlobalAllocator(), mcdata->densityMapValueCount * sizeof(*mcdata->densityMap), MEM_TAG_TEST);
+	if (iterations != 0)
+    	mcdata->densityMap = Alloc(GetGlobalAllocator(), mcdata->densityMapValueCount * sizeof(*mcdata->densityMap), MEM_TAG_TEST);
 
     // Looping over every kernel sized area in the density map
     for (u32 i = 0; i < iterations; i++)
@@ -131,7 +133,8 @@ void MCGenerateDensityMap()
         }
     }
 
-    Free(GetGlobalAllocator(), nonBlurredDensityMap);
+	if (iterations != 0)
+	    Free(GetGlobalAllocator(), nonBlurredDensityMap);
     Free(GetGlobalAllocator(), kernel);
 }
 
@@ -237,6 +240,8 @@ void MCGenerateMesh()
     {
         indices[i] = i;
     }
+
+	GRASSERT_MSG(numberOfVertices > 0, "Marching cubes density function produced no vertices");
 
     mcdata->verticesDarray = verticesDarray;
     mcdata->indices = indices;

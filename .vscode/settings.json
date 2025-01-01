@@ -23,6 +23,7 @@
 		"text_renderer.h": "c",
 		"string.h": "c",
 		"asserts.h": "c",
-		"math_types.h": "c"
+		"math_types.h": "c",
+		"logger.h": "c"
 	}
 }

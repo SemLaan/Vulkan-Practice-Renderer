@@ -61,3 +61,55 @@ static inline void DensityFuncSphereHole(f32* densityMap, u32 mapWidth, u32 mapH
 }
 
 
+#define RANDOM_SPHERES_COUNT 1050
+static inline void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+{
+	u32 mapHeightTimesDepth = mapHeight * mapDepth;
+
+	// Spheres for calculating density
+    vec3 spheresCenter = vec3_from_float(mapWidth / 2);
+	f32 spheresRadius = mapWidth / 8;
+    f32 sphereRadius = 2;
+
+	// Generating random positions in a sphere
+	vec3 sphereCenters[RANDOM_SPHERES_COUNT] = {};
+	u32 seed = 10;
+
+	for (u32 i = 0; i < RANDOM_SPHERES_COUNT; i++)
+	{
+		//vec2 pointOnDisc = RandomPointInUnitDisc(&seed);
+		//sphereCenters[i] = vec3_add_vec3(vec3_mul_f32(vec3_create(pointOnDisc.x, 0, pointOnDisc.y), spheresRadius), spheresCenter);
+		sphereCenters[i] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(&seed), spheresRadius), spheresCenter);
+		_DEBUG("x: %f, y: %f, z: %f", sphereCenters[i].x, sphereCenters[i].y, sphereCenters[i].z);
+	}
+
+    // Looping over every density point and calculating the density.
+    for (u32 x = 0; x < mapWidth; x++)
+    {
+        for (u32 y = 0; y < mapHeight; y++)
+        {
+            for (u32 z = 0; z < mapDepth; z++)
+            {
+				// Find distance to closest sphere
+				f32 closestDistance = 0;
+				for (u32 i = 0; i < RANDOM_SPHERES_COUNT; i++)
+				{
+					f32 distance = vec3_distance(vec3_create(x, y, z), sphereCenters[i]) - sphereRadius;
+					if (distance <= closestDistance)
+					{
+						closestDistance = distance;
+					}
+				}
+
+				if (closestDistance <= -2)
+                    closestDistance = -2;
+
+				// Calculating the density value
+                *GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1 + closestDistance;
+            }
+        }
+    }
+}
+
+
+
