@@ -30,7 +30,7 @@ vec3 RandomPointInUnitSphere(u32* seed)
 {
 	f32 randomTheta = 2*PI * RandomFloat(seed);
 	f32 randomPhi = acos(2 * RandomFloat(seed) - 1) - 0.5f*PI;
-	f32 randomRadius = pow(RandomFloat(seed), 1/3);
+	f32 randomRadius = pow(RandomFloat(seed), 1.f/3.f);
 	f32 y = sin(randomPhi);
 	f32 x = cos(randomPhi) * sin(randomTheta);
 	f32 z = cos(randomPhi) * cos(randomTheta);
