@@ -51,7 +51,8 @@ void MCGenerateDensityMap()
 
     // ======================== Calculating the density values and filling in the density map
 	//DensityFuncSphereHole(mcdata->densityMap, mcdata->densityMapWidth, mcdata->densityMapHeigth, mcdata->densityMapDepth);
-	DensityFuncRandomSpheres(mcdata->densityMap, mcdata->densityMapWidth, mcdata->densityMapHeigth, mcdata->densityMapDepth);
+	//DensityFuncRandomSpheres(mcdata->densityMap, mcdata->densityMapWidth, mcdata->densityMapHeigth, mcdata->densityMapDepth);
+	DensityFuncBezierCurveHole(mcdata->densityMap, mcdata->densityMapWidth, mcdata->densityMapHeigth, mcdata->densityMapDepth);
     
 
     // Bluring the density map
@@ -86,7 +87,7 @@ void MCGenerateDensityMap()
 
     u32 padding = (kernelSize - 1) / 2;
 
-    u32 iterations = 0;
+    u32 iterations = 5;
 
     f32* nonBlurredDensityMap = mcdata->densityMap;
 	if (iterations != 0)
