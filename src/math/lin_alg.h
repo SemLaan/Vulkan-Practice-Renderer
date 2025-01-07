@@ -134,6 +134,11 @@ static float vec3_distance_squared(vec3 v1, vec3 v2)
 	return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
 }
 
+static vec3 vec3_lerp(vec3 v1, vec3 v2, f32 t)
+{
+	return vec3_add_vec3(v1, vec3_mul_f32(vec3_sub_vec3(v2, v1), t));
+}
+
 static vec3 vec3_create(f32 x, f32 y, f32 z)
 {
 	vec3 out;
