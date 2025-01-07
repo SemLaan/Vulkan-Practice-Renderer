@@ -290,6 +290,13 @@ void GameShutdown()
 void GameUpdateAndRender()
 {
     // =========================== Update ===================================
+	if (GetButtonDown(BUTTON_RIGHTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_RIGHTMOUSEBTN))
+	{
+		MCDestroyMeshAndDensityMap();
+		MCGenerateDensityMap();
+		MCGenerateMesh();
+	}
+
     if (gameState->destroyDebugMenu2 && gameState->debugMenu2)
     {
         DebugUIDestroyMenu(gameState->debugMenu2);
