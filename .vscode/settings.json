@@ -24,6 +24,12 @@
 		"string.h": "c",
 		"asserts.h": "c",
 		"math_types.h": "c",
-		"logger.h": "c"
+		"logger.h": "c",
+		"texture.h": "c",
+		"shader.h": "c",
+		"debug_ui.h": "c",
+		"marching_cubes.h": "c",
+		"render_target.h": "c",
+		"game_rendering.h": "c"
 	}
 }

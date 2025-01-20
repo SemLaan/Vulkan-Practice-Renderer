@@ -102,7 +102,7 @@ typedef struct RenderTarget
 
 typedef struct GlobalUniformObject
 {
-    _Alignas(16) mat4 projView;
+    _Alignas(16) mat4 viewProjection;
     _Alignas(16) vec3 viewPosition;
     _Alignas(16) vec3 directionalLight;
 } GlobalUniformObject;
