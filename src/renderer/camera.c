@@ -8,7 +8,7 @@ void CameraRecalculateViewAndViewProjection(Camera* camera)
 {
 	mat4 cameraViewTranslation = mat4_3Dtranslate(vec3_invert_sign(camera->position));
 	mat4 cameraViewRotation = mat4_rotate_xyz(vec3_invert_sign(camera->rotation));
-	camera->view = mat4_mul_mat4(cameraViewTranslation, cameraViewRotation);
+	camera->view = mat4_mul_mat4(cameraViewRotation, cameraViewTranslation);
 	camera->viewProjection = mat4_mul_mat4(camera->projection, camera->view);
 }
 
