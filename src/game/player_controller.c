@@ -35,10 +35,10 @@ void PlayerControllerUpdate()
         sceneCamera->rotation.x = -1.5f;
 
     // Create the rotation matrix
-    mat4 rotation = mat4_rotate_xyz(sceneCamera->rotation);
+    mat4 rotation = mat4_rotate_xyz(vec3_invert_sign(sceneCamera->rotation));
 
     vec3 forwardVector = {-rotation.values[2 + COL4(0)], -rotation.values[2 + COL4(1)], -rotation.values[2 + COL4(2)]};
-    vec3 rightVector = {rotation.values[0 + COL4(0)], rotation.values[1 + COL4(0)], rotation.values[2 + COL4(0)]};
+    vec3 rightVector = {rotation.values[0 + COL4(0)], rotation.values[0 + COL4(1)], rotation.values[0 + COL4(2)]};
 
     vec3 frameMovement = {};
 
