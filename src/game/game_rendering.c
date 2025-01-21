@@ -1,12 +1,12 @@
 #include "game_rendering.h"
 
-#include "renderer/render_target.h"
-#include "renderer/renderer.h"
-#include "math/lin_alg.h"
-#include "renderer/ui/text_renderer.h"
 #include "core/event.h"
 #include "core/platform.h"
 #include "marching_cubes.h"
+#include "math/lin_alg.h"
+#include "renderer/render_target.h"
+#include "renderer/renderer.h"
+#include "renderer/ui/text_renderer.h"
 
 #define LIGHTING_SHADER_NAME "lighting"
 #define UI_TEXTURE_SHADER_NAME "uitexture"
@@ -37,12 +37,12 @@ typedef struct GameRenderingState
     // Render targets
     RenderTarget shadowMapRenderTarget;
 
-	// Camera matrices and positions
-	Camera sceneCamera;
-	Camera uiCamera;
+    // Camera matrices and positions
+    Camera sceneCamera;
+    Camera uiCamera;
 
-	// Text, THIS IS TEMPORARY, this needs to be changed once the text system is finished
-	Text* textTest;
+    // Text, THIS IS TEMPORARY, this needs to be changed once the text system is finished
+    Text* textTest;
 } GameRenderingState;
 
 static GameRenderingState* renderingState = nullptr;
@@ -61,26 +61,26 @@ void GameRenderingInit()
 {
     renderingState = Alloc(GetGlobalAllocator(), sizeof(*renderingState), MEM_TAG_GAME);
 
-	// Calculating camera projections and listening to the window resize event to recalculate projection on window resize
-	vec2i windowSize = GetPlatformWindowSize();
+    // Calculating camera projections and listening to the window resize event to recalculate projection on window resize
+    vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
     renderingState->sceneCamera.projection = mat4_perspective(DEFAULT_FOV, windowAspectRatio, DEFAULT_NEAR_PLANE, DEFAULT_FAR_PLANE);
     renderingState->uiCamera.projection = mat4_orthographic(0, UI_ORTHO_HEIGHT * windowAspectRatio, 0, UI_ORTHO_HEIGHT, UI_NEAR_PLANE, UI_FAR_PLANE);
-	
-	RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
-	renderingState->sceneCamera.position = vec3_create(0, 0, 0);
-	renderingState->sceneCamera.rotation = vec3_create(0, 0, 0);
-	renderingState->uiCamera.position = vec3_create(0, 0, 0);
-	renderingState->uiCamera.rotation = vec3_create(0, 0, 0);
+    RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
+
+    renderingState->sceneCamera.position = vec3_create(0, 0, 0);
+    renderingState->sceneCamera.rotation = vec3_create(0, 0, 0);
+    renderingState->uiCamera.position = vec3_create(0, 0, 0);
+    renderingState->uiCamera.rotation = vec3_create(0, 0, 0);
 
     // Loading fonts
     TextLoadFont(FONT_NAME_ROBOTO, "Roboto-Black.ttf");
     TextLoadFont(FONT_NAME_ADORABLE_HANDMADE, "Adorable Handmade.ttf");
     TextLoadFont(FONT_NAME_NICOLAST, "Nicolast.ttf");
 
-	// Creating test text
-	// TODO: this will be replaced once the text rendering system is finished
+    // Creating test text
+    // TODO: this will be replaced once the text rendering system is finished
     const char* testString = "Beefy text testing!?.";
     renderingState->textTest = TextCreate(testString, FONT_NAME_ROBOTO, renderingState->uiCamera.projection, UPDATE_FREQUENCY_STATIC);
 
@@ -147,7 +147,7 @@ void GameRenderingInit()
         renderingState->marchingCubesMaterial = MaterialCreate(ShaderGetRef(MARCHING_CUBES_SHADER_NAME));
     }
 
-	// Creating the shadow map render target
+    // Creating the shadow map render target
     renderingState->shadowMapRenderTarget = RenderTargetCreate(4000, 4000, RENDER_TARGET_USAGE_NONE, RENDER_TARGET_USAGE_TEXTURE);
 
     // Initializing material state
@@ -157,11 +157,11 @@ void GameRenderingInit()
         MaterialUpdateTexture(renderingState->lightingMaterial, "shadowMapCompare", GetDepthAsTexture(renderingState->shadowMapRenderTarget), SAMPLER_TYPE_SHADOW);
         MaterialUpdateTexture(renderingState->instancedLightingMaterial, "shadowMap", GetDepthAsTexture(renderingState->shadowMapRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
         MaterialUpdateTexture(renderingState->instancedLightingMaterial, "shadowMapCompare", GetDepthAsTexture(renderingState->shadowMapRenderTarget), SAMPLER_TYPE_SHADOW);
-		vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
-    	f32 roughness = 0;
-		MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
-    	MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
-	}
+        vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
+        f32 roughness = 0;
+        MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
+        MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
+    }
 
     MCGenerateDensityMap();
     MCGenerateMesh();
@@ -169,47 +169,52 @@ void GameRenderingInit()
 
 void GameRenderingRender()
 {
-	// ================== Camera calculations
-	CameraRecalculateViewAndViewProjection(&renderingState->sceneCamera);
+    vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
+    f32 roughness = 0;
+    MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
+    MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
 
-	GlobalUniformObject globalUniformObject = {};
-    globalUniformObject.viewPosition = renderingState->sceneCamera.position;
+    // ================== Camera calculations
+    CameraRecalculateViewAndViewProjection(&renderingState->sceneCamera);
+
+    GlobalUniformObject globalUniformObject = {};
+    globalUniformObject.viewPosition = vec3_invert_sign(renderingState->sceneCamera.position);
     globalUniformObject.viewProjection = renderingState->sceneCamera.viewProjection;
     globalUniformObject.directionalLight = vec3_create(1, 0, 0);
     UpdateGlobalUniform(&globalUniformObject);
 
-	// ================== Start rendering
-	if (!BeginRendering())
+    // ================== Start rendering
+    if (!BeginRendering())
         return;
 
-	// ================== Rendering main scene to screen
+    // ================== Rendering main scene to screen
     RenderTargetStartRendering(GetMainRenderTarget());
 
-	// Rendering the marching cubes mesh
-	MaterialBind(renderingState->marchingCubesMaterial);
+    // Rendering the marching cubes mesh
+    MaterialBind(renderingState->marchingCubesMaterial);
     MCRenderWorld();
 
-	// Rendering text as a demo of the text system
+    // Rendering text as a demo of the text system
     mat4 bezierModel = mat4_2Dtranslate(vec2_create(0, 4));
     // TextUpdateTransform(gameState->textTest, mat4_mul_mat4(gameState->uiViewProj, bezierModel));
     TextUpdateTransform(renderingState->textTest, mat4_mul_mat4(renderingState->sceneCamera.viewProjection, bezierModel));
     TextRender();
 
-	// TODO: fix
-	// Rendering the debug menu's
-	//DebugUIRenderMenu(gameState->debugMenu);
-    //if (gameState->debugMenu2)
+    // TODO: fix
+    // Rendering the debug menu's
+    // DebugUIRenderMenu(gameState->debugMenu);
+    // if (gameState->debugMenu2)
     //    DebugUIRenderMenu(gameState->debugMenu2);
 
-	RenderTargetStopRendering(GetMainRenderTarget());
+    RenderTargetStopRendering(GetMainRenderTarget());
 
-	// ================== Ending rendering
+    // ================== Ending rendering
     EndRendering();
 }
 
 void GameRenderingShutdown()
 {
-	UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
+    UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
     MCDestroyMeshAndDensityMap();
 
@@ -226,12 +231,11 @@ void GameRenderingShutdown()
 
 GameCameras GetGameCameras()
 {
-	GRASSERT_DEBUG(renderingState);
+    GRASSERT_DEBUG(renderingState);
 
-	GameCameras gameCameras = {};
-	gameCameras.sceneCamera = &renderingState->sceneCamera;
-	gameCameras.uiCamera = &renderingState->uiCamera;
+    GameCameras gameCameras = {};
+    gameCameras.sceneCamera = &renderingState->sceneCamera;
+    gameCameras.uiCamera = &renderingState->uiCamera;
 
-	return gameCameras;
+    return gameCameras;
 }
-
