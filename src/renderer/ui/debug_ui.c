@@ -87,7 +87,6 @@ typedef struct InteractableData
 
 typedef struct DebugMenu
 {
-    mat4 menuTransform;                   // Transform of the menu.
     vec2 position;                        // Position, anchor is bottom left of the menu.
     vec2 size;                            // Vec 2 with the menu size, x is width y is height.
     InteractableData* interactablesArray; // Array of interactables (buttons, sliders, text, etc.).
@@ -106,9 +105,6 @@ typedef struct DebugMenu
 typedef struct DebugUIState
 {
     DebugMenu** debugMenuDarray;                  // Dynamic array with all the debug menu instances that exist
-    Material menuBackgroundMaterial;              // Material to render quads with.
-    QuadInstanceData* menuBackgroundQuads;        // Quad instances for all the menu backgrounds.
-    VertexBuffer menuBackgroundsVB;               // Vertex Buffer with the instances for menu background quads
     MeshData* quadMesh;                           // Mesh with the data to make quad instances.
     mat4 uiProjView;                              // Projection and view matrix for all debug menu's
     mat4 inverseProjView;                         // Inverted proj view matrix.
@@ -178,7 +174,6 @@ bool InitializeDebugUI()
     shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC4;	// Color
 
     ShaderCreate("roundedQuad", &shaderCreateInfo);
-    state->menuBackgroundMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
 
     state->debugMenuDarray = DarrayCreate(sizeof(*state->debugMenuDarray), MAX_DBG_MENUS, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
 
@@ -191,9 +186,6 @@ bool InitializeDebugUI()
     state->uiProjView = mat4_mul_mat4(projection, view);
     state->inverseProjView = mat4_inverse(state->uiProjView);
 
-    state->menuBackgroundQuads = Alloc(GetGlobalAllocator(), sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS, MEM_TAG_RENDERER_SUBSYS);
-    state->menuBackgroundsVB = VertexBufferCreate(state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
-
     RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
     return true;
@@ -204,7 +196,6 @@ void ShutdownDebugUI()
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
     DestroyFreelistAllocator(state->interactableInternalDataAllocator);
-    MaterialDestroy(state->menuBackgroundMaterial);
     DarrayDestroy(state->debugMenuDarray);
     Free(GetGlobalAllocator(), state);
 }
@@ -304,21 +295,20 @@ DebugMenu* DebugUICreateMenu()
 	// Positioning the menu
     menu->position = MENU_START_POSITION;
     menu->size = MENU_START_SIZE;
-    menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
 	menu->nextElementYOffset = MENU_ELEMENTS_OFFSET;	// Making sure that the first element that gets added to the menu has the correct offset from the edge of the menu.
-
-	// Creating a quad for the menu in the menuBackgrounds instanced vertex buffer (the base menu is basically just a quad with a color)
-	u32 menuIndex = DarrayGetSize(state->debugMenuDarray);
-    state->menuBackgroundQuads[menuIndex].transform = menu->menuTransform;
-    state->menuBackgroundQuads[menuIndex].color = MENU_BACKGROUND_COLOR;
-
-    VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
-
+	
 	// Creating an instanced vertex buffer for all the quads that will be rendered in the menu.
     menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
     menu->maxQuads = MAX_DBG_MENU_QUADS;
     menu->quadCount = 0;
     menu->menuElementMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
+
+	// Creating a quad for the menu background
+	menu->quadsInstanceData[menu->quadCount].transform = mat4_mul_mat4(mat4_3Dtranslate(vec3_create(0, 0, -0.5f)), mat4_2Dscale(menu->size));
+    menu->quadsInstanceData[menu->quadCount].color = MENU_BACKGROUND_COLOR;
+    menu->quadCount++;
+	
+	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
     menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
 
@@ -360,11 +350,6 @@ void DebugUIDestroyMenu(DebugMenu* menu)
 	{
 		if (state->debugMenuDarray[i] == menu)
 		{
-			// Removing the menu quad from the menu background quads
-			u32 menuQuadsToCopy = MAX_DBG_MENUS - i;
-			if (menuQuadsToCopy > 0)
-				MemoryCopy(&state->menuBackgroundQuads[i], &state->menuBackgroundQuads[i + 1], menuQuadsToCopy * sizeof(*state->menuBackgroundQuads));
-
 			// Removing the menu from the debug menu darray
 			DarrayPopAt(state->debugMenuDarray, i);
 			break;
@@ -379,13 +364,6 @@ void DebugUIRenderMenu(DebugMenu* menu)
 {
 	if (!menu->active)
 		return;
-
-    MaterialUpdateProperty(state->menuBackgroundMaterial, "menuView", &state->uiProjView);
-    MaterialBind(state->menuBackgroundMaterial);
-
-    VertexBuffer menuVertexBuffers[2] = {state->quadMesh->vertexBuffer, state->menuBackgroundsVB};
-
-    Draw(2, menuVertexBuffers, state->quadMesh->indexBuffer, nullptr, DarrayGetSize(state->debugMenuDarray));
 
 	// Z for the view translation is 0.5f so that menu elements are rendered above the menu itself
     mat4 menuElementsView = mat4_mul_mat4(state->uiProjView, mat4_3Dtranslate(vec3_create(menu->position.x, menu->position.y, 0.5f)));
@@ -571,20 +549,6 @@ void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* int
 	MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
 	vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
 	menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
-
-	// Updating the menu backround vertex buffer
-	menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
-	u32 menuIndex = 0;
-	for (u32 i = 0; i < MAX_DBG_MENUS; i++)
-	{
-		if (state->debugMenuDarray[i] == menu)
-		{
-			menuIndex = i;
-			break;
-		}
-	}
-    state->menuBackgroundQuads[menuIndex].transform = menu->menuTransform;
-    VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
 }
 
 void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
@@ -597,20 +561,6 @@ void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* intera
 	MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
 	vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
 	menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
-
-	// Updating the menu backround vertex buffer
-	menu->menuTransform = mat4_mul_mat4(mat4_2Dtranslate(menu->position), mat4_2Dscale(menu->size));
-    u32 menuIndex = 0;
-	for (u32 i = 0; i < MAX_DBG_MENUS; i++)
-	{
-		if (state->debugMenuDarray[i] == menu)
-		{
-			menuIndex = i;
-			break;
-		}
-	}
-    state->menuBackgroundQuads[menuIndex].transform = menu->menuTransform;
-    VertexBufferUpdate(state->menuBackgroundsVB, state->menuBackgroundQuads, sizeof(*state->menuBackgroundQuads) * MAX_DBG_MENUS);
 }
 
 
