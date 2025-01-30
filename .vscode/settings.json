@@ -30,6 +30,7 @@
 		"debug_ui.h": "c",
 		"marching_cubes.h": "c",
 		"render_target.h": "c",
-		"game_rendering.h": "c"
+		"game_rendering.h": "c",
+		"platform.h": "c"
 	}
 }
