@@ -64,11 +64,27 @@ void UpdateInput()
 void InputSetMouseCentered(bool enabled)
 {
 	state->mouseCentered = enabled;
+	if (state->mouseCentered)
+	{
+		vec2i centerOfScreen = { .x = GetPlatformWindowSize().x / 2, .y = GetPlatformWindowSize().y / 2 };
+		state->previousMousePosX = centerOfScreen.x;
+		state->mousePosX = centerOfScreen.x;
+		state->previousMousePosY = centerOfScreen.y;
+		state->mousePosY = centerOfScreen.y;
+	}
 }
 
 void InputToggleMouseCentered()
 {
 	state->mouseCentered = !state->mouseCentered;
+	if (state->mouseCentered)
+	{
+		vec2i centerOfScreen = { .x = GetPlatformWindowSize().x / 2, .y = GetPlatformWindowSize().y / 2 };
+		state->previousMousePosX = centerOfScreen.x;
+		state->mousePosX = centerOfScreen.x;
+		state->previousMousePosY = centerOfScreen.y;
+		state->mousePosY = centerOfScreen.y;
+	}
 }
 
 bool GetKeyDown(KeyCode key)
