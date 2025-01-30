@@ -12,13 +12,6 @@
 typedef struct GameState
 {
     Timer timer;
-    DebugMenu* debugMenu;
-    DebugMenu* debugMenu2;
-    f32 mouseMoveSpeed;
-    bool mouseEnabled;
-    bool mouseEnableButtonPressed;
-    bool perspectiveEnabled;
-    bool destroyDebugMenu2;
 } GameState;
 
 extern GameState* gameState;

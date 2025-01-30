@@ -26,6 +26,9 @@
 
 typedef struct GameRenderingState
 {
+    // Debug menu's
+    DebugMenu** debugMenuDarray;
+
     // Materials
     Material instancedShadowMaterial;
     Material shadowMaterial;
@@ -73,6 +76,9 @@ void GameRenderingInit()
     renderingState->sceneCamera.rotation = vec3_create(0, 0, 0);
     renderingState->uiCamera.position = vec3_create(0, 0, 0);
     renderingState->uiCamera.rotation = vec3_create(0, 0, 0);
+
+    // Creating darray for debug ui's
+    renderingState->debugMenuDarray = DarrayCreate(sizeof(*renderingState->debugMenuDarray), 5, GetGlobalAllocator(), MEM_TAG_TEST);
 
     // Loading fonts
     TextLoadFont(FONT_NAME_ROBOTO, "Roboto-Black.ttf");
@@ -200,11 +206,11 @@ void GameRenderingRender()
     TextUpdateTransform(renderingState->textTest, mat4_mul_mat4(renderingState->sceneCamera.viewProjection, bezierModel));
     TextRender();
 
-    // TODO: fix
     // Rendering the debug menu's
-    // DebugUIRenderMenu(gameState->debugMenu);
-    // if (gameState->debugMenu2)
-    //    DebugUIRenderMenu(gameState->debugMenu2);
+    for (u32 i = 0; i < DarrayGetSize(renderingState->debugMenuDarray); i++)
+    {
+        DebugUIRenderMenu(renderingState->debugMenuDarray[i]);
+    }
 
     RenderTargetStopRendering(GetMainRenderTarget());
 
@@ -215,6 +221,9 @@ void GameRenderingRender()
 void GameRenderingShutdown()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
+
+    // Creating darray for debug ui's
+    DarrayDestroy(renderingState->debugMenuDarray);
 
     MCDestroyMeshAndDensityMap();
 
@@ -238,4 +247,21 @@ GameCameras GetGameCameras()
     gameCameras.uiCamera = &renderingState->uiCamera;
 
     return gameCameras;
+}
+
+void RegisterDebugMenu(DebugMenu* debugMenu)
+{
+    renderingState->debugMenuDarray = DarrayPushback(renderingState->debugMenuDarray, &debugMenu);
+}
+
+void UnregisterDebugMenu(DebugMenu* debugMenu)
+{
+    for (u32 i = 0; i < DarrayGetSize(renderingState->debugMenuDarray); i++)
+    {
+        if (renderingState->debugMenuDarray[i] == debugMenu)
+        {
+            DarrayPopAt(renderingState->debugMenuDarray, i);
+			return;
+        }
+    }
 }
