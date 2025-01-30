@@ -29,6 +29,8 @@ void DebugUIDestroyMenu(DebugMenu* menu);
 /// @param menu Pointer to the menu.
 void DebugUIRenderMenu(DebugMenu* menu);
 
+void DebugUIMenuSetActive(DebugMenu* menu, bool active);
+
 /// @brief Adds a button to the bottom of the Debug UI menu with some text.
 /// @param menu Pointer to the menu that the button should be added to.
 /// @param text Text that should be displayed in the button.
