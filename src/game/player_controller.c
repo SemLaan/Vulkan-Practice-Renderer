@@ -47,10 +47,8 @@ void PlayerControllerUpdate()
     if (GetKeyDown(KEY_D))
         frameMovement = vec3_add_vec3(frameMovement, rightVector);
     if (GetKeyDown(KEY_S))
-		//frameMovement.z -= forwardVector.z;
         frameMovement = vec3_sub_vec3(frameMovement, forwardVector);
     if (GetKeyDown(KEY_W))
-		//frameMovement.z += forwardVector.z;
         frameMovement = vec3_add_vec3(frameMovement, forwardVector);
     if (GetKeyDown(KEY_SHIFT))
         frameMovement.y -= 1;

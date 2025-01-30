@@ -99,6 +99,7 @@ typedef struct DebugMenu
     u32 quadCount;                        // Current amount of quads
     u32 interactablesCount;               // Amount of buttons, sliders or other elements in the menu.
 	f32 nextElementYOffset;				  // Y offset that the next element needs to have to not overlap with everything else in the menu.
+	bool active;
 } DebugMenu;
 
 // Data about the state of the Debug ui system, only one instance of this struct should exist.
@@ -222,6 +223,9 @@ void UpdateDebugUI()
     {
         DebugMenu* menu = state->debugMenuDarray[i];
 
+		if (!menu->active)
+			continue;
+
         // If a button or slider is being interacted with already
         if (menu->activeInteractableIndex != NO_INTERACTABLE_ACTIVE_VALUE)
         {
@@ -294,6 +298,8 @@ DebugMenu* DebugUICreateMenu()
 {
 	// Allocating the DebugMenu struct
     DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu), MEM_TAG_RENDERER_SUBSYS);
+
+	menu->active = true;
 
 	// Positioning the menu
     menu->position = MENU_START_POSITION;
@@ -371,6 +377,9 @@ void DebugUIDestroyMenu(DebugMenu* menu)
 
 void DebugUIRenderMenu(DebugMenu* menu)
 {
+	if (!menu->active)
+		return;
+
     MaterialUpdateProperty(state->menuBackgroundMaterial, "menuView", &state->uiProjView);
     MaterialBind(state->menuBackgroundMaterial);
 
@@ -386,6 +395,11 @@ void DebugUIRenderMenu(DebugMenu* menu)
     VertexBuffer vertexBuffers[2] = {state->quadMesh->vertexBuffer, menu->quadsInstancedVB};
 
     Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
+}
+
+void DebugUIMenuSetActive(DebugMenu* menu, bool active)
+{
+	menu->active = active;
 }
 
 static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
