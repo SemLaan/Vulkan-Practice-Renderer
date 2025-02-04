@@ -24,10 +24,12 @@
 #define UI_FAR_PLANE 1
 #define UI_ORTHO_HEIGHT 10
 
+DEFINE_DARRAY_TYPE_REF(DebugMenu);
+
 typedef struct GameRenderingState
 {
     // Debug menu's
-    DebugMenu** debugMenuDarray;
+    DebugMenuRefDarray* debugMenuDarray;
 
     // Materials
     Material instancedShadowMaterial;
@@ -78,7 +80,7 @@ void GameRenderingInit()
     renderingState->uiCamera.rotation = vec3_create(0, 0, 0);
 
     // Creating darray for debug ui's
-    renderingState->debugMenuDarray = DarrayCreate(sizeof(*renderingState->debugMenuDarray), 5, GetGlobalAllocator(), MEM_TAG_TEST);
+    renderingState->debugMenuDarray = DebugMenuRefDarrayCreate(5, GetGlobalAllocator());
 
     // Loading fonts
     TextLoadFont(FONT_NAME_ROBOTO, "Roboto-Black.ttf");
@@ -207,9 +209,9 @@ void GameRenderingRender()
     TextRender();
 
     // Rendering the debug menu's
-    for (u32 i = 0; i < DarrayGetSize(renderingState->debugMenuDarray); i++)
+    for (u32 i = 0; i < renderingState->debugMenuDarray->size; i++)
     {
-        DebugUIRenderMenu(renderingState->debugMenuDarray[i]);
+        DebugUIRenderMenu(renderingState->debugMenuDarray->data[i]);
     }
 
     RenderTargetStopRendering(GetMainRenderTarget());
@@ -251,14 +253,14 @@ GameCameras GetGameCameras()
 
 void RegisterDebugMenu(DebugMenu* debugMenu)
 {
-    renderingState->debugMenuDarray = DarrayPushback(renderingState->debugMenuDarray, &debugMenu);
+    DebugMenuRefDarrayPushback(renderingState->debugMenuDarray, &debugMenu);
 }
 
 void UnregisterDebugMenu(DebugMenu* debugMenu)
 {
-    for (u32 i = 0; i < DarrayGetSize(renderingState->debugMenuDarray); i++)
+    for (u32 i = 0; i < renderingState->debugMenuDarray->size; i++)
     {
-        if (renderingState->debugMenuDarray[i] == debugMenu)
+        if (renderingState->debugMenuDarray->data[i] == debugMenu)
         {
             DarrayPopAt(renderingState->debugMenuDarray, i);
 			return;

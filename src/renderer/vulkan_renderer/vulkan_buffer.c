@@ -181,7 +181,7 @@ VertexBuffer VertexBufferCreate(void* vertices, size_t size)
         acquireDependencyInfo->imageMemoryBarrierCount = 0;
         acquireDependencyInfo->pImageMemoryBarriers = nullptr;
 
-        vk_state->requestedQueueAcquisitionOperationsDarray = (VkDependencyInfo**)DarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
+        VkDependencyInfoRefDarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
 
         // Making sure the staging buffer and memory get deleted when their corresponding command buffer is completed
         ResourceDestructionInfo bufferDestructionInfo = {};
@@ -194,8 +194,8 @@ VertexBuffer VertexBufferCreate(void* vertices, size_t size)
         memoryDestructionInfo.Destructor = VulkanMemoryDestructor;
         memoryDestructionInfo.signalValue = signaledValue;
 
-        vk_state->transferQueue.resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
-        vk_state->transferQueue.resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &memoryDestructionInfo);
+        ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
+        ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &memoryDestructionInfo);
     }
 
     return clientBuffer;
@@ -298,7 +298,7 @@ void VertexBufferUpdate(VertexBuffer clientBuffer, void* vertices, u64 size)
     acquireDependencyInfo->imageMemoryBarrierCount = 0;
     acquireDependencyInfo->pImageMemoryBarriers = nullptr;
 
-    vk_state->requestedQueueAcquisitionOperationsDarray = DarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
+    VkDependencyInfoRefDarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
 
     // Making sure the staging buffer and memory get deleted when their corresponding command buffer is completed
     ResourceDestructionInfo bufferDestructionInfo = {};
@@ -311,8 +311,8 @@ void VertexBufferUpdate(VertexBuffer clientBuffer, void* vertices, u64 size)
     memoryDestructionInfo.Destructor = VulkanMemoryDestructor;
     memoryDestructionInfo.signalValue = signaledValue;
 
-    vk_state->transferQueue.resourcesPendingDestructionDarray = DarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
-    vk_state->transferQueue.resourcesPendingDestructionDarray = DarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &memoryDestructionInfo);
+    ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
+    ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &memoryDestructionInfo);
 }
 
 static void VertexBufferDestructor(void* resource)
@@ -332,7 +332,7 @@ void VertexBufferDestroy(VertexBuffer clientBuffer)
     vertexBufferDestructionInfo.Destructor = VertexBufferDestructor;
     vertexBufferDestructionInfo.signalValue = vk_state->graphicsQueue.semaphore.submitValue;
 
-    vk_state->graphicsQueue.resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(vk_state->graphicsQueue.resourcesPendingDestructionDarray, &vertexBufferDestructionInfo);
+    ResourceDestructionInfoDarrayPushback(vk_state->graphicsQueue.resourcesPendingDestructionDarray, &vertexBufferDestructionInfo);
 }
 
 IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount)
@@ -425,7 +425,7 @@ IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount)
     acquireDependencyInfo->imageMemoryBarrierCount = 0;
     acquireDependencyInfo->pImageMemoryBarriers = nullptr;
 
-    vk_state->requestedQueueAcquisitionOperationsDarray = (VkDependencyInfo**)DarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
+    VkDependencyInfoRefDarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
 
     // Making sure the staging buffer and memory get deleted when their corresponding command buffer is completed
     ResourceDestructionInfo bufferDestructionInfo = {};
@@ -438,8 +438,8 @@ IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount)
     memoryDestructionInfo.Destructor = VulkanMemoryDestructor;
     memoryDestructionInfo.signalValue = signaledValue;
 
-    vk_state->transferQueue.resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
-    vk_state->transferQueue.resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &memoryDestructionInfo);
+    ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
+    ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &memoryDestructionInfo);
 
     return clientBuffer;
 }
@@ -461,5 +461,5 @@ void IndexBufferDestroy(IndexBuffer clientBuffer)
     indexBufferDestructionInfo.Destructor = IndexBufferDestructor;
     indexBufferDestructionInfo.signalValue = vk_state->graphicsQueue.semaphore.submitValue;
 
-    vk_state->graphicsQueue.resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(vk_state->graphicsQueue.resourcesPendingDestructionDarray, &indexBufferDestructionInfo);
+    ResourceDestructionInfoDarrayPushback(vk_state->graphicsQueue.resourcesPendingDestructionDarray, &indexBufferDestructionInfo);
 }

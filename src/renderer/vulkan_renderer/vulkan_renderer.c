@@ -23,6 +23,9 @@
 #define RENDERER_POOL_ALLOCATOR_32b_SIZE 200
 #define RENDERER_RESOURCE_ACQUISITION_SIZE 200
 
+DEFINE_DARRAY_TYPE(VkExtensionProperties);
+DEFINE_DARRAY_TYPE(VkLayerProperties);
+DEFINE_DARRAY_TYPE(u32);
 
 RendererState* vk_state = nullptr;
 
@@ -83,10 +86,10 @@ bool InitializeRenderer()
             // Checking if required extensions are available
             u32 availableExtensionCount = 0;
             vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, nullptr);
-            VkExtensionProperties* availableExtensionsDarray = (VkExtensionProperties*)DarrayCreateWithSize(sizeof(VkExtensionProperties), availableExtensionCount, vk_state->rendererAllocator, MEM_TAG_RENDERER_SUBSYS);
-            vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, availableExtensionsDarray);
+            VkExtensionPropertiesDarray* availableExtensionsDarray = VkExtensionPropertiesDarrayCreateWithSize(availableExtensionCount, vk_state->rendererAllocator);
+            vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, availableExtensionsDarray->data);
 
-            bool extensionsAvailable = CheckRequiredExtensions(requiredInstanceExtensionCount, requiredInstanceExtensions, availableExtensionCount, availableExtensionsDarray);
+            bool extensionsAvailable = CheckRequiredExtensions(requiredInstanceExtensionCount, requiredInstanceExtensions, availableExtensionCount, availableExtensionsDarray->data);
 
             DarrayDestroy(availableExtensionsDarray);
 
@@ -103,10 +106,10 @@ bool InitializeRenderer()
             // Checking if required layers are available
             u32 availableLayerCount = 0;
             vkEnumerateInstanceLayerProperties(&availableLayerCount, nullptr);
-            VkLayerProperties* availableLayersDarray = (VkLayerProperties*)DarrayCreate(sizeof(VkLayerProperties), availableLayerCount, vk_state->rendererAllocator, MEM_TAG_RENDERER_SUBSYS);
-            vkEnumerateInstanceLayerProperties(&availableLayerCount, availableLayersDarray);
+            VkLayerPropertiesDarray* availableLayersDarray = VkLayerPropertiesDarrayCreate(availableLayerCount, vk_state->rendererAllocator);
+            vkEnumerateInstanceLayerProperties(&availableLayerCount, availableLayersDarray->data);
 
-            bool layersAvailable = CheckRequiredLayers(requiredInstanceLayerCount, requiredInstanceLayers, availableLayerCount, availableLayersDarray);
+            bool layersAvailable = CheckRequiredLayers(requiredInstanceLayerCount, requiredInstanceLayers, availableLayerCount, availableLayersDarray->data);
 
             DarrayDestroy(availableLayersDarray);
 
@@ -196,10 +199,10 @@ bool InitializeRenderer()
             { // Checking if the device has the required extensions
                 u32 availableExtensionCount = 0;
                 vkEnumerateDeviceExtensionProperties(availableDevices[i], nullptr, &availableExtensionCount, nullptr);
-                VkExtensionProperties* availableExtensionsDarray = (VkExtensionProperties*)DarrayCreateWithSize(sizeof(VkExtensionProperties), availableExtensionCount, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS); // TODO: change from darray to just array
-                vkEnumerateDeviceExtensionProperties(availableDevices[i], nullptr, &availableExtensionCount, availableExtensionsDarray);
+                VkExtensionPropertiesDarray* availableExtensionsDarray = VkExtensionPropertiesDarrayCreateWithSize(availableExtensionCount, GetGlobalAllocator()); // TODO: change from darray to just array
+                vkEnumerateDeviceExtensionProperties(availableDevices[i], nullptr, &availableExtensionCount, availableExtensionsDarray->data);
 
-                extensionsAvailable = CheckRequiredExtensions(requiredDeviceExtensionCount, requiredDeviceExtensions, availableExtensionCount, availableExtensionsDarray);
+                extensionsAvailable = CheckRequiredExtensions(requiredDeviceExtensionCount, requiredDeviceExtensions, availableExtensionCount, availableExtensionsDarray->data);
 
                 DarrayDestroy(availableExtensionsDarray);
             }
@@ -267,17 +270,17 @@ bool InitializeRenderer()
     // ============================================================================================================================================================
     {
         // ===================== Specifying queues for logical device =================================
-        u32* uniqueQueueFamiliesDarray = DarrayCreate(sizeof(u32), 5, vk_state->rendererAllocator, MEM_TAG_RENDERER_SUBSYS);
+        u32Darray* uniqueQueueFamiliesDarray = u32DarrayCreate(5, vk_state->rendererAllocator);
         if (!DarrayContains(uniqueQueueFamiliesDarray, &vk_state->graphicsQueue.index))
-            uniqueQueueFamiliesDarray = DarrayPushback(uniqueQueueFamiliesDarray, &vk_state->graphicsQueue.index);
+            u32DarrayPushback(uniqueQueueFamiliesDarray, &vk_state->graphicsQueue.index);
         if (!DarrayContains(uniqueQueueFamiliesDarray, &vk_state->presentQueueFamilyIndex))
-            uniqueQueueFamiliesDarray = DarrayPushback(uniqueQueueFamiliesDarray, &vk_state->presentQueueFamilyIndex);
+            u32DarrayPushback(uniqueQueueFamiliesDarray, &vk_state->presentQueueFamilyIndex);
         if (!DarrayContains(uniqueQueueFamiliesDarray, &vk_state->transferQueue.index))
-            uniqueQueueFamiliesDarray = DarrayPushback(uniqueQueueFamiliesDarray, &vk_state->transferQueue.index);
+            u32DarrayPushback(uniqueQueueFamiliesDarray, &vk_state->transferQueue.index);
 
         const f32 queuePriority = 1.0f;
 
-        u32 uniqueQueueCount = DarrayGetSize(uniqueQueueFamiliesDarray);
+        u32 uniqueQueueCount = uniqueQueueFamiliesDarray->size;
 
         VkDeviceQueueCreateInfo* queueCreateInfos = Alloc(vk_state->rendererAllocator, sizeof(*queueCreateInfos) * uniqueQueueCount, MEM_TAG_RENDERER_SUBSYS);
 
@@ -286,7 +289,7 @@ bool InitializeRenderer()
             queueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             queueCreateInfos[i].pNext = nullptr;
             queueCreateInfos[i].flags = 0;
-            queueCreateInfos[i].queueFamilyIndex = uniqueQueueFamiliesDarray[i];
+            queueCreateInfos[i].queueFamilyIndex = uniqueQueueFamiliesDarray->data[i];
             queueCreateInfos[i].queueCount = 1;
             queueCreateInfos[i].pQueuePriorities = &queuePriority;
         }
@@ -355,10 +358,10 @@ bool InitializeRenderer()
         /// TODO: get compute queue
         // Graphics, transfer and (in the future) compute queue
         vkGetDeviceQueue(vk_state->device, vk_state->graphicsQueue.index, 0, &vk_state->graphicsQueue.handle);
-        vk_state->graphicsQueue.resourcesPendingDestructionDarray = DarrayCreate(sizeof(ResourceDestructionInfo), 20, vk_state->rendererAllocator, MEM_TAG_RENDERER_SUBSYS);
+        vk_state->graphicsQueue.resourcesPendingDestructionDarray = ResourceDestructionInfoDarrayCreate(20, vk_state->rendererAllocator);
 
         vkGetDeviceQueue(vk_state->device, vk_state->transferQueue.index, 0, &vk_state->transferQueue.handle);
-        vk_state->transferQueue.resourcesPendingDestructionDarray = DarrayCreate(sizeof(ResourceDestructionInfo), 20, vk_state->rendererAllocator, MEM_TAG_RENDERER_SUBSYS);
+        vk_state->transferQueue.resourcesPendingDestructionDarray = ResourceDestructionInfoDarrayCreate(20, vk_state->rendererAllocator);
 
         // ==================== Creating command pools for each of the queue families =============================
         VkCommandPoolCreateInfo commandPoolCreateInfo = {};
@@ -406,7 +409,7 @@ bool InitializeRenderer()
             return false;
         }
 
-        vk_state->requestedQueueAcquisitionOperationsDarray = DarrayCreate(sizeof(VkDependencyInfo*), 10, vk_state->rendererAllocator, MEM_TAG_RENDERER_SUBSYS);
+        vk_state->requestedQueueAcquisitionOperationsDarray = VkDependencyInfoRefDarrayCreate(10, vk_state->rendererAllocator);
 
         _TRACE("Successfully created vulkan queues");
     }
@@ -995,10 +998,10 @@ bool BeginRendering()
     VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
 
     // =============================== acquire ownership of all uploaded resources =======================================
-    for (u32 i = 0; i < DarrayGetSize(vk_state->requestedQueueAcquisitionOperationsDarray); ++i)
+    for (u32 i = 0; i < vk_state->requestedQueueAcquisitionOperationsDarray->size; ++i)
     {
-        vkCmdPipelineBarrier2(currentCommandBuffer, vk_state->requestedQueueAcquisitionOperationsDarray[i]);
-        Free(vk_state->resourceAcquisitionPool, vk_state->requestedQueueAcquisitionOperationsDarray[i]);
+        vkCmdPipelineBarrier2(currentCommandBuffer, vk_state->requestedQueueAcquisitionOperationsDarray->data[i]);
+        Free(vk_state->resourceAcquisitionPool, vk_state->requestedQueueAcquisitionOperationsDarray->data[i]);
     }
 
     DarraySetSize(vk_state->requestedQueueAcquisitionOperationsDarray, 0);

@@ -2,7 +2,7 @@
 
 #include "defines.h"
 #include "core/meminc.h"
-
+#include "containers/darray.h"
 
 // ============================================= Hashmap explaination ===================================================
 // The hashmap has a backing array that elements are put in, collisions are handled via linked lists.
@@ -24,6 +24,8 @@ typedef struct MapEntryU64
     void* value;                // Value
     struct MapEntryU64* next;   // Next map entry in the linked list (see hashmap explaination)
 } MapEntryU64;
+
+DEFINE_DARRAY_TYPE_REF(MapEntryU64);
 
 // Hashmap struct, client shouldn't touch internals
 typedef struct HashmapU64
@@ -58,7 +60,7 @@ void* MapU64Delete(HashmapU64* hashmap, u64 key);
 void MapU64Flush(HashmapU64* hashmap);
 
 // Returns a Darray made with the given allocator, this darray needs to be destroyed by the client of this function
-void** MapU64GetValueDarray(HashmapU64* hashmap, Allocator* allocator);
+Darray* MapU64GetValueRefDarray(HashmapU64* hashmap, Allocator* allocator);
 
 // Returns a Darray made with the given allocator, this darray needs to be destroyed by the client of this function
-MapEntryU64** MapU64GetMapEntryDarray(HashmapU64* hashmap, Allocator* allocator);
+MapEntryU64RefDarray* MapU64GetMapEntryRefDarray(HashmapU64* hashmap, Allocator* allocator);

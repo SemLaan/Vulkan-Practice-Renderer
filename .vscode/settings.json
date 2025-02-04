@@ -31,6 +31,13 @@
 		"marching_cubes.h": "c",
 		"render_target.h": "c",
 		"game_rendering.h": "c",
-		"platform.h": "c"
+		"platform.h": "c",
+		"memory_subsys.h": "c",
+		"array": "c",
+		"compare": "c",
+		"tuple": "c",
+		"type_traits": "c",
+		"utility": "c",
+		"camera.h": "c"
 	}
 }

@@ -26,6 +26,7 @@ extern RendererState* vk_state;
 		}                                                           \
 	} while (0)
 
+
 typedef struct VulkanVertexBuffer
 {
 	VkDeviceSize size;
@@ -116,11 +117,13 @@ typedef struct ResourceDestructionInfo
 	u64						signalValue;
 } ResourceDestructionInfo;
 
+DEFINE_DARRAY_TYPE(ResourceDestructionInfo);
+
 typedef struct QueueFamily
 {
 	VkQueue handle;
 	VkCommandPool commandPool;
-	ResourceDestructionInfo* resourcesPendingDestructionDarray;
+	ResourceDestructionInfoDarray* resourcesPendingDestructionDarray;
 	VulkanSemaphore semaphore;
 	u32 index;
 } QueueFamily;
@@ -149,6 +152,8 @@ typedef struct VulkanSamplers
 	VkSampler linearRepeat;
 	VkSampler shadow;				// Sampler with comparisson state enabled for percentage closer filtering
 } VulkanSamplers;
+
+DEFINE_DARRAY_TYPE_REF(VkDependencyInfo);
 
 typedef struct RendererState
 {
@@ -188,7 +193,7 @@ typedef struct RendererState
 	// Data that is not used every frame or possibly used every frame
 	QueueFamily graphicsQueue;										// Graphics family queue
 	QueueFamily transferQueue;										// Transfer family queue
-	VkDependencyInfo** requestedQueueAcquisitionOperationsDarray;	// For transfering queue ownership from transfer to graphics after a resource has been uploaded
+	VkDependencyInfoRefDarray* requestedQueueAcquisitionOperationsDarray;	// For transfering queue ownership from transfer to graphics after a resource has been uploaded
 	VkAllocationCallbacks* vkAllocator;								// Vulkan API allocator, only for reading vulkan allocations not for taking over allocation from vulkan //TODO: this is currently just nullptr
 	VkDescriptorPool descriptorPool;								// Pool used to allocate descriptor sets for all materials
 	Material defaultMaterial;										// Material based on default shader

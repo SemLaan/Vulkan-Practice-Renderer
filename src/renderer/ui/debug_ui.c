@@ -101,10 +101,12 @@ typedef struct DebugMenu
 	bool active;
 } DebugMenu;
 
+DEFINE_DARRAY_TYPE_REF(DebugMenu);
+
 // Data about the state of the Debug ui system, only one instance of this struct should exist.
 typedef struct DebugUIState
 {
-    DebugMenu** debugMenuDarray;                  // Dynamic array with all the debug menu instances that exist
+    DebugMenuRefDarray* debugMenuDarray;                  // Dynamic array with all the debug menu instances that exist
     MeshData* quadMesh;                           // Mesh with the data to make quad instances.
     mat4 uiProjView;                              // Projection and view matrix for all debug menu's
     mat4 inverseProjView;                         // Inverted proj view matrix.
@@ -175,7 +177,7 @@ bool InitializeDebugUI()
 
     ShaderCreate("roundedQuad", &shaderCreateInfo);
 
-    state->debugMenuDarray = DarrayCreate(sizeof(*state->debugMenuDarray), MAX_DBG_MENUS, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
+    state->debugMenuDarray = DebugMenuRefDarrayCreate(MAX_DBG_MENUS, GetGlobalAllocator());
 
     state->quadMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);
 
@@ -207,12 +209,12 @@ void UpdateDebugUI()
     vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
     vec4 mouseWorldPos = mat4_mul_vec4(state->inverseProjView, clipCoords);
 
-    u32 menuCount = DarrayGetSize(state->debugMenuDarray);
+    u32 menuCount = state->debugMenuDarray->size;
 
     // Looping through all the menu's to handle user interaction for each one.
     for (int i = 0; i < menuCount; i++)
     {
-        DebugMenu* menu = state->debugMenuDarray[i];
+        DebugMenu* menu = state->debugMenuDarray->data[i];
 
 		if (!menu->active)
 			continue;
@@ -313,8 +315,8 @@ DebugMenu* DebugUICreateMenu()
     menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
 
 	// Putting the menu struct in the menu d array
-    state->debugMenuDarray = DarrayPushback(state->debugMenuDarray, &menu);
-    GRASSERT_DEBUG(DarrayGetSize(state->debugMenuDarray) <= MAX_DBG_MENUS);
+    DebugMenuRefDarrayPushback(state->debugMenuDarray, &menu);
+    GRASSERT_DEBUG(state->debugMenuDarray->size <= MAX_DBG_MENUS);
 
 	// Creating an array for keeping track of all the interactable elements in the menu
     menu->interactablesArray = Alloc(GetGlobalAllocator(), sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES, MEM_TAG_RENDERER_SUBSYS);
@@ -348,7 +350,7 @@ void DebugUIDestroyMenu(DebugMenu* menu)
 	// remove the menu from the debugMenuArray and remove the menu quad from the quads darray
 	for (int i = 0; i < MAX_DBG_MENUS; i++)
 	{
-		if (state->debugMenuDarray[i] == menu)
+		if (state->debugMenuDarray->data[i] == menu)
 		{
 			// Removing the menu from the debug menu darray
 			DarrayPopAt(state->debugMenuDarray, i);

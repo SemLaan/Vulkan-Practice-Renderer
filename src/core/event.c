@@ -3,10 +3,11 @@
 #include "core/memory/memory_subsys.h"
 #include "core/asserts.h"
 
+DEFINE_DARRAY_TYPE(PFN_OnEvent);
 
 typedef struct EventState
 {
-	PFN_OnEvent* eventCallbacksDarrays[MAX_EVENTS];	// Array of Darrays for event listener functions
+	PFN_OnEventDarray* eventCallbacksDarrays[MAX_EVENTS];	// Array of Darrays for event listener functions
 } EventState;
 
 static EventState* state = nullptr;
@@ -47,26 +48,26 @@ void RegisterEventListener(EventCode type, PFN_OnEvent listener)
 {
 	if (!state->eventCallbacksDarrays[type])
 	{
-		state->eventCallbacksDarrays[type] = (PFN_OnEvent*)DarrayCreate(sizeof(PFN_OnEvent), 5, GetGlobalAllocator(), MEM_TAG_EVENT_SUBSYS);
+		state->eventCallbacksDarrays[type] = PFN_OnEventDarrayCreate(5, GetGlobalAllocator());
 	}
 
 #ifndef DIST
-	for (u32 i = 0; i < DarrayGetSize(state->eventCallbacksDarrays[type]); ++i)
+	for (u32 i = 0; i < state->eventCallbacksDarrays[type]->size; ++i)
 	{
-		GRASSERT_MSG(state->eventCallbacksDarrays[type][i] != listener, "Tried to insert duplicate listener");
+		GRASSERT_MSG(state->eventCallbacksDarrays[type]->data[i] != listener, "Tried to insert duplicate listener");
 	}
 #endif // !DIST
 
-	state->eventCallbacksDarrays[type] = (PFN_OnEvent*)DarrayPushback(state->eventCallbacksDarrays[type], &listener);
+	PFN_OnEventDarrayPushback(state->eventCallbacksDarrays[type], &listener);
 }
 
 void UnregisterEventListener(EventCode type, PFN_OnEvent listener)
 {
 	GRASSERT_DEBUG(state->eventCallbacksDarrays[type]);
 
-	for (u32 i = 0; i < DarrayGetSize(state->eventCallbacksDarrays[type]); ++i)
+	for (u32 i = 0; i < state->eventCallbacksDarrays[type]->size; ++i)
 	{
-		if (state->eventCallbacksDarrays[type][i] == listener)
+		if (state->eventCallbacksDarrays[type]->data[i] == listener)
 		{
 			DarrayPopAt(state->eventCallbacksDarrays[type], i);
 			return;
@@ -80,10 +81,10 @@ void InvokeEvent(EventCode type, EventData data)
 {
 	if (state->eventCallbacksDarrays[type])
 	{
-		for (u32 i = 0; i < DarrayGetSize(state->eventCallbacksDarrays[type]); ++i)
+		for (u32 i = 0; i < state->eventCallbacksDarrays[type]->size; ++i)
 		{
 			// PFN_OnEvent callbacks return true if the event is handled so then we don't need to call anything else
-			if (state->eventCallbacksDarrays[type][i](type, data))
+			if (state->eventCallbacksDarrays[type]->data[i](type, data))
 				return;
 		}
 	}

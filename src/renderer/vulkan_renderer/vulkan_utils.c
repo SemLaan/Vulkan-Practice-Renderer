@@ -40,17 +40,17 @@ bool CheckRequiredLayers(u32 requiredLayerCount, const char** requiredLayers, u3
 
 static void TryDestroyResourcesPendingDestructionInQueue(QueueFamily* queue)
 {
-	if (DarrayGetSize(queue->resourcesPendingDestructionDarray) != 0)
+	if (queue->resourcesPendingDestructionDarray->size != 0)
 	{
 		u64 semaphoreValue;
 		vkGetSemaphoreCounterValue(vk_state->device, queue->semaphore.handle, &semaphoreValue);
 
 		// Looping from the end of the list to the beginning so we can remove elements without ruining the loop
-		for (i32 i = (i32)DarrayGetSize(queue->resourcesPendingDestructionDarray) - 1; i >= 0; --i)
+		for (i32 i = (i32)queue->resourcesPendingDestructionDarray->size - 1; i >= 0; --i)
 		{
-			if (queue->resourcesPendingDestructionDarray[i].signalValue <= semaphoreValue)
+			if (queue->resourcesPendingDestructionDarray->data[i].signalValue <= semaphoreValue)
 			{
-				queue->resourcesPendingDestructionDarray[i].Destructor(queue->resourcesPendingDestructionDarray[i].resource);
+				queue->resourcesPendingDestructionDarray->data[i].Destructor(queue->resourcesPendingDestructionDarray->data[i].resource);
 				DarrayPopAt(queue->resourcesPendingDestructionDarray, i);
 			}
 		}

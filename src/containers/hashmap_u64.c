@@ -3,6 +3,8 @@
 #include "core/asserts.h"
 #include "darray.h"
 
+DEFINE_DARRAY_TYPE_REF(void);
+
 // ====================================== Hash functions
 // https://gist.github.com/badboy/6267743#64-bit-to-32-bit-hash-functions
 u32 Hash6432Shift(u64 key)
@@ -137,12 +139,12 @@ void MapU64Flush(HashmapU64* hashmap)
     FlushPoolAllocator(hashmap->linkedEntryPool);
 }
 
-void** MapU64GetValueDarray(HashmapU64* hashmap, Allocator* allocator)
+Darray* MapU64GetValueRefDarray(HashmapU64* hashmap, Allocator* allocator)
 {
     // Assume we have at least a few elements in the hashmap, so starting the darray from zero would cause a lot of unnecessary resizes at the start
     #define ARBITRARY_DARRAY_START_CAPACITY 50
 
-    void** valuesDarray = DarrayCreate(sizeof(*valuesDarray), ARBITRARY_DARRAY_START_CAPACITY, allocator, MEM_TAG_HASHMAP);
+    voidRefDarray* valuesDarray = voidRefDarrayCreate(ARBITRARY_DARRAY_START_CAPACITY, allocator);
 
     for (u32 i = 0; i < hashmap->backingArrayCapacity; ++i)
     {
@@ -150,22 +152,22 @@ void** MapU64GetValueDarray(HashmapU64* hashmap, Allocator* allocator)
         
         if (item->value)
         {
-            valuesDarray = DarrayPushback(valuesDarray, &item->value);
+            voidRefDarrayPushback(valuesDarray, &item->value);
 
             while (item->next)
             {
                 item = item->next;
-                valuesDarray = DarrayPushback(valuesDarray, &item->value);
+                voidRefDarrayPushback(valuesDarray, &item->value);
             }
         }
     }
 
-    return valuesDarray;
+    return (Darray*)valuesDarray;
 }
 
-MapEntryU64** MapU64GetMapEntryDarray(HashmapU64* hashmap, Allocator* allocator)
+MapEntryU64RefDarray* MapU64GetMapEntryRefDarray(HashmapU64* hashmap, Allocator* allocator)
 {
-    MapEntryU64** entriesDarray = DarrayCreate(sizeof(*entriesDarray), ARBITRARY_DARRAY_START_CAPACITY, allocator, MEM_TAG_HASHMAP);
+    MapEntryU64RefDarray* entriesDarray = MapEntryU64RefDarrayCreate(ARBITRARY_DARRAY_START_CAPACITY, allocator);
 
     for (u32 i = 0; i < hashmap->backingArrayCapacity; ++i)
     {
@@ -173,12 +175,12 @@ MapEntryU64** MapU64GetMapEntryDarray(HashmapU64* hashmap, Allocator* allocator)
         
         if (item->value)
         {
-            entriesDarray = DarrayPushback(entriesDarray, &item);
+            MapEntryU64RefDarrayPushback(entriesDarray, &item);
 
             while (item->next)
             {
                 item = item->next;
-                entriesDarray = DarrayPushback(entriesDarray, &item);
+                MapEntryU64RefDarrayPushback(entriesDarray, &item);
             }
         }
     }
