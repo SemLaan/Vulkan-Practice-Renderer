@@ -2,156 +2,127 @@
 
 #include "core/asserts.h"
 
-// NOTE: Darray struct size (as in the amount of bytes the struct takes up not the size variable) NEEDS to be smaller than DARRAY_MIN_ALIGNMENT
-typedef struct Darray
+void* DarrayCreate(u32 stride, u32 startCapacity, Allocator* allocator)
 {
-	Allocator* 	allocator;		// Allocator used to allocate this array
-	void* 		memoryBlock;	// Pointer to the start of the memory block (used for reallocating and freeing)
-	u32        	stride;			// Size of each array element
-	u32        	size;			// Amount of elements in the array
-	u32        	capacity;		// Amount of elements the array can hold
-} Darray;
+    Darray* darray = Alloc(allocator, sizeof(*darray), MEM_TAG_DARRAY);
 
+    darray->data = AlignedAlloc(allocator, stride * startCapacity, DARRAY_MIN_ALIGNMENT, MEM_TAG_DARRAY);
+	darray->allocator = allocator;
+    darray->size = 0;
+    darray->capacity = startCapacity;
+    darray->stride = stride;
 
-void* DarrayCreate(u32 stride, u32 capacity, Allocator* allocator, MemTag tag)
-{
-	GRASSERT_DEBUG(sizeof(Darray) < DARRAY_MIN_ALIGNMENT);
-
-	// Allocating memory for the darray elements + state
-	void* block = AlignedAlloc(allocator, DARRAY_MIN_ALIGNMENT + (capacity * stride), DARRAY_MIN_ALIGNMENT, tag);
-
-	// Getting a pointer to where the elements of the array will be stored
-	void* elements = (u8*)block + DARRAY_MIN_ALIGNMENT;
-
-	// Storing array state in the memory before the elements
-	Darray* state = (Darray*)elements - 1;
-	state->allocator = allocator;
-	state->memoryBlock = block;
-	state->stride = stride;
-	state->size = 0;
-	state->capacity = capacity;
-
-	// Returning a pointer to only the elements
-	return elements;
+    return darray;
 }
 
-// Same as darray create except size is set to the same as capacity
-void* DarrayCreateWithSize(u32 stride, u32 capacityAndSize, Allocator* allocator, MemTag tag)
+void* DarrayCreateWithSize(u32 stride, u32 startCapacityAndSize, Allocator* allocator)
 {
-	void* block = AlignedAlloc(allocator, DARRAY_MIN_ALIGNMENT + (capacityAndSize * stride), DARRAY_MIN_ALIGNMENT, tag);
+    Darray* darray = Alloc(allocator, sizeof(*darray), MEM_TAG_DARRAY);
 
-	void* elements = (u8*)block + DARRAY_MIN_ALIGNMENT;
+    darray->data = AlignedAlloc(allocator, stride * startCapacityAndSize, DARRAY_MIN_ALIGNMENT, MEM_TAG_DARRAY);
+	darray->allocator = allocator;
+    darray->size = startCapacityAndSize;
+    darray->capacity = startCapacityAndSize;
+    darray->stride = stride;
 
-	Darray* state = (Darray*)elements - 1;
-	state->allocator = allocator;
-	state->memoryBlock = block;
-	state->stride = stride;
-	state->size = capacityAndSize;
-	state->capacity = capacityAndSize;
-
-	return elements;
+    return darray;
 }
 
-void* DarrayPushback(void* elements, void* element)
+void DarrayDestroy(void* darray)
 {
-	// Getting a pointer to the state data
-	Darray* state = (Darray*)elements - 1;
+    Darray* state = (Darray*)darray;
 
-	// If there is no more room for another element, increase the capacity of the array
-	if (state->size >= state->capacity)
-	{
-		state->capacity = (u32)(state->capacity * DARRAY_SCALING_FACTOR + 1);
-		void* temp = Realloc(state->allocator, state->memoryBlock, (state->stride * state->capacity) + DARRAY_MIN_ALIGNMENT);
-		elements = (u8*)temp + DARRAY_MIN_ALIGNMENT;
-		state = (Darray*)elements - 1;
-		state->memoryBlock = temp;
-	}
-
-	// Copy the element data into the next free slot in the array
-	MemoryCopy((u8*)elements + (state->stride * state->size), element, (size_t)state->stride);
-	state->size++;
-	return elements;
+    Free(state->allocator, state->data);
+    Free(state->allocator, state);
 }
 
-void DarrayPop(void* elements)
+void DarrayPushback(void* darray, void* ptrToElement)
 {
-	Darray* state = (Darray*)elements - 1;
-	state->size--;
+    Darray* state = (Darray*)darray;
+
+    // Check if the array needs more memory, if so use the scaling factor to determine how much
+    if (state->size >= state->capacity)
+    {
+        state->capacity = (u32)(state->capacity * DARRAY_SCALING_FACTOR + 1);
+        state->data = Realloc(state->allocator, state->data, state->capacity * state->stride);
+    }
+
+    MemoryCopy((u8*)state->data + (state->stride * state->size), ptrToElement, (size_t)state->stride);
+    state->size++;
 }
 
-void DarrayPopAt(void* elements, u32 index)
+void DarrayPop(void* darray)
 {
-	Darray* state = (Darray*)elements - 1;
-
-	// Copy all the elements that come after the popped element downward to fill the hole in the array
-	u8* address = (u8*)elements + (index * state->stride);
-	MemoryCopy(address, address + state->stride, (state->size - 1 - index) * state->stride);
-
-	state->size--;
+    Darray* state = (Darray*)darray;
+    state->size--;
 }
 
-void DarrayDestroy(void* elements)
+void DarrayPopAt(void* darray, u32 index)
 {
-	Darray* state = (Darray*)elements - 1;
-	Free(state->allocator, state->memoryBlock);
+    Darray* state = (Darray*)darray;
+
+    // Copy all the elements that come after the popped element downward to fill the hole in the array
+    u8* address = (u8*)state->data + (index * state->stride);
+    MemoryCopy(address, address + state->stride, (state->size - 1 - index) * state->stride);
+
+    state->size--;
 }
 
-u32 DarrayGetSize(void* elements)
+// Sets the size value of the darray, increases capacity if necessary
+void DarraySetSize(void* darray, u32 size)
 {
-	Darray* state = (Darray*)elements - 1;
-	return state->size;
+    Darray* state = (Darray*)darray;
+
+    if (size > state->capacity)
+    {
+        state->capacity = size;
+        state->data = Realloc(state->allocator, state->data, state->capacity * state->stride);
+    }
+    state->size = size;
 }
 
-void DarraySetSize(void* elements, u32 size)
+// Reallocs the data to make the capacity the same as size.
+void DarrayFitExact(void* darray)
 {
-	Darray* state = (Darray*)elements - 1;
-	state->size = size;
-}
+	Darray* state = (Darray*)darray;
 
-void DarrayFitExact(void* elements)
-{
-	Darray* state = (Darray*)elements - 1;
-
-	if (state->size != state->capacity)
+	if (state->capacity != state->size)
 	{
 		state->capacity = state->size;
-		void* memoryBlock = state->memoryBlock;
-		void* temp = Realloc(state->allocator, state->memoryBlock, (state->stride * state->size) + DARRAY_MIN_ALIGNMENT);
-
-		if (temp != memoryBlock)
-		{
-			elements = (u8*)temp + DARRAY_MIN_ALIGNMENT;
-			state = (Darray*)elements - 1;
-			state->memoryBlock = temp;
-		}
+		state->data = Realloc(state->allocator, state->data, state->capacity * state->stride);
 	}
 }
 
-bool DarrayContains(void* elements, void* element)
+// Does a linear search through the array to find the element
+// Only use on small arrays because performance is poor, consider a hash map
+bool DarrayContains(void* darray, void* ptrToElement)
 {
-	Darray* state = (Darray*)elements - 1;
+	Darray* state = (Darray*)darray;
 
 	// Looping through the array to find the element
-	for (u32 i = 0; i < state->size; i++)
-	{
-		if (MemoryCompare((u8*)elements + (i * state->stride), element, state->stride))
-			return true;
-	}
+    for (u32 i = 0; i < state->size; i++)
+    {
+        if (MemoryCompare((u8*)state->data + (i * state->stride), ptrToElement, state->stride))
+            return true;
+    }
 
-	return false;
+    return false;
 }
 
-u32 DarrayGetElementIndex(void* elements, void* element)
+// Does a linear search through the array to find the element
+// Only use on small arrays because performance is poor, consider a hash map
+u32 DarrayGetElementIndex(void* darray, void* ptrToElement)
 {
-	Darray* state = (Darray*)elements - 1;
+	Darray* state = (Darray*)darray;
 
 	// Looping through the array to find the element
-	for (u32 i = 0; i < state->size; i++)
-	{
-		if (MemoryCompare((u8*)elements + (i * state->stride), element, state->stride))
-			return i;
-	}
+    for (u32 i = 0; i < state->size; i++)
+    {
+        if (MemoryCompare((u8*)state->data + (i * state->stride), ptrToElement, state->stride))
+            return i;
+    }
 
-	_ERROR("Darray: tried to get element index of non-existent element");
-	return UINT32_MAX;
+    _ERROR("Darray: tried to get element index of non-existent element");
+    return UINT32_MAX;
 }
+

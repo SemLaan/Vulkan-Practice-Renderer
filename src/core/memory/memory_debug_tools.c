@@ -13,6 +13,7 @@
 #define ALLOCATIONS_MAP_SIZE 50000
 #define ALLOCATIONS_MAP_MAX_COLLISIONS 1000
 
+
 // Can turn a memory tag into a string, used for printing/logging
 static const char* memTagToText[MAX_MEMORY_TAGS] = {
     "ALLOCATOR STATE    ",
@@ -52,6 +53,8 @@ typedef struct AllocInfo
     u32 alignment;          // Alignment of the allocation
 } AllocInfo;
 
+DEFINE_DARRAY_TYPE_REF(AllocInfo);
+
 // Info about a registered allocator, is stored for every allocator the game creates
 typedef struct RegisteredAllocatorInfo
 {
@@ -65,6 +68,8 @@ typedef struct RegisteredAllocatorInfo
     AllocatorType type;     // Type of allocator
 } RegisteredAllocatorInfo;
 
+DEFINE_DARRAY_TYPE(RegisteredAllocatorInfo);
+
 // State
 typedef struct MemoryDebugState
 {
@@ -72,7 +77,7 @@ typedef struct MemoryDebugState
     u64 arenaStart;                                         // Start of the allocator used by the debug tools
     u64 arenaEnd;                                           // End of the allocator used by the debug tools
     u64 arenaSize;                                          // Size of the arena used by the debug tools
-    RegisteredAllocatorInfo* registeredAllocatorDarray;     // Darray for all the allocators that are going to be registered
+    RegisteredAllocatorInfoDarray* registeredAllocatorDarray;// Darray for all the allocators that are going to be registered
     HashmapU64* allocationsMap;                             // Hashmap that maps all the allocations to their alloc info struct
     Allocator* allocInfoPool;                               // Pool allocator that contains all the alloc info structs
     u64 totalUserAllocated;                                 // Amount of memory allocated by the game
@@ -106,7 +111,7 @@ void _StartMemoryDebugSubsys()
     state->arenaStart = memoryDebugArenaStart;
     state->arenaSize = memoryDebugArenaSize;
     state->arenaEnd = memoryDebugArenaStart + memoryDebugArenaSize;
-    state->registeredAllocatorDarray = DarrayCreate(sizeof(*state->registeredAllocatorDarray), 10, memoryDebugAllocator, MEM_TAG_MEMORY_DEBUG);
+    state->registeredAllocatorDarray = RegisteredAllocatorInfoDarrayCreate(10, memoryDebugAllocator);
     state->markedAllocatorId = UINT32_MAX;
 
     memoryDebuggingAllocatorsCreated = true;
@@ -188,8 +193,8 @@ static void PrintAllocatorStatsRecursively(RegisteredAllocatorInfo* root, u32 re
     // Calling this function on all the current allocator's children
     for (u32 i = 0; i < registeredAllocatorCount; ++i)
     {
-        if (root->allocatorId == state->registeredAllocatorDarray[i].parentAllocatorId)
-            PrintAllocatorStatsRecursively(state->registeredAllocatorDarray + i, registeredAllocatorCount, depth + 1);
+        if (root->allocatorId == state->registeredAllocatorDarray->data[i].parentAllocatorId)
+            PrintAllocatorStatsRecursively(state->registeredAllocatorDarray->data + i, registeredAllocatorCount, depth + 1);
     }
 }
 
@@ -199,10 +204,10 @@ void _PrintMemoryStats()
     _INFO("Printing memory stats:");
 
     // Printing allocators
-    u32 registeredAllocatorCount = DarrayGetSize(state->registeredAllocatorDarray);
+    u32 registeredAllocatorCount = state->registeredAllocatorDarray->size;
     _INFO("Printing %u live allocators:", registeredAllocatorCount);
 
-    RegisteredAllocatorInfo* globalAllocator = state->registeredAllocatorDarray;
+    RegisteredAllocatorInfo* globalAllocator = state->registeredAllocatorDarray->data;
 
     PrintAllocatorStatsRecursively(globalAllocator, registeredAllocatorCount, 1 /*start depth 1 to indent all allocators at least one tab*/);
 
@@ -222,22 +227,22 @@ void _PrintMemoryStats()
 
     // Printing all active allocations
     // TODO: add a bool parameter to the function to specify whether to print this or not, because it's a lot
-    AllocInfo** allocInfoDarray = (AllocInfo**)MapU64GetValueDarray(state->allocationsMap, memoryDebugAllocator);
+    AllocInfoRefDarray* allocInfoDarray = (AllocInfoRefDarray*)MapU64GetValueRefDarray(state->allocationsMap, memoryDebugAllocator);
 
     RegisteredAllocatorInfo* allocatedWithAllocator;
 
     _INFO("All active allocations:");
-    for (u32 i = 0; i < DarrayGetSize(allocInfoDarray); ++i)
+    for (u32 i = 0; i < allocInfoDarray->size; ++i)
     {
-        AllocInfo* item = allocInfoDarray[i];
+        AllocInfo* item = allocInfoDarray->data[i];
 
         allocatedWithAllocator = nullptr;
 
         for (u32 i = 0; i < registeredAllocatorCount; ++i)
         {
-            if (state->registeredAllocatorDarray[i].allocatorId == item->allocatorId)
+            if (state->registeredAllocatorDarray->data[i].allocatorId == item->allocatorId)
             {
-                allocatedWithAllocator = state->registeredAllocatorDarray + i;
+                allocatedWithAllocator = state->registeredAllocatorDarray->data + i;
                 break;
             }
         }
@@ -297,20 +302,20 @@ void _RegisterAllocator(u64 arenaStart, u64 arenaEnd, u32 stateSize, u32* out_al
     else
         allocatorInfo.parentAllocatorId = 0;
 
-    state->registeredAllocatorDarray = DarrayPushback(state->registeredAllocatorDarray, &allocatorInfo);
+    DarrayPushback(state->registeredAllocatorDarray, &allocatorInfo);
 }
 
 void _UnregisterAllocator(u32 allocatorId, AllocatorType allocatorType)
 {
-    u32 registeredAllocatorCount = DarrayGetSize(state->registeredAllocatorDarray);
+    u32 registeredAllocatorCount = state->registeredAllocatorDarray->size;
 
     // Finding the allocator that is being unregistered in the array
     for (u32 i = 0; i < registeredAllocatorCount; ++i)
     {
-        if (state->registeredAllocatorDarray[i].allocatorId == allocatorId)
+        if (state->registeredAllocatorDarray->data[i].allocatorId == allocatorId)
         {
             // Removing all the info about the allocations that the allocator still contained
-            u32 freedCount = _DebugFlushAllocator(state->registeredAllocatorDarray[i].allocator);
+            u32 freedCount = _DebugFlushAllocator(state->registeredAllocatorDarray->data[i].allocator);
             if (freedCount > 0)
                 _WARN("Destroyed allocator with %u active allocation(s)", freedCount);
             DarrayPopAt(state->registeredAllocatorDarray, i);
@@ -328,14 +333,14 @@ void _UnregisterAllocator(u32 allocatorId, AllocatorType allocatorType)
 u32 _DebugFlushAllocator(Allocator* allocator)
 {
     // Getting an array of all allocations
-    MapEntryU64** mapEntriesDarray = MapU64GetMapEntryDarray(state->allocationsMap, memoryDebugAllocator);
+    MapEntryU64RefDarray* mapEntriesDarray = MapU64GetMapEntryRefDarray(state->allocationsMap, memoryDebugAllocator);
 
     u32 freedAllocations = 0;
 
     // Looping through all allocations and clearing them if they are owned by the allocator being flushed
-    for (u32 i = 0; i < DarrayGetSize(mapEntriesDarray); ++i)
+    for (u32 i = 0; i < mapEntriesDarray->size; ++i)
     {
-        MapEntryU64* mapEntry = mapEntriesDarray[i];
+        MapEntryU64* mapEntry = mapEntriesDarray->data[i];
         AllocInfo* allocInfo = mapEntry->value;
 
         if (allocator->id == allocInfo->allocatorId)
@@ -418,21 +423,21 @@ void* DebugRealloc(Allocator* allocator, void* block, u64 newSize, const char* f
             _FATAL("Tried to realloc allocation with wrong allocator!");
             _FATAL("Allocation: %s:%u", oldAllocInfo->file, oldAllocInfo->line);
             _FATAL("Reallocation: %s:%u", file, line);
-            u32 registeredAllocatorCount = DarrayGetSize(state->registeredAllocatorDarray);
+            u32 registeredAllocatorCount = state->registeredAllocatorDarray->size;
             const char* allocatorName;
             for (u32 i = 0; i < registeredAllocatorCount; ++i)
             {
-                if (state->registeredAllocatorDarray[i].allocatorId == allocator->id)
+                if (state->registeredAllocatorDarray->data[i].allocatorId == allocator->id)
                 {
-                    allocatorName = state->registeredAllocatorDarray[i].name;
+                    allocatorName = state->registeredAllocatorDarray->data[i].name;
                 }
             }
             _FATAL("Wrong allocator: %s", allocatorName);
             for (u32 i = 0; i < registeredAllocatorCount; ++i)
             {
-                if (state->registeredAllocatorDarray[i].allocatorId == oldAllocInfo->allocatorId)
+                if (state->registeredAllocatorDarray->data[i].allocatorId == oldAllocInfo->allocatorId)
                 {
-                    allocatorName = state->registeredAllocatorDarray[i].name;
+                    allocatorName = state->registeredAllocatorDarray->data[i].name;
                 }
             }
             _FATAL("Correct allocator: %s", allocatorName);
@@ -490,21 +495,21 @@ void DebugFree(Allocator* allocator, void* block, const char* file, u32 line)
             _FATAL("Tried to free allocation with wrong allocator!");
             _FATAL("Allocation: %s:%u", allocInfo->file, allocInfo->line);
             _FATAL("Free: %s:%u", file, line);
-            u32 registeredAllocatorCount = DarrayGetSize(state->registeredAllocatorDarray);
+            u32 registeredAllocatorCount = state->registeredAllocatorDarray->size;
             const char* allocatorName;
             for (u32 i = 0; i < registeredAllocatorCount; ++i)
             {
-                if (state->registeredAllocatorDarray[i].allocatorId == allocator->id)
+                if (state->registeredAllocatorDarray->data[i].allocatorId == allocator->id)
                 {
-                    allocatorName = state->registeredAllocatorDarray[i].name;
+                    allocatorName = state->registeredAllocatorDarray->data[i].name;
                 }
             }
             _FATAL("Wrong allocator: %s", allocatorName);
             for (u32 i = 0; i < registeredAllocatorCount; ++i)
             {
-                if (state->registeredAllocatorDarray[i].allocatorId == allocInfo->allocatorId)
+                if (state->registeredAllocatorDarray->data[i].allocatorId == allocInfo->allocatorId)
                 {
-                    allocatorName = state->registeredAllocatorDarray[i].name;
+                    allocatorName = state->registeredAllocatorDarray->data[i].name;
                 }
             }
             _FATAL("Correct allocator: %s", allocatorName);

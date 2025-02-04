@@ -8,6 +8,7 @@
 
 #define DARRAY_START_CAPACITY 100
 
+
 typedef struct ObjVertex
 {
     vec3 position;
@@ -20,6 +21,10 @@ typedef struct ObjVertexIndices
     // 0 = position, 1 = uvCoord, 2 = normal;
     i32 indices[3];
 } ObjVertexIndices;
+
+DEFINE_DARRAY_TYPE(u32);
+DEFINE_DARRAY_TYPE(ObjVertex);
+DEFINE_DARRAY_TYPE(ObjVertexIndices);
 
 bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bool flipWindingOrder)
 {
@@ -42,16 +47,16 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
     fclose(file);
 
     // ====================================== Creating index arrays of the starting indices of all the v, vn, vt, and f lines =============================================
-    u32* positionIndices = DarrayCreate(sizeof(*positionIndices), DARRAY_START_CAPACITY, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
-    u32* normalIndices = DarrayCreate(sizeof(*normalIndices), DARRAY_START_CAPACITY, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
-    u32* uvCoordIndices = DarrayCreate(sizeof(*uvCoordIndices), DARRAY_START_CAPACITY, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
-    u32* faceIndices = DarrayCreate(sizeof(*faceIndices), DARRAY_START_CAPACITY, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
+    u32Darray* positionIndices = u32DarrayCreate(DARRAY_START_CAPACITY, GetGlobalAllocator());
+    u32Darray* normalIndices = u32DarrayCreate(DARRAY_START_CAPACITY, GetGlobalAllocator());
+    u32Darray* uvCoordIndices = u32DarrayCreate(DARRAY_START_CAPACITY, GetGlobalAllocator());
+    u32Darray* faceIndices = u32DarrayCreate(DARRAY_START_CAPACITY, GetGlobalAllocator());
 
     // Adding a null element in the 0th position of these arrays because obj indices start at 1
-    void* nullElement = nullptr;
-    positionIndices = DarrayPushback(positionIndices, &nullElement);
-    normalIndices = DarrayPushback(normalIndices, &nullElement);
-    uvCoordIndices = DarrayPushback(uvCoordIndices, &nullElement);
+    u32 nullElement = 0;
+    u32DarrayPushback(positionIndices, &nullElement);
+    u32DarrayPushback(normalIndices, &nullElement);
+    u32DarrayPushback(uvCoordIndices, &nullElement);
 
     for (u32 i = 0; i < fileSize - 3 /*minus 3 to stop 3 characters short of the end of the file*/; i++)
     {
@@ -59,35 +64,35 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
         {
             if (MemoryCompare(text + i, "\nv ", 3))
             {
-                positionIndices = DarrayPushback(positionIndices, &i);
+                u32DarrayPushback(positionIndices, &i);
             }
 
             if (MemoryCompare(text + i, "\nvt ", 4))
             {
-                uvCoordIndices = DarrayPushback(uvCoordIndices, &i);
+                u32DarrayPushback(uvCoordIndices, &i);
             }
 
             if (MemoryCompare(text + i, "\nvn ", 4))
             {
-                normalIndices = DarrayPushback(normalIndices, &i);
+                u32DarrayPushback(normalIndices, &i);
             }
 
             if (MemoryCompare(text + i, "\nf ", 3))
             {
-                faceIndices = DarrayPushback(faceIndices, &i);
+                u32DarrayPushback(faceIndices, &i);
             }
         }
     }
 
     // ============================== Creating a list of all the unique vertices and creating the final indices array ===============================================
     // TODO: replace with map/dictionary for quick lookups
-    ObjVertexIndices* uniqueVertices = DarrayCreate(sizeof(*uniqueVertices), DARRAY_START_CAPACITY, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
+    ObjVertexIndicesDarray* uniqueVertices = ObjVertexIndicesDarrayCreate(DARRAY_START_CAPACITY, GetGlobalAllocator());
 
-    u32* objIndices = DarrayCreate(sizeof(*objIndices), DARRAY_START_CAPACITY, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
+    u32Darray* objIndices = u32DarrayCreate(DARRAY_START_CAPACITY, GetGlobalAllocator());
 
-    for (int i = 0; i < DarrayGetSize(faceIndices); i++)
+    for (int i = 0; i < faceIndices->size; i++)
     {
-        char* face = text + faceIndices[i];
+        char* face = text + faceIndices->data[i];
 
         // Looping through face vertices
         for (int j = 0; j < 3; j++)
@@ -117,9 +122,9 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
             // Checking if the vertex already exists and getting its index if it does
             u32 vertexIndex = UINT32_MAX;
 
-            for (int k = 0; k < DarrayGetSize(uniqueVertices); k++)
+            for (int k = 0; k < uniqueVertices->size; k++)
             {
-                if (MemoryCompare(uniqueVertices + k, &vertexIndices, sizeof(vertexIndices)))
+                if (MemoryCompare(uniqueVertices->data + k, &vertexIndices, sizeof(vertexIndices)))
                 {
                     vertexIndex = k;
                     break;
@@ -129,23 +134,23 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
             // Adding the vertex to the array if it doesn't exist yet
             if (vertexIndex == UINT32_MAX)
             {
-                vertexIndex = DarrayGetSize(uniqueVertices);
-                uniqueVertices = DarrayPushback(uniqueVertices, &vertexIndices);
+                vertexIndex = uniqueVertices->size;
+                ObjVertexIndicesDarrayPushback(uniqueVertices, &vertexIndices);
             }
 
             // Adding the index to the indices array
-            objIndices = DarrayPushback(objIndices, &vertexIndex);
+            u32DarrayPushback(objIndices, &vertexIndex);
         }
     }
 
     // ============================== Creating the final vertices array ===============================================
-    ObjVertex* objVertices = DarrayCreateWithSize(sizeof(*objVertices), DarrayGetSize(uniqueVertices), GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
+    ObjVertexDarray* objVerticesDarray = ObjVertexDarrayCreateWithSize(uniqueVertices->size, GetGlobalAllocator());
 
-    for (int i = 0; i < DarrayGetSize(uniqueVertices); i++)
+    for (int i = 0; i < uniqueVertices->size; i++)
     {
-        char* positionString = text + positionIndices[uniqueVertices[i].indices[0]];
-        char* normalString = text + normalIndices[uniqueVertices[i].indices[2]];
-        char* uvCoordString = text + uvCoordIndices[uniqueVertices[i].indices[1]];
+        char* positionString = text + positionIndices->data[uniqueVertices->data[i].indices[0]];
+        char* normalString = text + normalIndices->data[uniqueVertices->data[i].indices[2]];
+        char* uvCoordString = text + uvCoordIndices->data[uniqueVertices->data[i].indices[1]];
 
         // Positions
         positionString += 3;
@@ -161,9 +166,9 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
         while (*positionString != '\n' && *positionString != '\0') positionString++;
         *positionString = '\0';
 
-        objVertices[i].position.x = atof(positionXString);
-        objVertices[i].position.y = atof(positionYString);
-        objVertices[i].position.z = atof(positionZString);
+        objVerticesDarray->data[i].position.x = atof(positionXString);
+        objVerticesDarray->data[i].position.y = atof(positionYString);
+        objVerticesDarray->data[i].position.z = atof(positionZString);
 
         // Normals
         normalString += 4;
@@ -179,9 +184,9 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
         while (*normalString != '\n' && *normalString != '\0') normalString++;
         *normalString = '\0';
 
-        objVertices[i].normal.x = atof(normalXString);
-        objVertices[i].normal.y = atof(normalYString);
-        objVertices[i].normal.z = atof(normalZString);
+        objVerticesDarray->data[i].normal.x = atof(normalXString);
+        objVerticesDarray->data[i].normal.y = atof(normalYString);
+        objVerticesDarray->data[i].normal.z = atof(normalZString);
 
         // uv coords
         uvCoordString += 4;
@@ -193,27 +198,27 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
         while (*uvCoordString != '\n' && *uvCoordString != '\0') uvCoordString++;
         *uvCoordString = '\0';
 
-        objVertices[i].uvCoord.x = atof(uvCoordXString);
-        objVertices[i].uvCoord.y = atof(uvCoordYString);
+        objVerticesDarray->data[i].uvCoord.x = atof(uvCoordXString);
+        objVerticesDarray->data[i].uvCoord.y = atof(uvCoordYString);
     }
 
     // ============================== Flipping winding order if necessary ===============================================
     if (flipWindingOrder)
     {
-        for (int i = 0; i < DarrayGetSize(objIndices) - 1; i += 3)
+        for (int i = 0; i < objIndices->size - 1; i += 3)
         {
-            u32 temp = objIndices[i];
-            objIndices[i] = objIndices[i + 2];
-            objIndices[i + 2] = temp;
+            u32 temp = objIndices->data[i];
+            objIndices->data[i] = objIndices->data[i + 2];
+            objIndices->data[i + 2] = temp;
         }
     }
 
     // ============================== Uploading the vertices and indices to the GPU ===============================================
-    *out_vb = VertexBufferCreate(objVertices, sizeof(*objVertices) * DarrayGetSize(objVertices));
-    *out_ib = IndexBufferCreate(objIndices, DarrayGetSize(objIndices));
+    *out_vb = VertexBufferCreate(objVerticesDarray->data, objVerticesDarray->stride * objVerticesDarray->size);
+    *out_ib = IndexBufferCreate(objIndices->data, objIndices->size);
 
     // ============================== Cleanup ===============================================
-    DarrayDestroy(objVertices);
+    DarrayDestroy(objVerticesDarray);
     DarrayDestroy(objIndices);
 
     DarrayDestroy(uniqueVertices);

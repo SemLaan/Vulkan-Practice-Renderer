@@ -39,6 +39,8 @@ typedef struct Font
     u32 characterBezierCounts[255];        // Array of amount of bezier's for each character.
 } Font;
 
+DEFINE_DARRAY_TYPE_REF(Text);
+
 typedef struct TextRendererState
 {
     Allocator* textPool;            // Pool allocator for allocating text structs.
@@ -47,7 +49,7 @@ typedef struct TextRendererState
     VertexBuffer bezierVB;          // Vertex buffer for instanced bezier rendering.
     IndexBuffer bezierIB;           // Index buffer for instanced bezier rendering.
     SimpleMap* fontMap;             // Map with all the loaded fonts.
-    Text** textDarray;              // Darray with pointers to all text objects.
+    TextRefDarray* textDarray;              // Darray with pointers to all text objects.
     u32 nextTextId;                 // Integer for giving each text object a unique id.
 } TextRendererState;
 
@@ -64,7 +66,7 @@ bool InitializeTextRenderer()
     MemoryZero(state, sizeof(*state));
 
     state->fontMap = SimpleMapCreate(GetGlobalAllocator(), 16);
-    state->textDarray = DarrayCreate(sizeof(*state->textDarray), MAX_TEXT_OBJECTS, GetGlobalAllocator(), MEM_TAG_DARRAY);
+    state->textDarray = TextRefDarrayCreate(MAX_TEXT_OBJECTS, GetGlobalAllocator());
     CreatePoolAllocator("text renderer text pool", GetGlobalAllocator(), TEXT_BLOCK_SIZE, MAX_TEXT_OBJECTS, &state->textPool);
     CreateFreelistAllocator("Text renderer text strings", GetGlobalAllocator(), TEXT_STRING_ARENA_SIZE, &state->textStringAllocator);
     state->nextTextId = 1;
@@ -264,7 +266,7 @@ Text* TextCreate(const char* textString, const char* fontName, mat4 transform, U
     Free(GetGlobalAllocator(), bezierCurves);
 
     // Adding the text to the text darray
-    state->textDarray = DarrayPushback(state->textDarray, &text);
+    TextRefDarrayPushback(state->textDarray, &text);
 
     return text;
 }
@@ -278,14 +280,14 @@ void TextRender()
 {
     // TODO: add a way to check with the renderer whether we are in an appropriate renderpass and assert that.
 
-    u32 textCount = DarrayGetSize(state->textDarray);
+    u32 textCount = state->textDarray->size;
 
     MaterialBind(state->bezierMaterial);
 
     // Loop over all the text objects and render the active ones.
     for (int i = 0; i < textCount; i++)
     {
-        Text* text = state->textDarray[i];
+        Text* text = state->textDarray->data[i];
 
         // Skip this text if it's disabled
         if (!text->enabled)

@@ -5,7 +5,8 @@
 
 #define MAX_SUBMITTED_COMMAND_BUFFERS 20
 
-
+DEFINE_DARRAY_TYPE(VkSemaphoreSubmitInfo);
+DEFINE_DARRAY_TYPE(VkCommandBufferSubmitInfo);
 
 bool AllocateCommandBuffer(QueueFamily* queueFamily, CommandBuffer* ref_pCommandBuffer)
 {
@@ -94,11 +95,11 @@ bool EndSubmitAndFreeSingleUseCommandBuffer(CommandBuffer commandBuffer, u32 wai
 	semaphoreInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 	semaphoreInfo.deviceIndex = 0;
 
-	VkSemaphoreSubmitInfo* semaphoreInfosDarray = DarrayCreate(sizeof(VkSemaphoreSubmitInfo), signalSemaphoreCount + 1, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
-	semaphoreInfosDarray = DarrayPushback(semaphoreInfosDarray, &semaphoreInfo);
+	VkSemaphoreSubmitInfoDarray* semaphoreInfosDarray = VkSemaphoreSubmitInfoDarrayCreate(signalSemaphoreCount + 1, GetGlobalAllocator());
+	VkSemaphoreSubmitInfoDarrayPushback(semaphoreInfosDarray, &semaphoreInfo);
 
 	for (u32 i = 0; i < signalSemaphoreCount; ++i)
-		semaphoreInfosDarray = DarrayPushback(semaphoreInfosDarray, &pSignalSemaphoreSubmitInfos[i]);
+		VkSemaphoreSubmitInfoDarrayPushback(semaphoreInfosDarray, &pSignalSemaphoreSubmitInfos[i]);
 
 	VkSubmitInfo2 submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
@@ -108,8 +109,8 @@ bool EndSubmitAndFreeSingleUseCommandBuffer(CommandBuffer commandBuffer, u32 wai
 	submitInfo.pWaitSemaphoreInfos = pWaitSemaphoreSubmitInfos;
 	submitInfo.commandBufferInfoCount = 1;
 	submitInfo.pCommandBufferInfos = &commandBufferInfo;
-	submitInfo.signalSemaphoreInfoCount = DarrayGetSize(semaphoreInfosDarray);
-	submitInfo.pSignalSemaphoreInfos = semaphoreInfosDarray;
+	submitInfo.signalSemaphoreInfoCount = semaphoreInfosDarray->size;
+	submitInfo.pSignalSemaphoreInfos = semaphoreInfosDarray->data;
 
 	VkResult result = vkQueueSubmit2(commandBuffer.queueFamily->handle, 1, &submitInfo, VK_NULL_HANDLE);
 
@@ -132,7 +133,7 @@ bool EndSubmitAndFreeSingleUseCommandBuffer(CommandBuffer commandBuffer, u32 wai
 	if (ref_signaledValue)
 		*ref_signaledValue = commandBuffer.queueFamily->semaphore.submitValue;
 
-	commandBuffer.queueFamily->resourcesPendingDestructionDarray = (ResourceDestructionInfo*)DarrayPushback(commandBuffer.queueFamily->resourcesPendingDestructionDarray, &commandBufferDestructionInfo);
+	ResourceDestructionInfoDarrayPushback(commandBuffer.queueFamily->resourcesPendingDestructionDarray, &commandBufferDestructionInfo);
 
 	return true;
 }
@@ -183,7 +184,7 @@ bool SubmitCommandBuffers(u32 waitSemaphoreCount, VkSemaphoreSubmitInfo* pWaitSe
 	}
 #endif // DEBUG
 
-	VkCommandBufferSubmitInfo* commandBufferSubmitInfosDarray = (VkCommandBufferSubmitInfo*)DarrayCreate(sizeof(VkCommandBufferSubmitInfo), commandBufferCount, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
+	VkCommandBufferSubmitInfoDarray* commandBufferSubmitInfosDarray = VkCommandBufferSubmitInfoDarrayCreate(commandBufferCount, GetGlobalAllocator());
 	for (u32 i = 0; i < commandBufferCount; ++i)
 	{
 		VkCommandBufferSubmitInfo commandBufferInfo = {};
@@ -191,7 +192,7 @@ bool SubmitCommandBuffers(u32 waitSemaphoreCount, VkSemaphoreSubmitInfo* pWaitSe
 		commandBufferInfo.pNext = 0;
 		commandBufferInfo.commandBuffer = commandBuffers[i].handle;
 		commandBufferInfo.deviceMask = 0;
-		commandBufferSubmitInfosDarray = (VkCommandBufferSubmitInfo*)DarrayPushback(commandBufferSubmitInfosDarray, &commandBufferInfo);
+		VkCommandBufferSubmitInfoDarrayPushback(commandBufferSubmitInfosDarray, &commandBufferInfo);
 	}
 
 	commandBuffers[0].queueFamily->semaphore.submitValue++;
@@ -203,11 +204,11 @@ bool SubmitCommandBuffers(u32 waitSemaphoreCount, VkSemaphoreSubmitInfo* pWaitSe
 	semaphoreInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 	semaphoreInfo.deviceIndex = 0;
 
-	VkSemaphoreSubmitInfo* semaphoreInfosDarray = (VkSemaphoreSubmitInfo*)DarrayCreate(sizeof(VkSemaphoreSubmitInfo), signalSemaphoreCount + 1, GetGlobalAllocator(), MEM_TAG_RENDERER_SUBSYS);
-	semaphoreInfosDarray = (VkSemaphoreSubmitInfo*)DarrayPushback(semaphoreInfosDarray, &semaphoreInfo);
+	VkSemaphoreSubmitInfoDarray* semaphoreInfosDarray = VkSemaphoreSubmitInfoDarrayCreate(signalSemaphoreCount + 1, GetGlobalAllocator());
+	VkSemaphoreSubmitInfoDarrayPushback(semaphoreInfosDarray, &semaphoreInfo);
 
 	for (u32 i = 0; i < signalSemaphoreCount; ++i)
-		semaphoreInfosDarray = (VkSemaphoreSubmitInfo*)DarrayPushback(semaphoreInfosDarray, &pSignalSemaphoreInfos[i]);
+		VkSemaphoreSubmitInfoDarrayPushback(semaphoreInfosDarray, &pSignalSemaphoreInfos[i]);
 
 	VkSubmitInfo2 submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
@@ -216,9 +217,9 @@ bool SubmitCommandBuffers(u32 waitSemaphoreCount, VkSemaphoreSubmitInfo* pWaitSe
 	submitInfo.waitSemaphoreInfoCount = waitSemaphoreCount;
 	submitInfo.pWaitSemaphoreInfos = pWaitSemaphoreInfos;
 	submitInfo.commandBufferInfoCount = commandBufferCount;
-	submitInfo.pCommandBufferInfos = commandBufferSubmitInfosDarray;
-	submitInfo.signalSemaphoreInfoCount = DarrayGetSize(semaphoreInfosDarray);
-	submitInfo.pSignalSemaphoreInfos = semaphoreInfosDarray;
+	submitInfo.pCommandBufferInfos = commandBufferSubmitInfosDarray->data;
+	submitInfo.signalSemaphoreInfoCount = semaphoreInfosDarray->size;
+	submitInfo.pSignalSemaphoreInfos = semaphoreInfosDarray->data;
 
 	if (VK_SUCCESS != vkQueueSubmit2(commandBuffers[0].queueFamily->handle, 1, &submitInfo, fence))
 	{
