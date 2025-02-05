@@ -10,6 +10,7 @@
 
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
 #define NORMAL_SHADER_NAME "normal_shader"
+#define OUTLINE_SHADER_NAME "outline_shader"
 #define FONT_NAME_ROBOTO "roboto"
 #define FONT_NAME_ADORABLE_HANDMADE "adorable"
 #define FONT_NAME_NICOLAST "nicolast"
@@ -29,9 +30,11 @@ typedef struct GameRenderingState
 
     // Materials
     Material marchingCubesMaterial;
-	Material normalRenderingMaterial;
+    Material normalRenderingMaterial;
+	Material outlineMaterial;
 
     // Render targets
+    RenderTarget normalAndDepthRenderTarget;
 
     // Camera matrices and positions
     Camera sceneCamera;
@@ -45,10 +48,18 @@ static GameRenderingState* renderingState = nullptr;
 
 static bool OnWindowResize(EventCode type, EventData data)
 {
+	// Recalculating projection matrices
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
     renderingState->sceneCamera.projection = mat4_perspective(DEFAULT_FOV, windowAspectRatio, DEFAULT_NEAR_PLANE, DEFAULT_FAR_PLANE);
     renderingState->uiCamera.projection = mat4_orthographic(0, UI_ORTHO_HEIGHT * windowAspectRatio, 0, UI_ORTHO_HEIGHT, UI_NEAR_PLANE, UI_FAR_PLANE);
+
+	// Resizing framebuffer
+	RenderTargetDestroy(renderingState->normalAndDepthRenderTarget);
+	renderingState->normalAndDepthRenderTarget = RenderTargetCreate(windowSize.x, windowSize.y, RENDER_TARGET_USAGE_TEXTURE, RENDER_TARGET_USAGE_TEXTURE);
+
+	MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+	MaterialUpdateTexture(renderingState->outlineMaterial, "colorTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
 
     return false;
 }
@@ -83,30 +94,64 @@ void GameRenderingInit()
     const char* testString = "Beefy text testing!?.";
     renderingState->textTest = TextCreate(testString, FONT_NAME_ROBOTO, renderingState->uiCamera.projection, UPDATE_FREQUENCY_STATIC);
 
+    // Creating render targets
+    {
+        renderingState->normalAndDepthRenderTarget = RenderTargetCreate(windowSize.x, windowSize.y, RENDER_TARGET_USAGE_TEXTURE, RENDER_TARGET_USAGE_TEXTURE);
+    }
+
     // Loading shaders
     {
-        ShaderCreateInfo shaderCreateInfo = {};
-        shaderCreateInfo.renderTargetStencil = false;
-        shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 2;
-        shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
-        shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
-        shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
+        {
+            ShaderCreateInfo shaderCreateInfo = {};
+            shaderCreateInfo.renderTargetColor = true;
+            shaderCreateInfo.renderTargetDepth = true;
+            shaderCreateInfo.renderTargetStencil = false;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 2;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+            shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
 
-        shaderCreateInfo.vertexShaderName = "marchingCubes";
-        shaderCreateInfo.fragmentShaderName = "marchingCubes";
-        shaderCreateInfo.renderTargetColor = true;
-        shaderCreateInfo.renderTargetDepth = true;
-        ShaderCreate(MARCHING_CUBES_SHADER_NAME, &shaderCreateInfo);
+            shaderCreateInfo.vertexShaderName = "marchingCubes";
+            shaderCreateInfo.fragmentShaderName = "marchingCubes";
+            ShaderCreate(MARCHING_CUBES_SHADER_NAME, &shaderCreateInfo);
+        }
 
-		shaderCreateInfo.vertexShaderName = "normal";
-        shaderCreateInfo.fragmentShaderName = "normal";
-		ShaderCreate(NORMAL_SHADER_NAME, &shaderCreateInfo);
+        {
+			ShaderCreateInfo shaderCreateInfo = {};
+            shaderCreateInfo.renderTargetColor = true;
+            shaderCreateInfo.renderTargetDepth = true;
+            shaderCreateInfo.renderTargetStencil = false;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 2;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+            shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
+
+            shaderCreateInfo.vertexShaderName = "normal";
+            shaderCreateInfo.fragmentShaderName = "normal";
+            ShaderCreate(NORMAL_SHADER_NAME, &shaderCreateInfo);
+        }
+
+		{
+			ShaderCreateInfo shaderCreateInfo = {};
+            shaderCreateInfo.renderTargetColor = true;
+            shaderCreateInfo.renderTargetDepth = false;
+            shaderCreateInfo.renderTargetStencil = false;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 2;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC2;
+            shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
+
+            shaderCreateInfo.vertexShaderName = "fullscreen";
+            shaderCreateInfo.fragmentShaderName = "outline";
+            ShaderCreate(OUTLINE_SHADER_NAME, &shaderCreateInfo);
+        }
     }
 
     // Creating materials
     {
         renderingState->marchingCubesMaterial = MaterialCreate(ShaderGetRef(MARCHING_CUBES_SHADER_NAME));
-		renderingState->normalRenderingMaterial = MaterialCreate(ShaderGetRef(NORMAL_SHADER_NAME));
+        renderingState->normalRenderingMaterial = MaterialCreate(ShaderGetRef(NORMAL_SHADER_NAME));
+		renderingState->outlineMaterial = MaterialCreate(ShaderGetRef(OUTLINE_SHADER_NAME));
     }
 
     // Initializing material state
@@ -115,6 +160,8 @@ void GameRenderingInit()
         f32 roughness = 0;
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
+		MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+		MaterialUpdateTexture(renderingState->outlineMaterial, "colorTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
     }
 
     MCGenerateDensityMap();
@@ -127,6 +174,10 @@ void GameRenderingRender()
     f32 roughness = 0;
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
+	f32 nearPlane = DEFAULT_NEAR_PLANE;
+	f32 farPlane = DEFAULT_FAR_PLANE;
+	MaterialUpdateProperty(renderingState->outlineMaterial, "zNear", &nearPlane);
+	MaterialUpdateProperty(renderingState->outlineMaterial, "zFar", &farPlane);
 
     // ================== Camera calculations
     CameraRecalculateViewAndViewProjection(&renderingState->sceneCamera);
@@ -141,12 +192,25 @@ void GameRenderingRender()
     if (!BeginRendering())
         return;
 
-    // ================== Rendering main scene to screen
-    RenderTargetStartRendering(GetMainRenderTarget());
+    // ================== Rendering normals and depth of the marching cubes mesh
+    RenderTargetStartRendering(renderingState->normalAndDepthRenderTarget);
 
     // Rendering the marching cubes mesh
     MaterialBind(renderingState->normalRenderingMaterial);
     MCRenderWorld();
+
+	RenderTargetStopRendering(renderingState->normalAndDepthRenderTarget);
+
+	// ================== Rendering main scene to screen
+    RenderTargetStartRendering(GetMainRenderTarget());
+
+	MaterialBind(renderingState->marchingCubesMaterial);
+    MCRenderWorld();
+
+	// TODO: remove this test
+	MaterialBind(renderingState->outlineMaterial);
+	MeshData* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
+	Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
 
     // Rendering text as a demo of the text system
     mat4 bezierModel = mat4_2Dtranslate(vec2_create(0, 4));
@@ -175,8 +239,11 @@ void GameRenderingShutdown()
 
     MCDestroyMeshAndDensityMap();
 
-	MaterialDestroy(renderingState->normalRenderingMaterial);
+	MaterialDestroy(renderingState->outlineMaterial);
+    MaterialDestroy(renderingState->normalRenderingMaterial);
     MaterialDestroy(renderingState->marchingCubesMaterial);
+
+    RenderTargetDestroy(renderingState->normalAndDepthRenderTarget);
 
     Free(GetGlobalAllocator(), renderingState);
 }
@@ -204,7 +271,7 @@ void UnregisterDebugMenu(DebugMenu* debugMenu)
         if (renderingState->debugMenuDarray->data[i] == debugMenu)
         {
             DarrayPopAt(renderingState->debugMenuDarray, i);
-			return;
+            return;
         }
     }
 }
