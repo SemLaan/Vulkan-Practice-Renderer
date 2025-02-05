@@ -756,8 +756,8 @@ bool InitializeRenderer()
 	f32 fullscreenTriangleVertices[FULLSCREEN_TRIANGLE_VERT_COUNT * FULLSCREEN_TRIANGLE_VERT_FLOAT_COUNT] = 
 	{ 
 		//Clip Pos       
-		-1, 3, 0.f, 		2, 0,
-		3, -1, 0.f, 		0, 2,
+		-1, 3, 0.f, 		0, 2,
+		3, -1, 0.f, 		2, 0,
 		-1, -1, 0.f, 		0, 0,
 	};
 	u32 fullscreenTriangleIndices[FULLSCREEN_TRIANGLE_VERT_COUNT] = { 0, 1, 2 };
