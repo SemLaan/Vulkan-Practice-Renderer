@@ -9,6 +9,7 @@
 #include "renderer/ui/text_renderer.h"
 
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
+#define NORMAL_SHADER_NAME "normal_shader"
 #define FONT_NAME_ROBOTO "roboto"
 #define FONT_NAME_ADORABLE_HANDMADE "adorable"
 #define FONT_NAME_NICOLAST "nicolast"
@@ -28,6 +29,7 @@ typedef struct GameRenderingState
 
     // Materials
     Material marchingCubesMaterial;
+	Material normalRenderingMaterial;
 
     // Render targets
 
@@ -95,11 +97,16 @@ void GameRenderingInit()
         shaderCreateInfo.renderTargetColor = true;
         shaderCreateInfo.renderTargetDepth = true;
         ShaderCreate(MARCHING_CUBES_SHADER_NAME, &shaderCreateInfo);
+
+		shaderCreateInfo.vertexShaderName = "normal";
+        shaderCreateInfo.fragmentShaderName = "normal";
+		ShaderCreate(NORMAL_SHADER_NAME, &shaderCreateInfo);
     }
 
     // Creating materials
     {
         renderingState->marchingCubesMaterial = MaterialCreate(ShaderGetRef(MARCHING_CUBES_SHADER_NAME));
+		renderingState->normalRenderingMaterial = MaterialCreate(ShaderGetRef(NORMAL_SHADER_NAME));
     }
 
     // Initializing material state
@@ -138,7 +145,7 @@ void GameRenderingRender()
     RenderTargetStartRendering(GetMainRenderTarget());
 
     // Rendering the marching cubes mesh
-    MaterialBind(renderingState->marchingCubesMaterial);
+    MaterialBind(renderingState->normalRenderingMaterial);
     MCRenderWorld();
 
     // Rendering text as a demo of the text system
@@ -168,6 +175,7 @@ void GameRenderingShutdown()
 
     MCDestroyMeshAndDensityMap();
 
+	MaterialDestroy(renderingState->normalRenderingMaterial);
     MaterialDestroy(renderingState->marchingCubesMaterial);
 
     Free(GetGlobalAllocator(), renderingState);
