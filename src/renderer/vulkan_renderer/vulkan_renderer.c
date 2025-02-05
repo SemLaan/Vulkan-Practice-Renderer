@@ -22,6 +22,7 @@
 
 #define RENDERER_POOL_ALLOCATOR_32b_SIZE 200
 #define RENDERER_RESOURCE_ACQUISITION_SIZE 200
+#define MAX_VERTEX_BUFFERS_PER_DRAW_CALL 2
 
 DEFINE_DARRAY_TYPE(VkExtensionProperties);
 DEFINE_DARRAY_TYPE(VkLayerProperties);
@@ -733,17 +734,39 @@ bool InitializeRenderer()
 	// ============================================================================================================================================================
     // ============================ Loading basic meshes ======================================================================================================
     // ============================================================================================================================================================
-	vk_state->basicMeshMap = SimpleMapCreate(vk_state->rendererAllocator, BASIC_MESH_COUNT + 5/*making sure collisions don't occur*/);
+	vk_state->basicMeshMap = SimpleMapCreate(vk_state->rendererAllocator, BASIC_MESH_COUNT + 20/*making sure collisions don't occur*/);
+
+	u32 currentBasicMeshIndex = 0;
 
 	MeshData* basicMeshDataArray = Alloc(vk_state->rendererAllocator, sizeof(*basicMeshDataArray) * BASIC_MESH_COUNT, MEM_TAG_RENDERER_SUBSYS);
-	LoadObj("models/quad.obj", &basicMeshDataArray[0].vertexBuffer, &basicMeshDataArray[0].indexBuffer, false);
-	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_QUAD, basicMeshDataArray + 0);
+	LoadObj("models/quad.obj", &basicMeshDataArray[currentBasicMeshIndex].vertexBuffer, &basicMeshDataArray[currentBasicMeshIndex].indexBuffer, false);
+	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_QUAD, basicMeshDataArray + currentBasicMeshIndex);
+	currentBasicMeshIndex++;
 
-	LoadObj("models/sphere.obj", &basicMeshDataArray[1].vertexBuffer, &basicMeshDataArray[1].indexBuffer, false);
-	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_SPHERE, basicMeshDataArray + 1);
+	LoadObj("models/sphere.obj", &basicMeshDataArray[currentBasicMeshIndex].vertexBuffer, &basicMeshDataArray[currentBasicMeshIndex].indexBuffer, false);
+	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_SPHERE, basicMeshDataArray + currentBasicMeshIndex);
+	currentBasicMeshIndex++;
 
-	LoadObj("models/cube.obj", &basicMeshDataArray[2].vertexBuffer, &basicMeshDataArray[2].indexBuffer, false);
-	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_CUBE, basicMeshDataArray + 2);
+	LoadObj("models/cube.obj", &basicMeshDataArray[currentBasicMeshIndex].vertexBuffer, &basicMeshDataArray[currentBasicMeshIndex].indexBuffer, false);
+	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_CUBE, basicMeshDataArray + currentBasicMeshIndex);
+	currentBasicMeshIndex++;
+
+#define FULLSCREEN_TRIANGLE_VERT_COUNT 3
+#define FULLSCREEN_TRIANGLE_VERT_FLOAT_COUNT 5
+	f32 fullscreenTriangleVertices[FULLSCREEN_TRIANGLE_VERT_COUNT * FULLSCREEN_TRIANGLE_VERT_FLOAT_COUNT] = 
+	{ 
+		//Clip Pos       
+		-1, 3, 0.f, 		2, 0,
+		3, -1, 0.f, 		0, 2,
+		-1, -1, 0.f, 		0, 0,
+	};
+	u32 fullscreenTriangleIndices[FULLSCREEN_TRIANGLE_VERT_COUNT] = { 0, 1, 2 };
+	basicMeshDataArray[currentBasicMeshIndex].vertexBuffer = VertexBufferCreate(fullscreenTriangleVertices, sizeof(fullscreenTriangleVertices));
+	basicMeshDataArray[currentBasicMeshIndex].indexBuffer = IndexBufferCreate(fullscreenTriangleIndices, FULLSCREEN_TRIANGLE_VERT_COUNT);
+	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE, basicMeshDataArray + currentBasicMeshIndex);
+	currentBasicMeshIndex++;
+
+	GRASSERT_DEBUG(currentBasicMeshIndex == BASIC_MESH_COUNT);
 
     return true;
 }
@@ -1204,8 +1227,10 @@ void Draw(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer 
     VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
     VulkanIndexBuffer* indexBuffer = clientIndexBuffer.internalState;
 
+	GRASSERT_DEBUG(vertexBufferCount <= MAX_VERTEX_BUFFERS_PER_DRAW_CALL);
+
     // Getting vertex buffer vulkan handles for binding
-    VkBuffer vertexBuffers[2] = {};
+    VkBuffer vertexBuffers[MAX_VERTEX_BUFFERS_PER_DRAW_CALL] = {};
     for (int i = 0; i < vertexBufferCount; i++)
     {
         VulkanVertexBuffer* vb = clientVertexBuffers[i].internalState;

@@ -10,7 +10,7 @@ typedef struct RendererState RendererState;
 extern RendererState* vk_state;
 
 #define MAX_SHADERS 256
-#define BASIC_MESH_COUNT 3
+#define BASIC_MESH_COUNT 4
 #define MAX_FRAMES_IN_FLIGHT 2
 #define RENDER_POOL_BLOCK_SIZE_32 32
 #define QUEUE_ACQUISITION_POOL_BLOCK_SIZE 160 // 160 bytes (2.5 cache lines) 32 byte aligned, enough to store VkDependencyInfo + (VkImageMemoryBarrier2 or VkBufferMemoryBarrier2)
