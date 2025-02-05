@@ -69,7 +69,6 @@ static inline void DensityFuncBezierCurveHole(f32* densityMap, u32 mapWidth, u32
 
 // Generating a random bezier curve
 #define BEZIER_DEGREE_PLUS_ONE (50 + 1)
-    u32 seed = 10;
 
     vec3 bezierCurvePoints[BEZIER_DEGREE_PLUS_ONE] = {};
 
@@ -120,7 +119,6 @@ static inline void DensityFuncBezierCurveHole(f32* densityMap, u32 mapWidth, u32
                 if (sphereValue >= 0)
                     sphereValue = 0;
 
-                u32 closestBezierPoint = 0;
                 f32 closestBezierDistanceSquared = 100000000000;
                 for (u32 sampleIndex = distanceBetweenSamplePoints - 1; sampleIndex < CURVE_POINTS; sampleIndex += distanceBetweenSamplePoints)
                 {
@@ -128,7 +126,6 @@ static inline void DensityFuncBezierCurveHole(f32* densityMap, u32 mapWidth, u32
                     if (distanceSquared < closestBezierDistanceSquared)
                     {
                         closestBezierDistanceSquared = distanceSquared;
-                        closestBezierPoint = sampleIndex;
                     }
                 }
 
