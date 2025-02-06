@@ -103,13 +103,28 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
                 while (*uniformStart == ' ' || *uniformStart == '\t' || *uniformStart == '\n')
                     uniformStart++;
 
+				if (MemoryCompare(uniformStart, "int", 3))
+                {
+                    // Putting uniformStart past the type and at the start of the property name
+                    uniformStart += 4;
+
+                    // ===== Saving information about the property
+                    // Making sure the int is properly aligned
+                    u32 alignmentPadding = (SCALAR_ALIGNMENT - (ref_propertyData->uniformBufferSize % SCALAR_ALIGNMENT)) % SCALAR_ALIGNMENT;
+                    ref_propertyData->uniformBufferSize += alignmentPadding;
+
+                    ref_propertyData->propertyOffsets[currentProperty] = ref_propertyData->uniformBufferSize;
+                    ref_propertyData->propertySizes[currentProperty] = SCALAR_SIZE;
+                    ref_propertyData->uniformBufferSize += SCALAR_SIZE;
+                }
+
                 if (MemoryCompare(uniformStart, "float", 5))
                 {
                     // Putting uniformStart past the type and at the start of the property name
                     uniformStart += 6;
 
                     // ===== Saving information about the property
-                    // Making sure the matrix is properly aligned
+                    // Making sure the float is properly aligned
                     u32 alignmentPadding = (SCALAR_ALIGNMENT - (ref_propertyData->uniformBufferSize % SCALAR_ALIGNMENT)) % SCALAR_ALIGNMENT;
                     ref_propertyData->uniformBufferSize += alignmentPadding;
 
