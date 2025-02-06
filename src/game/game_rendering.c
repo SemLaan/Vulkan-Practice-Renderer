@@ -23,10 +23,17 @@
 
 DEFINE_DARRAY_TYPE_REF(DebugMenu);
 
+typedef struct ShaderParameters
+{
+	float normalEdgeThreshold;
+} ShaderParameters;
+
 typedef struct GameRenderingState
 {
     // Debug menu's
     DebugMenuRefDarray* debugMenuDarray;
+	// Debug menu for adjusting shader parameters
+	DebugMenu* shaderParamDebugMenu;
 
     // Materials
     Material marchingCubesMaterial;
@@ -39,6 +46,9 @@ typedef struct GameRenderingState
     // Camera matrices and positions
     Camera sceneCamera;
     Camera uiCamera;
+
+	// Shader params
+	ShaderParameters shaderParameters;
 
     // Text, THIS IS TEMPORARY, this needs to be changed once the text system is finished
     Text* textTest;
@@ -59,7 +69,7 @@ static bool OnWindowResize(EventCode type, EventData data)
 	renderingState->normalAndDepthRenderTarget = RenderTargetCreate(windowSize.x, windowSize.y, RENDER_TARGET_USAGE_TEXTURE, RENDER_TARGET_USAGE_TEXTURE);
 
 	MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
-	MaterialUpdateTexture(renderingState->outlineMaterial, "colorTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+	MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
 
     return false;
 }
@@ -161,8 +171,12 @@ void GameRenderingInit()
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
 		MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
-		MaterialUpdateTexture(renderingState->outlineMaterial, "colorTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+		MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
     }
+
+	renderingState->shaderParamDebugMenu = DebugUICreateMenu();
+	RegisterDebugMenu(renderingState->shaderParamDebugMenu);
+	DebugUIAddSlider(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 10, &renderingState->shaderParameters.normalEdgeThreshold);
 
     MCGenerateDensityMap();
     MCGenerateMesh();
@@ -176,8 +190,12 @@ void GameRenderingRender()
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
 	f32 nearPlane = DEFAULT_NEAR_PLANE;
 	f32 farPlane = DEFAULT_FAR_PLANE;
+	vec2i windowSize = GetPlatformWindowSize();
 	MaterialUpdateProperty(renderingState->outlineMaterial, "zNear", &nearPlane);
 	MaterialUpdateProperty(renderingState->outlineMaterial, "zFar", &farPlane);
+	MaterialUpdateProperty(renderingState->outlineMaterial, "screenWidth", &windowSize.x);
+	MaterialUpdateProperty(renderingState->outlineMaterial, "screenHeight", &windowSize.y);
+	MaterialUpdateProperty(renderingState->outlineMaterial, "normalEdgeThreshold", &renderingState->shaderParameters.normalEdgeThreshold);
 
     // ================== Camera calculations
     CameraRecalculateViewAndViewProjection(&renderingState->sceneCamera);
@@ -234,7 +252,9 @@ void GameRenderingShutdown()
 {
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
-    // Creating darray for debug ui's
+    // Destroying debug menu for shader params and darray for debug ui's
+	UnregisterDebugMenu(renderingState->shaderParamDebugMenu);
+	DebugUIDestroyMenu(renderingState->shaderParamDebugMenu);
     DarrayDestroy(renderingState->debugMenuDarray);
 
     MCDestroyMeshAndDensityMap();
