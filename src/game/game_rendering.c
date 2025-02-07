@@ -176,7 +176,7 @@ void GameRenderingInit()
 
 	renderingState->shaderParamDebugMenu = DebugUICreateMenu();
 	RegisterDebugMenu(renderingState->shaderParamDebugMenu);
-	DebugUIAddSlider(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 10, &renderingState->shaderParameters.normalEdgeThreshold);
+	DebugUIAddSlider(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
 
     MCGenerateDensityMap();
     MCGenerateMesh();
@@ -223,7 +223,7 @@ void GameRenderingRender()
     RenderTargetStartRendering(GetMainRenderTarget());
 
 	MaterialBind(renderingState->marchingCubesMaterial);
-    MCRenderWorld();
+    //MCRenderWorld();
 
 	// TODO: remove this test
 	MaterialBind(renderingState->outlineMaterial);
