@@ -158,6 +158,11 @@ static vec4 vec4_create(f32 x, f32 y, f32 z, f32 w)
 	return out;
 }
 
+static vec4 vec4_mul_f32(vec4 a, f32 b)
+{
+	return vec4_create(a.x * b, a.y * b, a.z * b, a.w * b);
+}
+
 static f32 vec4_dot(vec4 v1, vec4 v2)
 {
 	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
