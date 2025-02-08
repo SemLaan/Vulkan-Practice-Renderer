@@ -9,12 +9,11 @@
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
 
-#define MAX_DBG_MENU_QUADS 100 // Change if you need more
-#define MAX_DBG_MENU_INTERACTABLES 20 // Change if you need more
-#define MAX_DBG_MENUS 3	// Change if you need more
+#define MAX_DBG_MENU_QUADS 100                             // Change if you need more
+#define MAX_DBG_MENU_INTERACTABLES 20                      // Change if you need more
+#define MAX_DBG_MENUS 3                                    // Change if you need more
 #define ITERACTABLE_INTERNAL_DATA_ALLOCATOR_SIZE (KiB * 5) // This size is arbitrary :)
 #define NO_INTERACTABLE_ACTIVE_VALUE -1
-
 
 // ====================== Debug menu visual constant values =====================================
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
@@ -32,7 +31,7 @@
 #define SLIDER_DOT_SIZE vec2_create(0.4f, 0.4f)
 #define SLIDER_BAR_COLOR vec4_create(0.3f, 0.3f, 0.3f, 1)
 #define SLIDER_DOT_COLOR vec4_create(1, 0, 0, 1)
-
+#define GREY_OUT_FACTOR 0.8f
 
 typedef struct QuadInstanceData
 {
@@ -43,37 +42,43 @@ typedef struct QuadInstanceData
 typedef enum InteractableType
 {
     INTERACTABLE_TYPE_BUTTON,
-	INTERACTABLE_TYPE_MENU_HANDLEBAR,
-	INTERACTABLE_TYPE_SLIDER,
+    INTERACTABLE_TYPE_TOGGLE_BUTTON,
+    INTERACTABLE_TYPE_MENU_HANDLEBAR,
+    INTERACTABLE_TYPE_SLIDER,
     INTERACTABLE_TYPE_NONE
 } InteractableType;
 
-#define INTERACTABLE_TYPE_COUNT 3
+#define INTERACTABLE_TYPE_COUNT 4
 
 // Interactable internal data for a button
 typedef struct ButtonInteractableData
 {
-    bool* pStateBool;	// Pointer to a bool that will store whether the button is currently being held down or not.
-    bool* pSignalBool;	// Pointer to a bool that will be set to true by the debug ui whenever the button is pressed (pressed = clicked on and let go by the player).
+    bool* pStateBool;  // Pointer to a bool that will store whether the button is currently being held down or not.
+    bool* pSignalBool; // Pointer to a bool that will be set to true by the debug ui whenever the button is pressed (pressed = clicked on and let go by the player).
 } ButtonInteractableData;
+
+// Interactable internal data for a toggle button
+typedef struct ToggleButtonInteractableData
+{
+    bool* pStateBool;  // Pointer to a bool that will store whether the button is currently being held down or not.
+} ToggleButtonInteractableData;
 
 // Interactable internal data for the menu handlebar
 typedef struct MenuHandlebarInteractableData
 {
-	vec4 mouseStartWorldPosition;	// Position of the mouse when it first clicked on the handlebar to move it.
-	vec2 menuStartPosition;			// Position of the menu when the player first clicked on the handlebar to move it.
+    vec4 mouseStartWorldPosition; // Position of the mouse when it first clicked on the handlebar to move it.
+    vec2 menuStartPosition;       // Position of the menu when the player first clicked on the handlebar to move it.
 } MenuHandlebarInteractableData;
 
 // Interactable internal data for the slider
 typedef struct SliderInteractableData
 {
-	f32* pSliderValue;			// Pointer to a float that stores the value of the slider for the client to read out.
-	f32 minValue;				// Minimum value of the slider.
-	f32 maxValue;				// Maximum value of the slider.
-	f32 valueRange;				// Max value - Min value. Used for calculating the position of the slider dot.
-	f32 sliderDotHeight;		// y element of the slider dot position. Used for recalculating the dot transform after repositioning it.
+    f32* pSliderValue;   // Pointer to a float that stores the value of the slider for the client to read out.
+    f32 minValue;        // Minimum value of the slider.
+    f32 maxValue;        // Maximum value of the slider.
+    f32 valueRange;      // Max value - Min value. Used for calculating the position of the slider dot.
+    f32 sliderDotHeight; // y element of the slider dot position. Used for recalculating the dot transform after repositioning it.
 } SliderInteractableData;
-
 
 typedef struct InteractableData
 {
@@ -97,8 +102,8 @@ typedef struct DebugMenu
     u32 maxQuads;                         // Max amount of quads
     u32 quadCount;                        // Current amount of quads
     u32 interactablesCount;               // Amount of buttons, sliders or other elements in the menu.
-	f32 nextElementYOffset;				  // Y offset that the next element needs to have to not overlap with everything else in the menu.
-	bool active;
+    f32 nextElementYOffset;               // Y offset that the next element needs to have to not overlap with everything else in the menu.
+    bool active;
 } DebugMenu;
 
 DEFINE_DARRAY_TYPE_REF(DebugMenu);
@@ -106,7 +111,7 @@ DEFINE_DARRAY_TYPE_REF(DebugMenu);
 // Data about the state of the Debug ui system, only one instance of this struct should exist.
 typedef struct DebugUIState
 {
-    DebugMenuRefDarray* debugMenuDarray;                  // Dynamic array with all the debug menu instances that exist
+    DebugMenuRefDarray* debugMenuDarray;          // Dynamic array with all the debug menu instances that exist
     MeshData* quadMesh;                           // Mesh with the data to make quad instances.
     mat4 uiProjView;                              // Projection and view matrix for all debug menu's
     mat4 inverseProjView;                         // Inverted proj view matrix.
@@ -121,6 +126,10 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text);
 void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+
+void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleToggleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
 void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
@@ -168,12 +177,12 @@ bool InitializeDebugUI()
     shaderCreateInfo.vertexShaderName = "roundedQuad";
     shaderCreateInfo.fragmentShaderName = "roundedQuad";
     shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 3;
-    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;	// Position
-    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;	// Normal
-    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;	// TexCoord
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3; // Position
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3; // Normal
+    shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2; // TexCoord
     shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 2;
-    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_MAT4;	// Model Matrix
-    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC4;	// Color
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[0] = VERTEX_ATTRIBUTE_TYPE_MAT4; // Model Matrix
+    shaderCreateInfo.vertexBufferLayout.perInstanceAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC4; // Color
 
     ShaderCreate("roundedQuad", &shaderCreateInfo);
 
@@ -216,8 +225,8 @@ void UpdateDebugUI()
     {
         DebugMenu* menu = state->debugMenuDarray->data[i];
 
-		if (!menu->active)
-			continue;
+        if (!menu->active)
+            continue;
 
         // If a button or slider is being interacted with already
         if (menu->activeInteractableIndex != NO_INTERACTABLE_ACTIVE_VALUE)
@@ -225,7 +234,7 @@ void UpdateDebugUI()
             // If the user let go of their mouse button then interaction end will be called for the active interactable.
             if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
             {
-                void (*interaction_end_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionEnd, HandleMenuHandlebarInteractionEnd, HandleSliderInteractionEnd};
+                void (*interaction_end_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionEnd, HandleToggleButtonInteractionEnd, HandleMenuHandlebarInteractionEnd, HandleSliderInteractionEnd};
 
                 GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractableIndex].interactableType < INTERACTABLE_TYPE_COUNT);
 
@@ -236,7 +245,7 @@ void UpdateDebugUI()
             }
             else // If the user is still holding the mouse down, give the interaction update call to the active interactable.
             {
-                void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionUpdate, HandleMenuHandlebarInteractionUpdate, HandleSliderInteractionUpdate};
+                void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionUpdate, HandleToggleButtonInteractionUpdate, HandleMenuHandlebarInteractionUpdate, HandleSliderInteractionUpdate};
 
                 GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractableIndex].interactableType < INTERACTABLE_TYPE_COUNT);
 
@@ -244,8 +253,8 @@ void UpdateDebugUI()
                 (*interaction_update_func_ptr_arr[menu->interactablesArray[menu->activeInteractableIndex].interactableType])(menu, &menu->interactablesArray[menu->activeInteractableIndex], mouseWorldPos);
             }
 
-			// Breaking out of the menu loop so that only one menu can be interacted with at a time
-			break;
+            // Breaking out of the menu loop so that only one menu can be interacted with at a time
+            break;
         }
         // If NO interactable in this menu is being interacted with and the mouse button was pressed.
         else if (GetButtonDown(BUTTON_LEFTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_LEFTMOUSEBTN))
@@ -257,8 +266,8 @@ void UpdateDebugUI()
             // If the mouse is in this menu, loop through all the elements in this menu to see which one needs to be interacted with.
             if (mouseInMenu)
             {
-				// Gets set to true if an element is found to be interacted with so we can break out of the menu loop
-				bool elementInteractedWith = false;
+                // Gets set to true if an element is found to be interacted with so we can break out of the menu loop
+                bool elementInteractedWith = false;
 
                 for (int j = 0; j < menu->interactablesCount; j++)
                 {
@@ -266,7 +275,7 @@ void UpdateDebugUI()
                     if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
                     {
                         // Array of all interaction start functions
-                        void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionStart, HandleMenuHandlebarInteractionStart, HandleSliderInteractionStart};
+                        void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionStart, HandleToggleButtonInteractionStart, HandleMenuHandlebarInteractionStart, HandleSliderInteractionStart};
 
                         GRASSERT_DEBUG(menu->interactablesArray[j].interactableType < INTERACTABLE_TYPE_COUNT);
 
@@ -274,14 +283,14 @@ void UpdateDebugUI()
                         (*interaction_start_func_ptr_arr[menu->interactablesArray[j].interactableType])(menu, &menu->interactablesArray[j], mouseWorldPos);
 
                         menu->activeInteractableIndex = j; // Here j is the index of the interactable that is now being interacted with.
-						elementInteractedWith = true;
+                        elementInteractedWith = true;
                         break;
                     }
                 }
 
-				// Breaking out of the menu loop if an element was clicked so that only one menu can be interacted with at a time
-				if (elementInteractedWith)
-					break;
+                // Breaking out of the menu loop if an element was clicked so that only one menu can be interacted with at a time
+                if (elementInteractedWith)
+                    break;
             }
         }
     }
@@ -289,85 +298,85 @@ void UpdateDebugUI()
 
 DebugMenu* DebugUICreateMenu()
 {
-	// Allocating the DebugMenu struct
+    // Allocating the DebugMenu struct
     DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu), MEM_TAG_RENDERER_SUBSYS);
 
-	menu->active = true;
+    menu->active = true;
 
-	// Positioning the menu
+    // Positioning the menu
     menu->position = MENU_START_POSITION;
     menu->size = MENU_START_SIZE;
-	menu->nextElementYOffset = MENU_ELEMENTS_OFFSET;	// Making sure that the first element that gets added to the menu has the correct offset from the edge of the menu.
-	
-	// Creating an instanced vertex buffer for all the quads that will be rendered in the menu.
+    menu->nextElementYOffset = MENU_ELEMENTS_OFFSET; // Making sure that the first element that gets added to the menu has the correct offset from the edge of the menu.
+
+    // Creating an instanced vertex buffer for all the quads that will be rendered in the menu.
     menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
     menu->maxQuads = MAX_DBG_MENU_QUADS;
     menu->quadCount = 0;
     menu->menuElementMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
 
-	// Creating a quad for the menu background
-	menu->quadsInstanceData[menu->quadCount].transform = mat4_mul_mat4(mat4_3Dtranslate(vec3_create(0, 0, -0.5f)), mat4_2Dscale(menu->size));
+    // Creating a quad for the menu background
+    menu->quadsInstanceData[menu->quadCount].transform = mat4_mul_mat4(mat4_3Dtranslate(vec3_create(0, 0, -0.5f)), mat4_2Dscale(menu->size));
     menu->quadsInstanceData[menu->quadCount].color = MENU_BACKGROUND_COLOR;
     menu->quadCount++;
-	
-	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+
+    GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
     menu->quadsInstancedVB = VertexBufferCreate(menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
 
-	// Putting the menu struct in the menu d array
+    // Putting the menu struct in the menu d array
     DebugMenuRefDarrayPushback(state->debugMenuDarray, &menu);
     GRASSERT_DEBUG(state->debugMenuDarray->size <= MAX_DBG_MENUS);
 
-	// Creating an array for keeping track of all the interactable elements in the menu
+    // Creating an array for keeping track of all the interactable elements in the menu
     menu->interactablesArray = Alloc(GetGlobalAllocator(), sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES, MEM_TAG_RENDERER_SUBSYS);
-	MemoryZero(menu->interactablesArray, sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES);
+    MemoryZero(menu->interactablesArray, sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES);
     menu->interactablesCount = 0;
     menu->activeInteractableIndex = NO_INTERACTABLE_ACTIVE_VALUE;
 
-	// Adding the menu handlebar
-	DebugUIAddMenuHandlebar(menu, "placeholder text (TODO: make user adjustable)");
+    // Adding the menu handlebar
+    DebugUIAddMenuHandlebar(menu, "placeholder text (TODO: make user adjustable)");
 
     return menu;
 }
 
 void DebugUIDestroyMenu(DebugMenu* menu)
 {
-	// Destroying graphics resources
-	VertexBufferDestroy(menu->quadsInstancedVB);
-	MaterialDestroy(menu->menuElementMaterial);
+    // Destroying graphics resources
+    VertexBufferDestroy(menu->quadsInstancedVB);
+    MaterialDestroy(menu->menuElementMaterial);
 
-	// Freeing simple allocations
-	Free(GetGlobalAllocator(), menu->quadsInstanceData);
+    // Freeing simple allocations
+    Free(GetGlobalAllocator(), menu->quadsInstanceData);
 
-	// Freeing interactables
-	for (int i = 0; i < MAX_DBG_MENU_INTERACTABLES; i++)
-	{
-		if (menu->interactablesArray[i].internalData)
-			Free(state->interactableInternalDataAllocator, menu->interactablesArray[i].internalData);
-	}
-	Free(GetGlobalAllocator(), menu->interactablesArray);
+    // Freeing interactables
+    for (int i = 0; i < MAX_DBG_MENU_INTERACTABLES; i++)
+    {
+        if (menu->interactablesArray[i].internalData)
+            Free(state->interactableInternalDataAllocator, menu->interactablesArray[i].internalData);
+    }
+    Free(GetGlobalAllocator(), menu->interactablesArray);
 
-	// remove the menu from the debugMenuArray and remove the menu quad from the quads darray
-	for (int i = 0; i < MAX_DBG_MENUS; i++)
-	{
-		if (state->debugMenuDarray->data[i] == menu)
-		{
-			// Removing the menu from the debug menu darray
-			DarrayPopAt(state->debugMenuDarray, i);
-			break;
-		}
-	}
+    // remove the menu from the debugMenuArray and remove the menu quad from the quads darray
+    for (int i = 0; i < MAX_DBG_MENUS; i++)
+    {
+        if (state->debugMenuDarray->data[i] == menu)
+        {
+            // Removing the menu from the debug menu darray
+            DarrayPopAt(state->debugMenuDarray, i);
+            break;
+        }
+    }
 
-	// Freeing the menu itself
-	Free(GetGlobalAllocator(), menu);
+    // Freeing the menu itself
+    Free(GetGlobalAllocator(), menu);
 }
 
 void DebugUIRenderMenu(DebugMenu* menu)
 {
-	if (!menu->active)
-		return;
+    if (!menu->active)
+        return;
 
-	// Z for the view translation is 0.5f so that menu elements are rendered above the menu itself
+    // Z for the view translation is 0.5f so that menu elements are rendered above the menu itself
     mat4 menuElementsView = mat4_mul_mat4(state->uiProjView, mat4_3Dtranslate(vec3_create(menu->position.x, menu->position.y, 0.5f)));
     MaterialUpdateProperty(menu->menuElementMaterial, "menuView", &menuElementsView);
     MaterialBind(menu->menuElementMaterial);
@@ -379,28 +388,28 @@ void DebugUIRenderMenu(DebugMenu* menu)
 
 void DebugUIMenuSetActive(DebugMenu* menu, bool active)
 {
-	menu->active = active;
+    menu->active = active;
 }
 
 static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 {
-	vec2 handlebarPosition = vec2_create(0, menu->size.y - HANDLEBAR_VERTICAL_SIZE);
-	vec2 handlebarSize = vec2_create(menu->size.x, HANDLEBAR_VERTICAL_SIZE);
-	mat4 handlebarTransform = mat4_mul_mat4(mat4_2Dtranslate(handlebarPosition), mat4_2Dscale(handlebarSize));
-	menu->quadsInstanceData[menu->quadCount].transform = handlebarTransform;
+    vec2 handlebarPosition = vec2_create(0, menu->size.y - HANDLEBAR_VERTICAL_SIZE);
+    vec2 handlebarSize = vec2_create(menu->size.x, HANDLEBAR_VERTICAL_SIZE);
+    mat4 handlebarTransform = mat4_mul_mat4(mat4_2Dtranslate(handlebarPosition), mat4_2Dscale(handlebarSize));
+    menu->quadsInstanceData[menu->quadCount].transform = handlebarTransform;
     menu->quadsInstanceData[menu->quadCount].color = HANDLEBAR_COLOR;
     menu->quadCount++;
-	
-	menu->nextElementYOffset += HANDLEBAR_VERTICAL_SIZE;
 
-	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+    menu->nextElementYOffset += HANDLEBAR_VERTICAL_SIZE;
 
-	VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+    GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
-	MenuHandlebarInteractableData* handlebarData = Alloc(state->interactableInternalDataAllocator, sizeof(*handlebarData), MEM_TAG_RENDERER_SUBSYS);
-	handlebarData->mouseStartWorldPosition = vec4_create(0, 0, 0, 0);
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
-	menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1; // Minus one because this function added one quad that belongs to the handlebar. 
+    MenuHandlebarInteractableData* handlebarData = Alloc(state->interactableInternalDataAllocator, sizeof(*handlebarData), MEM_TAG_RENDERER_SUBSYS);
+    handlebarData->mouseStartWorldPosition = vec4_create(0, 0, 0, 0);
+
+    menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1; // Minus one because this function added one quad that belongs to the handlebar.
     menu->interactablesArray[menu->interactablesCount].quadCount = 1;
     menu->interactablesArray[menu->interactablesCount].position = handlebarPosition;
     menu->interactablesArray[menu->interactablesCount].size = handlebarSize;
@@ -413,19 +422,19 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 
 void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool* pSignalBool)
 {
-	// Allocating internal button data and saving the pointers to the state and signal bools
+    // Allocating internal button data and saving the pointers to the state and signal bools
     ButtonInteractableData* buttonData = Alloc(state->interactableInternalDataAllocator, sizeof(*buttonData), MEM_TAG_RENDERER_SUBSYS);
     buttonData->pStateBool = pStateBool;
     buttonData->pSignalBool = pSignalBool;
 
-	menu->nextElementYOffset += BUTTON_SIZE.y;
+    menu->nextElementYOffset += BUTTON_SIZE.y;
     vec2 buttonPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset);
     vec2 buttonSize = BUTTON_SIZE;
     mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
     menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
     menu->quadCount++;
-	menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
+    menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -442,41 +451,76 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
     GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
 }
 
+void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
+{
+	GRASSERT_DEBUG(pStateBool);
+
+	// Allocating internal button data and saving the pointers to the state bool
+    ToggleButtonInteractableData* buttonData = Alloc(state->interactableInternalDataAllocator, sizeof(*buttonData), MEM_TAG_RENDERER_SUBSYS);
+    buttonData->pStateBool = pStateBool;
+
+    menu->nextElementYOffset += BUTTON_SIZE.y;
+    vec2 buttonPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset);
+    vec2 buttonSize = BUTTON_SIZE;
+    mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
+    menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
+	if (*pStateBool)
+	    menu->quadsInstanceData[menu->quadCount].color = BUTTON_PRESSED_COLOR;
+	else 
+		menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
+    menu->quadCount++;
+    menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
+
+    GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1; // Minus one because this function added one quad that belongs to the button.
+    menu->interactablesArray[menu->interactablesCount].quadCount = 1;
+    menu->interactablesArray[menu->interactablesCount].position = buttonPosition;
+    menu->interactablesArray[menu->interactablesCount].size = buttonSize;
+    menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_TOGGLE_BUTTON;
+    menu->interactablesArray[menu->interactablesCount].internalData = buttonData;
+
+    menu->interactablesCount++;
+    GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
+}
+
 void DebugUIAddSlider(DebugMenu* menu, const char* text, f32 minValue, f32 maxValue, f32* pSliderValue)
 {
-	// Allocating internal slider data and saving the pointer to the slider value
+    // Allocating internal slider data and saving the pointer to the slider value
     SliderInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
     sliderData->pSliderValue = pSliderValue;
-	sliderData->minValue = minValue;
-	sliderData->maxValue = maxValue;
-	sliderData->valueRange = maxValue - minValue;
+    sliderData->minValue = minValue;
+    sliderData->maxValue = maxValue;
+    sliderData->valueRange = maxValue - minValue;
 
-	// Setting the float at pSliderValue to minValue if it falls outside of min and max value, this value will be the start value of the slider and gets used to position the slider correctly.
-	if (*pSliderValue < minValue || *pSliderValue > maxValue)
-		*pSliderValue = minValue;
+    // Setting the float at pSliderValue to minValue if it falls outside of min and max value, this value will be the start value of the slider and gets used to position the slider correctly.
+    if (*pSliderValue < minValue || *pSliderValue > maxValue)
+        *pSliderValue = minValue;
 
-	// Percentage of how much of the slider is filled out.
-	f32 sliderProgress = (*pSliderValue - minValue) / sliderData->valueRange;
+    // Percentage of how much of the slider is filled out.
+    f32 sliderProgress = (*pSliderValue - minValue) / sliderData->valueRange;
 
-	// Adding a quad for the slider bar and a quad for the slider dot.
-	menu->nextElementYOffset += SLIDER_DOT_SIZE.y;
-	vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->size.y - menu->nextElementYOffset);
-	vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-	vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4));// Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
+    // Adding a quad for the slider bar and a quad for the slider dot.
+    menu->nextElementYOffset += SLIDER_DOT_SIZE.y;
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->size.y - menu->nextElementYOffset);
+    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
+    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
     vec2 sliderBarSize = SLIDER_BAR_SIZE;
     mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-	vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->size.y - menu->nextElementYOffset, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
-	vec2 sliderDotSize = SLIDER_DOT_SIZE;
-	mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
-	menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->size.y - menu->nextElementYOffset, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
     menu->quadCount++;
-	menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
+    menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
 
-	sliderData->sliderDotHeight	= sliderDotPosition.y;
+    sliderData->sliderDotHeight = sliderDotPosition.y;
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -506,8 +550,8 @@ void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactabl
 
     // Set the state of the button to being pressed
     ButtonInteractableData* buttonData = interactableData->internalData;
-	if (buttonData->pStateBool)
-    	*buttonData->pStateBool = true;
+    if (buttonData->pStateBool)
+        *buttonData->pStateBool = true;
 }
 
 void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
@@ -520,115 +564,151 @@ void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableD
     menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
-	// Set the state of the button to not being pressed
+    // Set the state of the button to not being pressed
     ButtonInteractableData* buttonData = interactableData->internalData;
-	if (buttonData->pStateBool)
-    	*buttonData->pStateBool = false;
+    if (buttonData->pStateBool)
+        *buttonData->pStateBool = false;
 
-	// If the player was still hovering over the button when they released it send a signal that the button was pressed.
+    // If the player was still hovering over the button when they released it send a signal that the button was pressed.
     if (buttonData->pSignalBool && PointInRect(vec2_add_vec2(interactableData->position, menu->position), interactableData->size, vec4_xy(mouseWorldPosition)))
     {
-		*buttonData->pSignalBool = true;
+        *buttonData->pSignalBool = true;
     }
+}
+
+/// ============================================ Toggle Button
+void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    ToggleButtonInteractableData* buttonData = interactableData->internalData;
+
+    // Set the button to the pressed color
+	if (buttonData->pStateBool)
+		menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_PRESSED_COLOR, GREY_OUT_FACTOR);
+	else
+		menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_BASIC_COLOR, GREY_OUT_FACTOR);
+
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+}
+
+void HandleToggleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+}
+
+void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    ToggleButtonInteractableData* buttonData = interactableData->internalData;
+
+	// If the player was still hovering over the button when they released it toggle it's state.
+    if (buttonData->pStateBool && PointInRect(vec2_add_vec2(interactableData->position, menu->position), interactableData->size, vec4_xy(mouseWorldPosition)))
+    {
+        *buttonData->pStateBool = !*buttonData->pStateBool;
+    }
+
+	// Changing the color of the button back to the non-pressed color
+    if (buttonData->pStateBool)
+		menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_PRESSED_COLOR;
+	else
+		menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
+
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 }
 
 /// ============================================= Menu Handlebar
 void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-	// Set the handlebar to the pressed color
+    // Set the handlebar to the pressed color
     menu->quadsInstanceData[interactableData->firstQuad].color = HANDLEBAR_PRESSED_COLOR;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
     // Set the position of the mouse when the user first clicked on the handlebar
     MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
-	handlebarData->mouseStartWorldPosition = mouseWorldPosition;
-	handlebarData->menuStartPosition = menu->position;
+    handlebarData->mouseStartWorldPosition = mouseWorldPosition;
+    handlebarData->menuStartPosition = menu->position;
 }
 
 void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-	// Moving the menu based on how the mouse has moved
-	MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
-	vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
-	menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
+    // Moving the menu based on how the mouse has moved
+    MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
+    vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
+    menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
 }
 
 void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-	// Changing the color of the handlebar back to the non-pressed color
+    // Changing the color of the handlebar back to the non-pressed color
     menu->quadsInstanceData[interactableData->firstQuad].color = HANDLEBAR_COLOR;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
-	// Moving the menu based on how the mouse has moved
-	MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
-	vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
-	menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
+    // Moving the menu based on how the mouse has moved
+    MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
+    vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
+    menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
 }
-
 
 /// ============================================= Slider
 void HandleSliderInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-	SliderInteractableData* sliderData = interactableData->internalData;
+    SliderInteractableData* sliderData = interactableData->internalData;
 
-	// Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-	f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET/*this represents the start of the slider*/);
-	if (mouseSliderPosition > SLIDER_BAR_SIZE.x/*this represents the length of the slider*/)
-		mouseSliderPosition = SLIDER_BAR_SIZE.x;
-	if (mouseSliderPosition < 0)
-		mouseSliderPosition = 0;
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
 
-	vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
-	vec2 sliderDotSize = SLIDER_DOT_SIZE;
-	mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
-	menu->quadsInstanceData[interactableData->firstQuad + 1/*indexing into the dot quad*/].transform = sliderDotTransform;
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
-	// Updating the slider value for the client.
-	mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
-	*sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
+    // Updating the slider value for the client.
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    *sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
 }
 
 void HandleSliderInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-	SliderInteractableData* sliderData = interactableData->internalData;
+    SliderInteractableData* sliderData = interactableData->internalData;
 
-	// Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-	f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET/*this represents the start of the slider*/);
-	if (mouseSliderPosition > SLIDER_BAR_SIZE.x/*this represents the length of the slider*/)
-		mouseSliderPosition = SLIDER_BAR_SIZE.x;
-	if (mouseSliderPosition < 0)
-		mouseSliderPosition = 0;
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
 
-	vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
-	vec2 sliderDotSize = SLIDER_DOT_SIZE;
-	mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
-	menu->quadsInstanceData[interactableData->firstQuad + 1/*indexing into the dot quad*/].transform = sliderDotTransform;
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
-	// Updating the slider value for the client.
-	mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
-	*sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
+    // Updating the slider value for the client.
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    *sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
 }
 
 void HandleSliderInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-	SliderInteractableData* sliderData = interactableData->internalData;
+    SliderInteractableData* sliderData = interactableData->internalData;
 
-	// Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-	f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET/*this represents the start of the slider*/);
-	if (mouseSliderPosition > SLIDER_BAR_SIZE.x/*this represents the length of the slider*/)
-		mouseSliderPosition = SLIDER_BAR_SIZE.x;
-	if (mouseSliderPosition < 0)
-		mouseSliderPosition = 0;
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
 
-	vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
-	vec2 sliderDotSize = SLIDER_DOT_SIZE;
-	mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
-	menu->quadsInstanceData[interactableData->firstQuad + 1/*indexing into the dot quad*/].transform = sliderDotTransform;
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
-	// Updating the slider value for the client.
-	mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
-	*sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
+    // Updating the slider value for the client.
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    *sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
 }
