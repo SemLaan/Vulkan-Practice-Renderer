@@ -25,7 +25,8 @@ DEFINE_DARRAY_TYPE_REF(DebugMenu);
 
 typedef struct ShaderParameters
 {
-	float normalEdgeThreshold;
+	f32 normalEdgeThreshold;
+	bool renderMarchingCubesMesh;
 } ShaderParameters;
 
 typedef struct GameRenderingState
@@ -177,6 +178,7 @@ void GameRenderingInit()
 	renderingState->shaderParamDebugMenu = DebugUICreateMenu();
 	RegisterDebugMenu(renderingState->shaderParamDebugMenu);
 	DebugUIAddSlider(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
+	DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
 
     MCGenerateDensityMap();
     MCGenerateMesh();
@@ -222,8 +224,11 @@ void GameRenderingRender()
 	// ================== Rendering main scene to screen
     RenderTargetStartRendering(GetMainRenderTarget());
 
-	MaterialBind(renderingState->marchingCubesMaterial);
-    //MCRenderWorld();
+	if (renderingState->shaderParameters.renderMarchingCubesMesh)
+	{
+		MaterialBind(renderingState->marchingCubesMaterial);
+		MCRenderWorld();
+	}
 
 	// TODO: remove this test
 	MaterialBind(renderingState->outlineMaterial);
