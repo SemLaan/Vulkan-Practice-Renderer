@@ -39,6 +39,12 @@ void DebugUIMenuSetActive(DebugMenu* menu, bool active);
 //  again the same frame otherwise new presses won't be signalled (releasing the button while still hovering over it counts as a press). (Can be nullptr if not needed)
 void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool* pSignalBool);
 
+/// @brief Adds a toggle button to the bottom of the Debug UI menu with some text.
+/// @param menu Pointer to the menu that the button should be added to.
+/// @param text Text that should be displayed in the button.
+/// @param pStateBool Pointer to a bool that will hold the state of the button
+void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool);
+
 /// @brief Adds a slider to the bottom of the Debug UI menu with some text.
 /// @param menu Pointer to the menu that the button should be added to.
 /// @param text Text that should be displayed in the button.
