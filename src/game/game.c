@@ -18,8 +18,11 @@ void GameInit()
 {
     gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
 
+	gameState->frameArena = ArenaCreate(GetGlobalAllocator(), MiB * 5);
 	GameRenderingInit();
 	PlayerControllerInit();
+
+	ArenaClear(&gameState->frameArena);
 
     StartOrResetTimer(&gameState->timer);
 }
@@ -29,6 +32,8 @@ void GameShutdown()
 	PlayerControllerShutdown();
 	GameRenderingShutdown();
 
+	ArenaClear(&gameState->frameArena);
+	ArenaDestroy(&gameState->frameArena, GetGlobalAllocator());
     Free(GetGlobalAllocator(), gameState);
 }
 
@@ -44,4 +49,6 @@ void GameUpdateAndRender()
 
 	PlayerControllerUpdate();
 	GameRenderingRender();
+
+	ArenaClear(&gameState->frameArena);
 }
