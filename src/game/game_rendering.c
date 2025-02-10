@@ -200,6 +200,7 @@ void GameRenderingInit()
         u32 densityMapValueCount = world->densityMapWidth * world->densityMapHeight * world->densityMapDepth;
         world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount, MEM_TAG_TEST);
         DensityFuncBezierCurveHole(&world->terrainSeed, nullptr, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+		BlurDensityMap(3, 3, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 		world->marchingCubesMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
     }
 
@@ -338,5 +339,6 @@ void RegenerateMarchingCubesMesh()
 {
 	World* world = &renderingState->world;
 	DensityFuncBezierCurveHole(&world->terrainSeed, nullptr, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+	BlurDensityMap(3, 3, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 	MarchingCubesRegenerateMesh(&world->marchingCubesMesh, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 }

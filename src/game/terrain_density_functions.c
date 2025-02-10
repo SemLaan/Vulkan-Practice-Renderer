@@ -190,10 +190,12 @@ void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 
     }
 }
 
-void BlurDensityMap(u32 iterations, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+void BlurDensityMap(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
 {
 	if (iterations == 0)
 		return;
+
+	GRASSERT_DEBUG(kernelSize & 1);
 
 	f32* originalDensityMap = densityMap;
 
@@ -202,10 +204,9 @@ void BlurDensityMap(u32 iterations, f32* densityMap, u32 mapWidth, u32 mapHeight
 
 	// Bluring the density map
 	// Generating the kernel
-    u32 kernelSize = 3;
     u32 kernelSizeMinusOne = kernelSize - 1;
     u32 kernelSizeSquared = kernelSize * kernelSize;
-    u32 kernelSizeCubed = kernelSize * kernelSize * kernelSize;
+    u32 kernelSizeCubed = kernelSizeSquared * kernelSize;
 
     f32* kernel = ArenaAlloc(&gameState->frameArena, kernelSizeCubed * sizeof(*kernel));
     f32 kernelTotal = 0;
@@ -236,6 +237,7 @@ void BlurDensityMap(u32 iterations, f32* densityMap, u32 mapWidth, u32 mapHeight
 	// Convolving the density map using the kernel to blur the density map
     f32* nonBlurredDensityMap = densityMap;
     densityMap = ArenaAlloc(&gameState->frameArena, densityMapValueCount * sizeof(*densityMap));
+	MemoryCopy(densityMap, nonBlurredDensityMap, densityMapValueCount * sizeof(*densityMap));
 
     // Looping over every kernel sized area in the density map
     for (u32 i = 0; i < iterations; i++)
@@ -255,7 +257,7 @@ void BlurDensityMap(u32 iterations, f32* densityMap, u32 mapWidth, u32 mapHeight
                         {
                             for (u32 kz = 0; kz < kernelSize; kz++)
                             {
-                                //                                        [                          x                          ]   [                    y                     ]   [       z        ]
+                                //                                        [                      x                      ]   [            y              ]   [       z        ]
                                 f32 preBlurDensity = nonBlurredDensityMap[(x + kx - padding) * densityMapHeightTimesDepth + (y + ky - padding) * mapDepth + (z + kz - padding)];
                                 sum += preBlurDensity * kernel[kx * kernelSizeSquared + ky * kernelSize + kz];
                             }
@@ -282,5 +284,8 @@ void BlurDensityMap(u32 iterations, f32* densityMap, u32 mapWidth, u32 mapHeight
 	{
 		MemoryCopy(originalDensityMap, densityMap, densityMapValueCount * sizeof(*densityMap));
 	}
+
+	// "Freeing" the kernel and temp density map because these allocations can be quite large
+	gameState->frameArena.arenaPointer = (void*)kernel;
 }
 
