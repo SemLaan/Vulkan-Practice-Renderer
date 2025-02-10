@@ -11,6 +11,7 @@ Arena ArenaCreate(Allocator* allocator, size_t size)
 	arena.memoryBlock = Alloc(allocator, size, MEM_TAG_TEST);
 	arena.arenaPointer = arena.memoryBlock;
 	arena.arenaCapacity = size;
+	return arena;
 }
 
 void ArenaDestroy(Arena* arena, Allocator* allocator)
@@ -22,8 +23,8 @@ void ArenaDestroy(Arena* arena, Allocator* allocator)
 void* ArenaAlloc(Arena* arena, size_t allocSize)
 {
 	GRASSERT_DEBUG(arena->memoryBlock);
-	void* allocation = ((size_t)arena->arenaPointer + DEFAULT_ALIGNMENT - 1) & ~(DEFAULT_ALIGNMENT - 1);
-	arena->arenaPointer = (size_t)allocation + allocSize;
+	void* allocation = (void*)(((size_t)arena->arenaPointer + DEFAULT_ALIGNMENT - 1) & ~(DEFAULT_ALIGNMENT - 1));
+	arena->arenaPointer = (void*)((size_t)allocation + allocSize);
 	GRASSERT((size_t)arena->memoryBlock + arena->arenaCapacity > (size_t)arena->arenaPointer);
 	return allocation;
 }
@@ -31,8 +32,8 @@ void* ArenaAlloc(Arena* arena, size_t allocSize)
 void* ArenaAlignedAlloc(Arena* arena, size_t allocSize, size_t allocAlignment)
 {
 	GRASSERT_DEBUG(arena->memoryBlock);
-	void* allocation = ((size_t)arena->arenaPointer + allocAlignment - 1) & ~(allocAlignment - 1);
-	arena->arenaPointer = (size_t)allocation + allocSize;
+	void* allocation = (void*)(((size_t)arena->arenaPointer + allocAlignment - 1) & ~(allocAlignment - 1));
+	arena->arenaPointer = (void*)((size_t)allocation + allocSize);
 	GRASSERT((size_t)arena->memoryBlock + arena->arenaCapacity > (size_t)arena->arenaPointer);
 	return allocation;
 }

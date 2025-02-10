@@ -7,6 +7,7 @@
 #include "renderer/render_target.h"
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
+#include "terrain_density_functions.h"
 
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
 #define NORMAL_SHADER_NAME "normal_shader"
@@ -20,26 +21,37 @@
 #define UI_NEAR_PLANE -1
 #define UI_FAR_PLANE 1
 #define UI_ORTHO_HEIGHT 10
+#define DENSITY_MAP_SIZE 100 // width, heigth and depth of the density map
 
 DEFINE_DARRAY_TYPE_REF(DebugMenu);
 
 typedef struct ShaderParameters
 {
-	f32 normalEdgeThreshold;
-	bool renderMarchingCubesMesh;
+    f32 normalEdgeThreshold;
+    bool renderMarchingCubesMesh;
 } ShaderParameters;
+
+typedef struct World
+{
+    f32* terrainDensityMap;
+    u32 densityMapWidth;
+    u32 densityMapHeight;
+    u32 densityMapDepth;
+    u32 terrainSeed;
+    MeshData marchingCubesMesh;
+} World;
 
 typedef struct GameRenderingState
 {
     // Debug menu's
     DebugMenuRefDarray* debugMenuDarray;
-	// Debug menu for adjusting shader parameters
-	DebugMenu* shaderParamDebugMenu;
+    // Debug menu for adjusting shader parameters
+    DebugMenu* shaderParamDebugMenu;
 
     // Materials
     Material marchingCubesMaterial;
     Material normalRenderingMaterial;
-	Material outlineMaterial;
+    Material outlineMaterial;
 
     // Render targets
     RenderTarget normalAndDepthRenderTarget;
@@ -48,8 +60,11 @@ typedef struct GameRenderingState
     Camera sceneCamera;
     Camera uiCamera;
 
-	// Shader params
-	ShaderParameters shaderParameters;
+    // World data (meshes and related data)
+    World world;
+
+    // Data controlled by debug menu's
+    ShaderParameters shaderParameters;
 
     // Text, THIS IS TEMPORARY, this needs to be changed once the text system is finished
     Text* textTest;
@@ -59,18 +74,18 @@ static GameRenderingState* renderingState = nullptr;
 
 static bool OnWindowResize(EventCode type, EventData data)
 {
-	// Recalculating projection matrices
+    // Recalculating projection matrices
     vec2i windowSize = GetPlatformWindowSize();
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
     renderingState->sceneCamera.projection = mat4_perspective(DEFAULT_FOV, windowAspectRatio, DEFAULT_NEAR_PLANE, DEFAULT_FAR_PLANE);
     renderingState->uiCamera.projection = mat4_orthographic(0, UI_ORTHO_HEIGHT * windowAspectRatio, 0, UI_ORTHO_HEIGHT, UI_NEAR_PLANE, UI_FAR_PLANE);
 
-	// Resizing framebuffer
-	RenderTargetDestroy(renderingState->normalAndDepthRenderTarget);
-	renderingState->normalAndDepthRenderTarget = RenderTargetCreate(windowSize.x, windowSize.y, RENDER_TARGET_USAGE_TEXTURE, RENDER_TARGET_USAGE_TEXTURE);
+    // Resizing framebuffer
+    RenderTargetDestroy(renderingState->normalAndDepthRenderTarget);
+    renderingState->normalAndDepthRenderTarget = RenderTargetCreate(windowSize.x, windowSize.y, RENDER_TARGET_USAGE_TEXTURE, RENDER_TARGET_USAGE_TEXTURE);
 
-	MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
-	MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+    MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+    MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
 
     return false;
 }
@@ -128,7 +143,7 @@ void GameRenderingInit()
         }
 
         {
-			ShaderCreateInfo shaderCreateInfo = {};
+            ShaderCreateInfo shaderCreateInfo = {};
             shaderCreateInfo.renderTargetColor = true;
             shaderCreateInfo.renderTargetDepth = true;
             shaderCreateInfo.renderTargetStencil = false;
@@ -142,8 +157,8 @@ void GameRenderingInit()
             ShaderCreate(NORMAL_SHADER_NAME, &shaderCreateInfo);
         }
 
-		{
-			ShaderCreateInfo shaderCreateInfo = {};
+        {
+            ShaderCreateInfo shaderCreateInfo = {};
             shaderCreateInfo.renderTargetColor = true;
             shaderCreateInfo.renderTargetDepth = false;
             shaderCreateInfo.renderTargetStencil = false;
@@ -162,7 +177,7 @@ void GameRenderingInit()
     {
         renderingState->marchingCubesMaterial = MaterialCreate(ShaderGetRef(MARCHING_CUBES_SHADER_NAME));
         renderingState->normalRenderingMaterial = MaterialCreate(ShaderGetRef(NORMAL_SHADER_NAME));
-		renderingState->outlineMaterial = MaterialCreate(ShaderGetRef(OUTLINE_SHADER_NAME));
+        renderingState->outlineMaterial = MaterialCreate(ShaderGetRef(OUTLINE_SHADER_NAME));
     }
 
     // Initializing material state
@@ -171,17 +186,28 @@ void GameRenderingInit()
         f32 roughness = 0;
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
-		MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
-		MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+        MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+        MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
     }
 
-	renderingState->shaderParamDebugMenu = DebugUICreateMenu();
-	RegisterDebugMenu(renderingState->shaderParamDebugMenu);
-	DebugUIAddSlider(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
-	DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
+    // Generating marching cubes terrain
+    {
+		World* world = &renderingState->world;
+        world->terrainSeed = 0;
+        world->densityMapWidth = DENSITY_MAP_SIZE;
+        world->densityMapHeight = DENSITY_MAP_SIZE;
+        world->densityMapDepth = DENSITY_MAP_SIZE;
+        u32 densityMapValueCount = world->densityMapWidth * world->densityMapHeight * world->densityMapDepth;
+        world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount, MEM_TAG_TEST);
+        DensityFuncBezierCurveHole(&world->terrainSeed, nullptr, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+		world->marchingCubesMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+    }
 
-    MCGenerateDensityMap();
-    MCGenerateMesh();
+    // Setting up debug ui's for shader parameters and TODO: terrain generation settings
+    renderingState->shaderParamDebugMenu = DebugUICreateMenu();
+    RegisterDebugMenu(renderingState->shaderParamDebugMenu);
+    DebugUIAddSlider(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
+    DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
 }
 
 void GameRenderingRender()
@@ -190,14 +216,15 @@ void GameRenderingRender()
     f32 roughness = 0;
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
-	f32 nearPlane = DEFAULT_NEAR_PLANE;
-	f32 farPlane = DEFAULT_FAR_PLANE;
-	vec2i windowSize = GetPlatformWindowSize();
-	MaterialUpdateProperty(renderingState->outlineMaterial, "zNear", &nearPlane);
-	MaterialUpdateProperty(renderingState->outlineMaterial, "zFar", &farPlane);
-	MaterialUpdateProperty(renderingState->outlineMaterial, "screenWidth", &windowSize.x);
-	MaterialUpdateProperty(renderingState->outlineMaterial, "screenHeight", &windowSize.y);
-	MaterialUpdateProperty(renderingState->outlineMaterial, "normalEdgeThreshold", &renderingState->shaderParameters.normalEdgeThreshold);
+    f32 nearPlane = DEFAULT_NEAR_PLANE;
+    f32 farPlane = DEFAULT_FAR_PLANE;
+    vec2i windowSize = GetPlatformWindowSize();
+    MaterialUpdateProperty(renderingState->outlineMaterial, "zNear", &nearPlane);
+    MaterialUpdateProperty(renderingState->outlineMaterial, "zFar", &farPlane);
+    MaterialUpdateProperty(renderingState->outlineMaterial, "screenWidth", &windowSize.x);
+    MaterialUpdateProperty(renderingState->outlineMaterial, "screenHeight", &windowSize.y);
+    MaterialUpdateProperty(renderingState->outlineMaterial, "normalEdgeThreshold", &renderingState->shaderParameters.normalEdgeThreshold);
+	mat4 identity = mat4_identity();
 
     // ================== Camera calculations
     CameraRecalculateViewAndViewProjection(&renderingState->sceneCamera);
@@ -217,23 +244,23 @@ void GameRenderingRender()
 
     // Rendering the marching cubes mesh
     MaterialBind(renderingState->normalRenderingMaterial);
-    MCRenderWorld();
+	Draw(1, &renderingState->world.marchingCubesMesh.vertexBuffer, renderingState->world.marchingCubesMesh.indexBuffer, &identity, 1);
 
-	RenderTargetStopRendering(renderingState->normalAndDepthRenderTarget);
+    RenderTargetStopRendering(renderingState->normalAndDepthRenderTarget);
 
-	// ================== Rendering main scene to screen
+    // ================== Rendering main scene to screen
     RenderTargetStartRendering(GetMainRenderTarget());
 
-	if (renderingState->shaderParameters.renderMarchingCubesMesh)
-	{
-		MaterialBind(renderingState->marchingCubesMaterial);
-		MCRenderWorld();
-	}
+    if (renderingState->shaderParameters.renderMarchingCubesMesh)
+    {
+        MaterialBind(renderingState->marchingCubesMaterial);
+		Draw(1, &renderingState->world.marchingCubesMesh.vertexBuffer, renderingState->world.marchingCubesMesh.indexBuffer, &identity, 1);
+    }
 
-	// TODO: remove this test
-	MaterialBind(renderingState->outlineMaterial);
-	MeshData* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
-	Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
+    // TODO: remove this test
+    MaterialBind(renderingState->outlineMaterial);
+    MeshData* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
+    Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
 
     // Rendering text as a demo of the text system
     mat4 bezierModel = mat4_2Dtranslate(vec2_create(0, 4));
@@ -258,13 +285,19 @@ void GameRenderingShutdown()
     UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
     // Destroying debug menu for shader params and darray for debug ui's
-	UnregisterDebugMenu(renderingState->shaderParamDebugMenu);
-	DebugUIDestroyMenu(renderingState->shaderParamDebugMenu);
+    UnregisterDebugMenu(renderingState->shaderParamDebugMenu);
+    DebugUIDestroyMenu(renderingState->shaderParamDebugMenu);
     DarrayDestroy(renderingState->debugMenuDarray);
 
-    MCDestroyMeshAndDensityMap();
+    // Destroying world data
+	{
+		World* world = &renderingState->world;
+		Free(GetGlobalAllocator(), world->terrainDensityMap);
+		VertexBufferDestroy(world->marchingCubesMesh.vertexBuffer);
+		IndexBufferDestroy(world->marchingCubesMesh.indexBuffer);
+	}
 
-	MaterialDestroy(renderingState->outlineMaterial);
+    MaterialDestroy(renderingState->outlineMaterial);
     MaterialDestroy(renderingState->normalRenderingMaterial);
     MaterialDestroy(renderingState->marchingCubesMaterial);
 
@@ -299,4 +332,11 @@ void UnregisterDebugMenu(DebugMenu* debugMenu)
             return;
         }
     }
+}
+
+void RegenerateMarchingCubesMesh()
+{
+	World* world = &renderingState->world;
+	DensityFuncBezierCurveHole(&world->terrainSeed, nullptr, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+	MarchingCubesRegenerateMesh(&world->marchingCubesMesh, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 }
