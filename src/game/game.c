@@ -18,7 +18,7 @@ void GameInit()
 {
     gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
 
-	gameState->frameArena = ArenaCreate(GetGlobalAllocator(), MiB * 5);
+	gameState->frameArena = ArenaCreate(GetGlobalAllocator(), MiB * 50);
 	GameRenderingInit();
 	PlayerControllerInit();
 
