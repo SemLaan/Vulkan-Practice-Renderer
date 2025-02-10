@@ -42,9 +42,7 @@ void GameUpdateAndRender()
     // =========================== Update ===================================
 	if (GetButtonDown(BUTTON_RIGHTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_RIGHTMOUSEBTN))
 	{
-		MCDestroyMeshAndDensityMap();
-		MCGenerateDensityMap();
-		MCGenerateMesh();
+		RegenerateMarchingCubesMesh();
 	}
 
 	PlayerControllerUpdate();

@@ -1,9 +1,6 @@
-#pragma once
-#include "containers/darray.h"
-#include "core/asserts.h"
-#include "core/meminc.h"
-#include "math/lin_alg.h"
-#include "math/random_utils.h"
+#include "terrain_density_functions.h"
+
+#include "game.h"
 
 // Indexes into a densityMap
 static inline f32* GetDensityValueRef(f32* densityMap, u32 mapHeightTimesDepth, u32 mapDepth, u32 x, u32 y, u32 z)
@@ -21,7 +18,8 @@ static inline f32 GetDensityValueRaw(f32* densityMap, u32 mapHeightTimesDepth, u
     return densityMap[x * mapHeightTimesDepth + y * mapDepth + z];
 }
 
-static inline void DensityFuncSphereHole(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+
+void DensityFuncSphereHole(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
 {
     u32 mapHeightTimesDepth = mapHeight * mapDepth;
 
@@ -58,9 +56,8 @@ static inline void DensityFuncSphereHole(f32* densityMap, u32 mapWidth, u32 mapH
     }
 }
 
-static u32 seed1 = 10;
 
-static inline void DensityFuncBezierCurveHole(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generationSettings, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
 {
     u32 mapHeightTimesDepth = mapHeight * mapDepth;
 
@@ -72,12 +69,12 @@ static inline void DensityFuncBezierCurveHole(f32* densityMap, u32 mapWidth, u32
 
     vec3 bezierCurvePoints[BEZIER_DEGREE_PLUS_ONE] = {};
 
-    bezierCurvePoints[0] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(&seed1), sphereRadius), sphereCenter);
-    bezierCurvePoints[BEZIER_DEGREE_PLUS_ONE - 1] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(&seed1), sphereRadius), sphereCenter);
+    bezierCurvePoints[0] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(seed), sphereRadius), sphereCenter);
+    bezierCurvePoints[BEZIER_DEGREE_PLUS_ONE - 1] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(seed), sphereRadius), sphereCenter);
 
     for (u32 i = 1; i < BEZIER_DEGREE_PLUS_ONE - 1; i++)
     {
-        bezierCurvePoints[i] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(&seed1), sphereRadius), sphereCenter);
+        bezierCurvePoints[i] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(seed), sphereRadius), sphereCenter);
     }
 
     f32 bezierRadius = 8;
@@ -144,7 +141,7 @@ static inline void DensityFuncBezierCurveHole(f32* densityMap, u32 mapWidth, u32
 }
 
 #define RANDOM_SPHERES_COUNT 1050
-static inline void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
 {
     u32 mapHeightTimesDepth = mapHeight * mapDepth;
 
@@ -192,3 +189,98 @@ static inline void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 m
         }
     }
 }
+
+void BlurDensityMap(u32 iterations, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+{
+	if (iterations == 0)
+		return;
+
+	f32* originalDensityMap = densityMap;
+
+	u32 densityMapHeightTimesDepth = mapHeight * mapDepth;
+    u32 densityMapValueCount = mapWidth * mapHeight * mapDepth;
+
+	// Bluring the density map
+	// Generating the kernel
+    u32 kernelSize = 3;
+    u32 kernelSizeMinusOne = kernelSize - 1;
+    u32 kernelSizeSquared = kernelSize * kernelSize;
+    u32 kernelSizeCubed = kernelSize * kernelSize * kernelSize;
+
+    f32* kernel = ArenaAlloc(&gameState->frameArena, kernelSizeCubed * sizeof(*kernel));
+    f32 kernelTotal = 0;
+
+    vec3 kernelCenter = vec3_from_float(kernelSizeMinusOne / 2);
+    f32 maximumEuclideanDistanceSquaredPlusOne = 1 + vec3_distance_squared(vec3_from_float(0), kernelCenter);
+
+    for (u32 x = 0; x < kernelSize; x++)
+    {
+        for (u32 y = 0; y < kernelSize; y++)
+        {
+            for (u32 z = 0; z < kernelSize; z++)
+            {
+                // ========= Kernel version one (kernel value is the maximum manhattan distance from the center of the kernel squared minus the manhattan distance of the current element from the center of the kernel squared)
+                // u32 value = 1 << ((x < kernelSizeMinusOne - x ? x : kernelSizeMinusOne - x) + (y < kernelSizeMinusOne - y ? y : kernelSizeMinusOne - y) + (z < kernelSizeMinusOne - z ? z : kernelSizeMinusOne - z));
+
+                // ========= Kernel version two (kernel value is one plus the maximum euclidean distance from the center of the kernel squared minus the euclidean distance of the current element from the center of the kernel squared)
+                f32 value = maximumEuclideanDistanceSquaredPlusOne - vec3_distance_squared(kernelCenter, vec3_create(x, y, z));
+
+                kernel[x * kernelSizeSquared + y * kernelSize + z] = value;
+                kernelTotal += value;
+            }
+        }
+    }
+
+    u32 padding = (kernelSize - 1) / 2;
+
+	// Convolving the density map using the kernel to blur the density map
+    f32* nonBlurredDensityMap = densityMap;
+    densityMap = ArenaAlloc(&gameState->frameArena, densityMapValueCount * sizeof(*densityMap));
+
+    // Looping over every kernel sized area in the density map
+    for (u32 i = 0; i < iterations; i++)
+    {
+        for (u32 x = padding; x < mapWidth - padding; x++)
+        {
+            for (u32 y = padding; y < mapHeight - padding; y++)
+            {
+                for (u32 z = padding; z < mapDepth - padding; z++)
+                {
+                    f32 sum = 0;
+
+                    // Looping over the kernel and multiplying each element of the kernel with its respective element of the kernel sized area in the density map
+                    for (u32 kx = 0; kx < kernelSize; kx++)
+                    {
+                        for (u32 ky = 0; ky < kernelSize; ky++)
+                        {
+                            for (u32 kz = 0; kz < kernelSize; kz++)
+                            {
+                                //                                        [                          x                          ]   [                    y                     ]   [       z        ]
+                                f32 preBlurDensity = nonBlurredDensityMap[(x + kx - padding) * densityMapHeightTimesDepth + (y + ky - padding) * mapDepth + (z + kz - padding)];
+                                sum += preBlurDensity * kernel[kx * kernelSizeSquared + ky * kernelSize + kz];
+                            }
+                        }
+                    }
+
+                    *GetDensityValueRef(densityMap, densityMapHeightTimesDepth, mapDepth, x, y, z) = sum / kernelTotal;
+                }
+            }
+        }
+
+        // Switching the nonBlurredDensityMap and the density map if there is another blur iteration
+		// The data in the densityMap (after the switch) doesn't have to be changed because it will be entirely overwritten and not read.
+		// Because during the blurring process only the nonBlurredDensity map gets read, which has just gone through a blur iteration.
+        if (i != iterations - 1)
+        {
+            f32* temp = nonBlurredDensityMap;
+            nonBlurredDensityMap = densityMap;
+            densityMap = temp;
+        }
+    }
+
+	if (originalDensityMap != densityMap)
+	{
+		MemoryCopy(originalDensityMap, densityMap, densityMapValueCount * sizeof(*densityMap));
+	}
+}
+
