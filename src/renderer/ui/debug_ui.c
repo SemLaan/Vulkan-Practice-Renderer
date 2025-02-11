@@ -9,6 +9,17 @@
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
 
+// STEPS TO ADD A NEW INTERACTABLE TYPE ==================================================================
+// Add it to the InteractableType enum
+// Add a struct named TypeInteractableData with the data that is important to that specific interactable type
+// Add the function prototypes for start, update and end: Handle*Type*Interaction#Start/Update/End#
+// Add the function definitions for these functions
+// Add these functions to the lists of function pointers in the UpdateDebugUI function (in the correct position, same position as it is in the enum)
+// Increase the INTERACTABLE_TYPE_COUNT define by one
+// Add a DebugUIAdd*Type* function declaration to the .h file
+// Create the definition for said function
+// Done!
+
 #define MAX_DBG_MENU_QUADS 100                             // Change if you need more
 #define MAX_DBG_MENU_INTERACTABLES 20                      // Change if you need more
 #define MAX_DBG_MENUS 3                                    // Change if you need more
@@ -44,7 +55,7 @@ typedef enum InteractableType
     INTERACTABLE_TYPE_BUTTON,
     INTERACTABLE_TYPE_TOGGLE_BUTTON,
     INTERACTABLE_TYPE_MENU_HANDLEBAR,
-    INTERACTABLE_TYPE_SLIDER,
+    INTERACTABLE_TYPE_SLIDER_FLOAT,
     INTERACTABLE_TYPE_NONE
 } InteractableType;
 
@@ -71,14 +82,14 @@ typedef struct MenuHandlebarInteractableData
 } MenuHandlebarInteractableData;
 
 // Interactable internal data for the slider
-typedef struct SliderInteractableData
+typedef struct SliderFloatInteractableData
 {
     f32* pSliderValue;   // Pointer to a float that stores the value of the slider for the client to read out.
     f32 minValue;        // Minimum value of the slider.
     f32 maxValue;        // Maximum value of the slider.
     f32 valueRange;      // Max value - Min value. Used for calculating the position of the slider dot.
     f32 sliderDotHeight; // y element of the slider dot position. Used for recalculating the dot transform after repositioning it.
-} SliderInteractableData;
+} SliderFloatInteractableData;
 
 typedef struct InteractableData
 {
@@ -135,9 +146,9 @@ void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* inte
 void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
-void HandleSliderInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
 static bool OnWindowResize(EventCode type, EventData data)
 {
@@ -213,6 +224,34 @@ void ShutdownDebugUI()
 
 void UpdateDebugUI()
 {
+	void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = 
+	{
+		HandleButtonInteractionStart, 
+		HandleToggleButtonInteractionStart, 
+		HandleMenuHandlebarInteractionStart, 
+		HandleSliderFloatInteractionStart,
+	};
+	GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_start_func_ptr_arr) / sizeof(*interaction_start_func_ptr_arr)))
+
+	void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = 
+	{
+		HandleButtonInteractionUpdate, 
+		HandleToggleButtonInteractionUpdate, 
+		HandleMenuHandlebarInteractionUpdate, 
+		HandleSliderFloatInteractionUpdate,
+	};
+	GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_update_func_ptr_arr) / sizeof(*interaction_update_func_ptr_arr)))
+
+	void (*interaction_end_func_ptr_arr[INTERACTABLE_TYPE_COUNT])(DebugMenu*, InteractableData*, vec4) = 
+	{
+		HandleButtonInteractionEnd, 
+		HandleToggleButtonInteractionEnd, 
+		HandleMenuHandlebarInteractionEnd, 
+		HandleSliderFloatInteractionEnd,
+	};
+	GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_end_func_ptr_arr) / sizeof(*interaction_end_func_ptr_arr)))
+
+
     // Getting the mouse position in world space.
     vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1); // A mouse position is 2d but we pad the z with 0 and w with 1, so that we can do matrix math
     vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
@@ -234,8 +273,6 @@ void UpdateDebugUI()
             // If the user let go of their mouse button then interaction end will be called for the active interactable.
             if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
             {
-                void (*interaction_end_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionEnd, HandleToggleButtonInteractionEnd, HandleMenuHandlebarInteractionEnd, HandleSliderInteractionEnd};
-
                 GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractableIndex].interactableType < INTERACTABLE_TYPE_COUNT);
 
                 // Calling the correct InteractionEnd function
@@ -245,8 +282,6 @@ void UpdateDebugUI()
             }
             else // If the user is still holding the mouse down, give the interaction update call to the active interactable.
             {
-                void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionUpdate, HandleToggleButtonInteractionUpdate, HandleMenuHandlebarInteractionUpdate, HandleSliderInteractionUpdate};
-
                 GRASSERT_DEBUG(menu->interactablesArray[menu->activeInteractableIndex].interactableType < INTERACTABLE_TYPE_COUNT);
 
                 // Calling the correct InteractionUpdate function
@@ -274,9 +309,6 @@ void UpdateDebugUI()
                     // If the mouse is on element j, handle the interaction start and set it as the active interactable.
                     if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
                     {
-                        // Array of all interaction start functions
-                        void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = {HandleButtonInteractionStart, HandleToggleButtonInteractionStart, HandleMenuHandlebarInteractionStart, HandleSliderInteractionStart};
-
                         GRASSERT_DEBUG(menu->interactablesArray[j].interactableType < INTERACTABLE_TYPE_COUNT);
 
                         // Calling the correct InteractionStart function
@@ -486,10 +518,10 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
     GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
 }
 
-void DebugUIAddSlider(DebugMenu* menu, const char* text, f32 minValue, f32 maxValue, f32* pSliderValue)
+void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 maxValue, f32* pSliderValue)
 {
     // Allocating internal slider data and saving the pointer to the slider value
-    SliderInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
+    SliderFloatInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
     sliderData->pSliderValue = pSliderValue;
     sliderData->minValue = minValue;
     sliderData->maxValue = maxValue;
@@ -530,7 +562,7 @@ void DebugUIAddSlider(DebugMenu* menu, const char* text, f32 minValue, f32 maxVa
     menu->interactablesArray[menu->interactablesCount].quadCount = 2;
     menu->interactablesArray[menu->interactablesCount].position = sliderTotalPosition;
     menu->interactablesArray[menu->interactablesCount].size = sliderTotalSize;
-    menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_SLIDER;
+    menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_SLIDER_FLOAT;
     menu->interactablesArray[menu->interactablesCount].internalData = sliderData;
 
     menu->interactablesCount++;
@@ -647,9 +679,9 @@ void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* intera
 }
 
 /// ============================================= Slider
-void HandleSliderInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-    SliderInteractableData* sliderData = interactableData->internalData;
+    SliderFloatInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
     f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
@@ -669,9 +701,9 @@ void HandleSliderInteractionStart(DebugMenu* menu, InteractableData* interactabl
     *sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
 }
 
-void HandleSliderInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-    SliderInteractableData* sliderData = interactableData->internalData;
+    SliderFloatInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
     f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
@@ -691,9 +723,9 @@ void HandleSliderInteractionUpdate(DebugMenu* menu, InteractableData* interactab
     *sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
 }
 
-void HandleSliderInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
-    SliderInteractableData* sliderData = interactableData->internalData;
+    SliderFloatInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
     f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
