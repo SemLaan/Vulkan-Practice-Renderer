@@ -81,14 +81,13 @@ typedef struct MenuHandlebarInteractableData
     vec2 menuStartPosition;       // Position of the menu when the player first clicked on the handlebar to move it.
 } MenuHandlebarInteractableData;
 
-// Interactable internal data for the slider
+// Interactable internal data for the slider float
 typedef struct SliderFloatInteractableData
 {
     f32* pSliderValue;   // Pointer to a float that stores the value of the slider for the client to read out.
     f32 minValue;        // Minimum value of the slider.
     f32 maxValue;        // Maximum value of the slider.
     f32 valueRange;      // Max value - Min value. Used for calculating the position of the slider dot.
-    f32 sliderDotHeight; // y element of the slider dot position. Used for recalculating the dot transform after repositioning it.
 } SliderFloatInteractableData;
 
 typedef struct InteractableData
@@ -173,6 +172,8 @@ static bool PointInRect(vec2 position, vec2 size, vec2 point)
 bool InitializeDebugUI()
 {
     GRASSERT_DEBUG(state == nullptr); // If this triggers, the debug ui was initialized twice.
+
+	GRASSERT_DEBUG(INTERACTABLE_TYPE_NONE_COUNT == INTERACTABLE_TYPE_COUNT);
 
     state = Alloc(GetGlobalAllocator(), sizeof(*state), MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(state, sizeof(*state));
@@ -552,8 +553,6 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
     menu->quadCount++;
     menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
 
-    sliderData->sliderDotHeight = sliderDotPosition.y;
-
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
@@ -690,7 +689,7 @@ void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* intera
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -712,7 +711,7 @@ void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* inter
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -734,7 +733,7 @@ void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interact
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, sliderData->sliderDotHeight, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
