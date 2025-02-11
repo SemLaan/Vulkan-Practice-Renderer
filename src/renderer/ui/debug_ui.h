@@ -51,4 +51,4 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
 /// @param minValue Minimum value of the slider.
 /// @param maxValue Maximum value of the slider.
 /// @param pSliderValue Pointer to where the current value of the slider should be stored. If the value being stored in this position is between minValue and maxValue the slider will start at this value, otherwise the slider will start at minValue.
-void DebugUIAddSlider(DebugMenu* menu, const char* text, f32 minValue, f32 maxValue, f32* pSliderValue);
+void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 maxValue, f32* pSliderValue);

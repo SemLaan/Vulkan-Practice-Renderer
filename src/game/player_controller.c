@@ -31,8 +31,8 @@ void PlayerControllerInit()
     controllerState->controllerSettingMenu = DebugUICreateMenu();
     RegisterDebugMenu(controllerState->controllerSettingMenu);
     DebugUIAddButton(controllerState->controllerSettingMenu, "control camera", nullptr, &controllerState->controlCameraButtonPressed);
-    DebugUIAddSlider(controllerState->controllerSettingMenu, "mouse sensitivity", 1, 10000, &controllerState->mouseSensitivity);
-    DebugUIAddSlider(controllerState->controllerSettingMenu, "move speed", 100, 1000, &controllerState->movementSpeed);
+    DebugUIAddSliderFloat(controllerState->controllerSettingMenu, "mouse sensitivity", 1, 10000, &controllerState->mouseSensitivity);
+    DebugUIAddSliderFloat(controllerState->controllerSettingMenu, "move speed", 100, 1000, &controllerState->movementSpeed);
 }
 
 void PlayerControllerUpdate()

@@ -207,7 +207,7 @@ void GameRenderingInit()
     // Setting up debug ui's for shader parameters and TODO: terrain generation settings
     renderingState->shaderParamDebugMenu = DebugUICreateMenu();
     RegisterDebugMenu(renderingState->shaderParamDebugMenu);
-    DebugUIAddSlider(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
     DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
 }
 
