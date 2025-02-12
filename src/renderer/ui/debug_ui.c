@@ -11,13 +11,13 @@
 
 // STEPS TO ADD A NEW INTERACTABLE TYPE ==================================================================
 // Add it to the InteractableType enum
+// Increase the INTERACTABLE_TYPE_COUNT define by one
 // Add a struct named TypeInteractableData with the data that is important to that specific interactable type
+// Add a DebugUIAdd*Type* function declaration to the .h file
+// Create the definition for said function
 // Add the function prototypes for start, update and end: Handle*Type*Interaction#Start/Update/End#
 // Add the function definitions for these functions
 // Add these functions to the lists of function pointers in the UpdateDebugUI function (in the correct position, same position as it is in the enum)
-// Increase the INTERACTABLE_TYPE_COUNT define by one
-// Add a DebugUIAdd*Type* function declaration to the .h file
-// Create the definition for said function
 // Done!
 
 #define MAX_DBG_MENU_QUADS 100                             // Change if you need more
@@ -56,10 +56,13 @@ typedef enum InteractableType
     INTERACTABLE_TYPE_TOGGLE_BUTTON,
     INTERACTABLE_TYPE_MENU_HANDLEBAR,
     INTERACTABLE_TYPE_SLIDER_FLOAT,
-    INTERACTABLE_TYPE_NONE
+    INTERACTABLE_TYPE_SLIDER_INT,
+    INTERACTABLE_TYPE_SLIDER_DISCRETE,
+    INTERACTABLE_TYPE_SLIDER_LOG,
+    INTERACTABLE_TYPE_NONE_COUNT
 } InteractableType;
 
-#define INTERACTABLE_TYPE_COUNT 4
+#define INTERACTABLE_TYPE_COUNT 7
 
 // Interactable internal data for a button
 typedef struct ButtonInteractableData
@@ -71,7 +74,7 @@ typedef struct ButtonInteractableData
 // Interactable internal data for a toggle button
 typedef struct ToggleButtonInteractableData
 {
-    bool* pStateBool;  // Pointer to a bool that will store whether the button is currently being held down or not.
+    bool* pStateBool; // Pointer to a bool that will store whether the button is currently being held down or not.
 } ToggleButtonInteractableData;
 
 // Interactable internal data for the menu handlebar
@@ -84,11 +87,42 @@ typedef struct MenuHandlebarInteractableData
 // Interactable internal data for the slider float
 typedef struct SliderFloatInteractableData
 {
-    f32* pSliderValue;   // Pointer to a float that stores the value of the slider for the client to read out.
-    f32 minValue;        // Minimum value of the slider.
-    f32 maxValue;        // Maximum value of the slider.
-    f32 valueRange;      // Max value - Min value. Used for calculating the position of the slider dot.
+    f32* pSliderValue; // Pointer to a float that stores the value of the slider for the client to read out.
+    f32 minValue;      // Minimum value of the slider.
+    f32 maxValue;      // Maximum value of the slider.
+    f32 valueRange;    // Max value - Min value. Used for calculating the position of the slider dot.
 } SliderFloatInteractableData;
+
+// Interactable internal data for the slider int
+typedef struct SliderIntInteractableData
+{
+    i64* pSliderValue; // Pointer to an int that stores the value of the slider for the client to read out.
+    i64 minValue;      // Minimum value of the slider.
+    i64 maxValue;      // Maximum value of the slider.
+    u64 valueRange;    // Max value - Min value. Used for calculating the position of the slider dot.
+} SliderIntInteractableData;
+
+// Interactable internal data for the slider discrete
+typedef struct SliderDiscreteInteractableData
+{
+    i64* pSliderValue;          // Value that the slider represents, the position of the slider can't be inferred from this, unless you compare the value to the discrete value array
+    i64* pDiscreteSliderValues; // Pointer to an float that stores the value of the slider for the client to read out.
+    // Min index not necessary because it will always be zero
+    u64 maxIndex; // Maximum index of the slider.
+                  // value range is also not necessary because it is equal to maxIndex
+} SliderDiscreteInteractableData;
+
+// Interactable internal data for the slider log
+typedef struct SliderLogInteractableData
+{
+    // Pointer to a float that stores the exponentiated value of the slider for the client to read out.
+    // This is the true value that the slider represents for the user, but not the position of the slider as it isn't linear but exponential.
+    f32* pSliderValue;
+    f32 base;               // Base used in the log
+    f32 minExponentValue;   // Minimum exponent value of the slider.
+    f32 maxExponentValue;   // Maximum exponent value of the slider.
+    f32 exponentValueRange; // Max exponent value - Min exponent value. Used for calculating the position of the slider dot.
+} SliderLogInteractableData;
 
 typedef struct InteractableData
 {
@@ -149,6 +183,18 @@ void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* intera
 void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
+void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+
+void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+
+void HandleSliderLogInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderLogInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleSliderLogInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+
 static bool OnWindowResize(EventCode type, EventData data)
 {
     vec2i windowSize = GetPlatformWindowSize();
@@ -173,7 +219,7 @@ bool InitializeDebugUI()
 {
     GRASSERT_DEBUG(state == nullptr); // If this triggers, the debug ui was initialized twice.
 
-	GRASSERT_DEBUG(INTERACTABLE_TYPE_NONE_COUNT == INTERACTABLE_TYPE_COUNT);
+    GRASSERT_DEBUG(INTERACTABLE_TYPE_NONE_COUNT == INTERACTABLE_TYPE_COUNT);
 
     state = Alloc(GetGlobalAllocator(), sizeof(*state), MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(state, sizeof(*state));
@@ -225,33 +271,41 @@ void ShutdownDebugUI()
 
 void UpdateDebugUI()
 {
-	void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = 
-	{
-		HandleButtonInteractionStart, 
-		HandleToggleButtonInteractionStart, 
-		HandleMenuHandlebarInteractionStart, 
-		HandleSliderFloatInteractionStart,
-	};
-	GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_start_func_ptr_arr) / sizeof(*interaction_start_func_ptr_arr)))
+    void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) =
+        {
+            HandleButtonInteractionStart,
+            HandleToggleButtonInteractionStart,
+            HandleMenuHandlebarInteractionStart,
+            HandleSliderFloatInteractionStart,
+            HandleSliderIntInteractionStart,
+            HandleSliderDiscreteInteractionStart,
+            HandleSliderLogInteractionStart,
+        };
+    GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_start_func_ptr_arr) / sizeof(*interaction_start_func_ptr_arr)))
 
-	void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) = 
-	{
-		HandleButtonInteractionUpdate, 
-		HandleToggleButtonInteractionUpdate, 
-		HandleMenuHandlebarInteractionUpdate, 
-		HandleSliderFloatInteractionUpdate,
-	};
-	GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_update_func_ptr_arr) / sizeof(*interaction_update_func_ptr_arr)))
+    void (*interaction_update_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) =
+        {
+            HandleButtonInteractionUpdate,
+            HandleToggleButtonInteractionUpdate,
+            HandleMenuHandlebarInteractionUpdate,
+            HandleSliderFloatInteractionUpdate,
+            HandleSliderIntInteractionUpdate,
+            HandleSliderDiscreteInteractionUpdate,
+            HandleSliderLogInteractionUpdate,
+        };
+    GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_update_func_ptr_arr) / sizeof(*interaction_update_func_ptr_arr)))
 
-	void (*interaction_end_func_ptr_arr[INTERACTABLE_TYPE_COUNT])(DebugMenu*, InteractableData*, vec4) = 
-	{
-		HandleButtonInteractionEnd, 
-		HandleToggleButtonInteractionEnd, 
-		HandleMenuHandlebarInteractionEnd, 
-		HandleSliderFloatInteractionEnd,
-	};
-	GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_end_func_ptr_arr) / sizeof(*interaction_end_func_ptr_arr)))
-
+    void (*interaction_end_func_ptr_arr[INTERACTABLE_TYPE_COUNT])(DebugMenu*, InteractableData*, vec4) =
+        {
+            HandleButtonInteractionEnd,
+            HandleToggleButtonInteractionEnd,
+            HandleMenuHandlebarInteractionEnd,
+            HandleSliderFloatInteractionEnd,
+            HandleSliderIntInteractionEnd,
+            HandleSliderDiscreteInteractionEnd,
+            HandleSliderLogInteractionEnd,
+        };
+    GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_end_func_ptr_arr) / sizeof(*interaction_end_func_ptr_arr)))
 
     // Getting the mouse position in world space.
     vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1); // A mouse position is 2d but we pad the z with 0 and w with 1, so that we can do matrix math
@@ -486,9 +540,9 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
 
 void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
 {
-	GRASSERT_DEBUG(pStateBool);
+    GRASSERT_DEBUG(pStateBool);
 
-	// Allocating internal button data and saving the pointers to the state bool
+    // Allocating internal button data and saving the pointers to the state bool
     ToggleButtonInteractableData* buttonData = Alloc(state->interactableInternalDataAllocator, sizeof(*buttonData), MEM_TAG_RENDERER_SUBSYS);
     buttonData->pStateBool = pStateBool;
 
@@ -497,10 +551,10 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
     vec2 buttonSize = BUTTON_SIZE;
     mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
-	if (*pStateBool)
-	    menu->quadsInstanceData[menu->quadCount].color = BUTTON_PRESSED_COLOR;
-	else 
-		menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
+    if (*pStateBool)
+        menu->quadsInstanceData[menu->quadCount].color = BUTTON_PRESSED_COLOR;
+    else
+        menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
     menu->quadCount++;
     menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
 
@@ -568,6 +622,169 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
     GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
 }
 
+void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 maxValue, i64* pSliderValue)
+{
+    // Allocating internal slider data and saving the pointer to the slider value
+    SliderIntInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
+    sliderData->pSliderValue = pSliderValue;
+    sliderData->minValue = minValue;
+    sliderData->maxValue = maxValue;
+    sliderData->valueRange = maxValue - minValue;
+
+    // Setting the int at pSliderValue to minValue if it falls outside of min and max value, this value will be the start value of the slider and gets used to position the slider correctly.
+    if (*pSliderValue < minValue || *pSliderValue > maxValue)
+        *pSliderValue = minValue;
+
+    // Percentage of how much of the slider is filled out.
+    f32 sliderProgress = (f32)(*pSliderValue - minValue) / (f32)sliderData->valueRange;
+
+    // Adding a quad for the slider bar and a quad for the slider dot.
+    menu->nextElementYOffset += SLIDER_DOT_SIZE.y;
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->size.y - menu->nextElementYOffset);
+    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
+    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
+    vec2 sliderBarSize = SLIDER_BAR_SIZE;
+    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
+    menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
+    menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
+    menu->quadCount++;
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->size.y - menu->nextElementYOffset, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
+    menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
+    menu->quadCount++;
+    menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
+
+    GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 2; // Minus two because this function added two quads that belong to the slider.
+    menu->interactablesArray[menu->interactablesCount].quadCount = 2;
+    menu->interactablesArray[menu->interactablesCount].position = sliderTotalPosition;
+    menu->interactablesArray[menu->interactablesCount].size = sliderTotalSize;
+    menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_SLIDER_INT;
+    menu->interactablesArray[menu->interactablesCount].internalData = sliderData;
+
+    menu->interactablesCount++;
+    GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
+}
+
+void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteValuesArray, u64 discreteValueCount, i64* pSliderValue)
+{
+    // Allocating internal slider data and saving the pointer to the slider value
+    SliderDiscreteInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
+    sliderData->pSliderValue = pSliderValue;
+    sliderData->pDiscreteSliderValues = discreteValuesArray;
+    sliderData->maxIndex = discreteValueCount - 1;
+    // Default initialize slider index to 0, then check if the value of slider value is in the discrete values array
+    // if so, set the slider index to the index of that value
+    u64 sliderIndex = 0;
+    for (u64 i = 0; i < discreteValueCount; i++)
+    {
+        if (*sliderData->pSliderValue == sliderData->pDiscreteSliderValues[i])
+        {
+            sliderIndex = i;
+            break;
+        }
+    }
+    // Setting the slider value to the value asigned to the current sliderIndex, this only changes the sliderValue if the initial slider value was not in the discrete values array
+    *sliderData->pSliderValue = sliderData->pDiscreteSliderValues[sliderIndex];
+
+    // Percentage of how much of the slider is filled out.
+    f32 sliderProgress = (f32)sliderIndex / (f32)sliderData->maxIndex;
+
+    // Adding a quad for the slider bar and a quad for the slider dot.
+    menu->nextElementYOffset += SLIDER_DOT_SIZE.y;
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->size.y - menu->nextElementYOffset);
+    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
+    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
+    vec2 sliderBarSize = SLIDER_BAR_SIZE;
+    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
+    menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
+    menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
+    menu->quadCount++;
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->size.y - menu->nextElementYOffset, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
+    menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
+    menu->quadCount++;
+    menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
+
+    GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 2; // Minus two because this function added two quads that belong to the slider.
+    menu->interactablesArray[menu->interactablesCount].quadCount = 2;
+    menu->interactablesArray[menu->interactablesCount].position = sliderTotalPosition;
+    menu->interactablesArray[menu->interactablesCount].size = sliderTotalSize;
+    menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_SLIDER_DISCRETE;
+    menu->interactablesArray[menu->interactablesCount].internalData = sliderData;
+
+    menu->interactablesCount++;
+    GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
+}
+
+void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minValue, f32 maxValue, f32* pSliderValue)
+{
+    f32 oneOverLogBase = 1.f / logf(base);
+
+    // Allocating internal slider data and saving the pointer to the slider value
+    SliderLogInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
+    sliderData->pSliderValue = pSliderValue;
+    sliderData->base = base;
+    GRASSERT_DEBUG(base - nearbyintf(base) < 0.000001 || nearbyintf(base) - base < 0.000001);
+    sliderData->minExponentValue = logf(minValue) * oneOverLogBase;
+    sliderData->maxExponentValue = logf(maxValue) * oneOverLogBase;
+    sliderData->exponentValueRange = sliderData->maxExponentValue - sliderData->minExponentValue;
+
+    // Setting the float at pSliderValue to minValue if it falls outside of min and max value, this value will be the start value of the slider and gets used to position the slider correctly.
+    f32 sliderExponentValue = logf(*sliderData->pSliderValue) * oneOverLogBase;
+    if (sliderExponentValue < sliderData->minExponentValue || sliderExponentValue > sliderData->maxExponentValue)
+    {
+        *pSliderValue = minValue;
+        sliderExponentValue = sliderData->minExponentValue;
+    }
+
+    // Percentage of how much of the slider is filled out.
+    f32 sliderProgress = (sliderExponentValue - sliderData->minExponentValue) / sliderData->exponentValueRange;
+
+    // Adding a quad for the slider bar and a quad for the slider dot.
+    menu->nextElementYOffset += SLIDER_DOT_SIZE.y;
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->size.y - menu->nextElementYOffset);
+    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
+    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->size.y - menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
+    vec2 sliderBarSize = SLIDER_BAR_SIZE;
+    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
+    menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
+    menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
+    menu->quadCount++;
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->size.y - menu->nextElementYOffset, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
+    menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
+    menu->quadCount++;
+    menu->nextElementYOffset += MENU_ELEMENTS_OFFSET;
+
+    GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 2; // Minus two because this function added two quads that belong to the slider.
+    menu->interactablesArray[menu->interactablesCount].quadCount = 2;
+    menu->interactablesArray[menu->interactablesCount].position = sliderTotalPosition;
+    menu->interactablesArray[menu->interactablesCount].size = sliderTotalSize;
+    menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_SLIDER_LOG;
+    menu->interactablesArray[menu->interactablesCount].internalData = sliderData;
+
+    menu->interactablesCount++;
+    GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
+}
+
 // =========================================================================================================================================
 // Interaction start/update/end functions
 // =========================================================================================================================================
@@ -613,10 +830,10 @@ void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* inter
     ToggleButtonInteractableData* buttonData = interactableData->internalData;
 
     // Set the button to the pressed color
-	if (buttonData->pStateBool)
-		menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_PRESSED_COLOR, GREY_OUT_FACTOR);
-	else
-		menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_BASIC_COLOR, GREY_OUT_FACTOR);
+    if (buttonData->pStateBool)
+        menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_PRESSED_COLOR, GREY_OUT_FACTOR);
+    else
+        menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_BASIC_COLOR, GREY_OUT_FACTOR);
 
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 }
@@ -629,17 +846,17 @@ void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interac
 {
     ToggleButtonInteractableData* buttonData = interactableData->internalData;
 
-	// If the player was still hovering over the button when they released it toggle it's state.
+    // If the player was still hovering over the button when they released it toggle it's state.
     if (buttonData->pStateBool && PointInRect(vec2_add_vec2(interactableData->position, menu->position), interactableData->size, vec4_xy(mouseWorldPosition)))
     {
         *buttonData->pStateBool = !*buttonData->pStateBool;
     }
 
-	// Changing the color of the button back to the non-pressed color
+    // Changing the color of the button back to the non-pressed color
     if (buttonData->pStateBool)
-		menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_PRESSED_COLOR;
-	else
-		menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
+        menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_PRESSED_COLOR;
+    else
+        menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
 
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 }
@@ -677,7 +894,7 @@ void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* intera
     menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
 }
 
-/// ============================================= Slider
+/// ============================================= Slider Float
 void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
     SliderFloatInteractableData* sliderData = interactableData->internalData;
@@ -742,4 +959,229 @@ void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interact
     // Updating the slider value for the client.
     mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
     *sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
+}
+
+/// ============================================= Slider Int
+void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderIntInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x;                                                            // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    mouseSliderPosition *= (f32)sliderData->valueRange;                                                  // Mapping the mouseSliderPosition from 0 to valueRange
+    mouseSliderPosition = nearbyintf(mouseSliderPosition);                                               // Rounding mouseSliderPosition to the nearest float representable integer
+    f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->valueRange); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    *sliderData->pSliderValue = sliderData->minValue + (i64)mouseSliderPosition;
+}
+
+void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderIntInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x;                                                            // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    mouseSliderPosition *= (f32)sliderData->valueRange;                                                  // Mapping the mouseSliderPosition from 0 to valueRange
+    mouseSliderPosition = nearbyintf(mouseSliderPosition);                                               // Rounding mouseSliderPosition to the nearest float representable integer
+    f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->valueRange); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    *sliderData->pSliderValue = sliderData->minValue + (i64)mouseSliderPosition;
+}
+
+void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderIntInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x;                                                            // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    mouseSliderPosition *= (f32)sliderData->valueRange;                                                  // Mapping the mouseSliderPosition from 0 to valueRange
+    mouseSliderPosition = nearbyintf(mouseSliderPosition);                                               // Rounding mouseSliderPosition to the nearest float representable integer
+    f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->valueRange); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    *sliderData->pSliderValue = sliderData->minValue + (i64)mouseSliderPosition;
+}
+
+/// ============================================= Slider Discrete
+void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderDiscreteInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x;                                                          // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    mouseSliderPosition *= (f32)sliderData->maxIndex;                                                  // Mapping the mouseSliderPosition from 0 to maxIndex
+    mouseSliderPosition = nearbyintf(mouseSliderPosition);                                             // Rounding mouseSliderPosition to the nearest float representable integer
+    f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->maxIndex); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    *sliderData->pSliderValue = sliderData->pDiscreteSliderValues[(u64)mouseSliderPosition];
+}
+
+void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderDiscreteInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x;                                                          // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    mouseSliderPosition *= (f32)sliderData->maxIndex;                                                  // Mapping the mouseSliderPosition from 0 to maxIndex
+    mouseSliderPosition = nearbyintf(mouseSliderPosition);                                             // Rounding mouseSliderPosition to the nearest float representable integer
+    f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->maxIndex); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    *sliderData->pSliderValue = sliderData->pDiscreteSliderValues[(u64)mouseSliderPosition];
+}
+
+void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderDiscreteInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x;                                                          // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    mouseSliderPosition *= (f32)sliderData->maxIndex;                                                  // Mapping the mouseSliderPosition from 0 to maxIndex
+    mouseSliderPosition = nearbyintf(mouseSliderPosition);                                             // Rounding mouseSliderPosition to the nearest float representable integer
+    f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->maxIndex); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    *sliderData->pSliderValue = sliderData->pDiscreteSliderValues[(u64)mouseSliderPosition];
+}
+
+/// ============================================= Slider Log
+void HandleSliderLogInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderLogInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    *sliderData->pSliderValue = powf(sliderData->base, sliderData->minExponentValue + (mouseSliderPosition * sliderData->exponentValueRange));
+}
+
+void HandleSliderLogInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderLogInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    *sliderData->pSliderValue = powf(sliderData->base, sliderData->minExponentValue + (mouseSliderPosition * sliderData->exponentValueRange));
+}
+
+void HandleSliderLogInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+    SliderLogInteractableData* sliderData = interactableData->internalData;
+
+    // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
+        mouseSliderPosition = SLIDER_BAR_SIZE.x;
+    if (mouseSliderPosition < 0)
+        mouseSliderPosition = 0;
+
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec2 sliderDotSize = SLIDER_DOT_SIZE;
+    mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
+    menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
+    VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+    // Updating the slider value for the client.
+    mouseSliderPosition /= SLIDER_BAR_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
+    *sliderData->pSliderValue = powf(sliderData->base, sliderData->minExponentValue + (mouseSliderPosition * sliderData->exponentValueRange));
 }
