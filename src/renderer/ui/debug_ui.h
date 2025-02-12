@@ -45,10 +45,36 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
 /// @param pStateBool Pointer to a bool that will hold the state of the button
 void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool);
 
-/// @brief Adds a slider to the bottom of the Debug UI menu with some text.
+/// @brief Adds a slider that controls a float value to the bottom of the Debug UI menu with some text.
 /// @param menu Pointer to the menu that the button should be added to.
 /// @param text Text that should be displayed in the button.
 /// @param minValue Minimum value of the slider.
 /// @param maxValue Maximum value of the slider.
 /// @param pSliderValue Pointer to where the current value of the slider should be stored. If the value being stored in this position is between minValue and maxValue the slider will start at this value, otherwise the slider will start at minValue.
 void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 maxValue, f32* pSliderValue);
+
+/// @brief Adds a slider that controls an int value to the bottom of the Debug UI menu with some text.
+/// @param menu Pointer to the menu that the button should be added to.
+/// @param text Text that should be displayed in the button.
+/// @param minValue Minimum value of the slider.
+/// @param maxValue Maximum value of the slider.
+/// @param pSliderValue Pointer to where the current value of the slider should be stored. If the value being stored in this position is between minValue and maxValue the slider will start at this value, otherwise the slider will start at minValue.
+void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 maxValue, i64* pSliderValue);
+
+/// @brief Adds a slider that controls a discrete int value to the bottom of the Debug UI menu with some text.
+/// @param menu Pointer to the menu that the button should be added to.
+/// @param text Text that should be displayed in the button.
+/// @param discreteValuesArray Array of the discrete values that this slider can represent, this array should remain valid for as long as this slider exists.
+/// @param discreteValueCount Amount of elements in the array.
+/// @param pSliderValue Pointer to where the current value of the slider should be stored. If the value being stored in this position is between minValue and maxValue the slider will start at this value, otherwise the slider will start at minValue.
+void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteValuesArray, u64 discreteValueCount, i64* pSliderValue);
+
+/// @brief Adds a slider that controls a float value and shows it's value on a logarithmic scale to the user to the bottom of the Debug UI menu with some text.
+/// @param menu Pointer to the menu that the button should be added to.
+/// @param text Text that should be displayed in the button.
+/// @param base Base of the logarithm used to scale the sliders values.
+/// @param minValue Minimum value of the slider.
+/// @param maxValue Maximum value of the slider.
+/// @param pSliderValue Pointer to where the current value of the slider should be stored. If the value being stored in this position is between minValue and maxValue the slider will start at this value, otherwise the slider will start at minValue.
+void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minValue, f32 maxValue, f32* pSliderValue);
+

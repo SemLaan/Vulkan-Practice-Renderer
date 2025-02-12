@@ -31,6 +31,14 @@ typedef struct ShaderParameters
     bool renderMarchingCubesMesh;
 } ShaderParameters;
 
+typedef struct WorldGenParameters
+{
+	f32 logTest;
+	i64 intTest;
+	i64 discreteTest;
+	i64 discreteArray[3];
+} WorldGenParameters;
+
 typedef struct World
 {
     f32* terrainDensityMap;
@@ -47,6 +55,7 @@ typedef struct GameRenderingState
     DebugMenuRefDarray* debugMenuDarray;
     // Debug menu for adjusting shader parameters
     DebugMenu* shaderParamDebugMenu;
+	DebugMenu* worldGenParamDebugMenu;
 
     // Materials
     Material marchingCubesMaterial;
@@ -65,6 +74,7 @@ typedef struct GameRenderingState
 
     // Data controlled by debug menu's
     ShaderParameters shaderParameters;
+	WorldGenParameters worldGenParams;
 
     // Text, THIS IS TEMPORARY, this needs to be changed once the text system is finished
     Text* textTest;
@@ -204,15 +214,30 @@ void GameRenderingInit()
 		world->marchingCubesMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
     }
 
-    // Setting up debug ui's for shader parameters and TODO: terrain generation settings
+    // Setting up debug ui's for shader parameters and terrain generation settings
     renderingState->shaderParamDebugMenu = DebugUICreateMenu();
     RegisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
     DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
+
+	renderingState->worldGenParams.discreteArray[0] = 3;
+	renderingState->worldGenParams.discreteArray[1] = 5;
+	renderingState->worldGenParams.discreteArray[2] = 7;
+
+	renderingState->worldGenParamDebugMenu = DebugUICreateMenu();
+	RegisterDebugMenu(renderingState->worldGenParamDebugMenu);
+	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "int slider test", -100, 200, &renderingState->worldGenParams.intTest);
+	DebugUIAddSliderDiscrete(renderingState->worldGenParamDebugMenu, "discrete slider test", renderingState->worldGenParams.discreteArray, 3, &renderingState->worldGenParams.discreteTest);
+	DebugUIAddSliderLog(renderingState->worldGenParamDebugMenu, "log slider test", 10, 0.01, 10, &renderingState->worldGenParams.logTest);
 }
 
 void GameRenderingRender()
 {
+
+	_DEBUG("Int test value		: %lli", renderingState->worldGenParams.intTest);
+	_DEBUG("Discrete test value	: %lli", renderingState->worldGenParams.discreteTest);
+	_DEBUG("Log test value		: %f", renderingState->worldGenParams.logTest);
+
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
     f32 roughness = 0;
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
@@ -289,6 +314,10 @@ void GameRenderingShutdown()
     UnregisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIDestroyMenu(renderingState->shaderParamDebugMenu);
     DarrayDestroy(renderingState->debugMenuDarray);
+
+	// Destroying debug menu for world gen parameters
+	UnregisterDebugMenu(renderingState->worldGenParamDebugMenu);
+    DebugUIDestroyMenu(renderingState->worldGenParamDebugMenu);
 
     // Destroying world data
 	{
