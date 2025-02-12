@@ -33,10 +33,11 @@ typedef struct ShaderParameters
 
 typedef struct WorldGenParameters
 {
-	f32 logTest;
-	i64 intTest;
-	i64 discreteTest;
-	i64 discreteArray[3];
+	BezierDensityFuncSettings bezierDensityFuncSettings;
+
+	i64 blurIterations;
+	i64 blurKernelSize;
+	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT];
 } WorldGenParameters;
 
 typedef struct World
@@ -200,7 +201,26 @@ void GameRenderingInit()
         MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
     }
 
-    // Generating marching cubes terrain
+    // Setting up debug ui's for shader parameters and terrain generation settings
+    renderingState->shaderParamDebugMenu = DebugUICreateMenu();
+    RegisterDebugMenu(renderingState->shaderParamDebugMenu);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
+    DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
+
+	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT] = POSSIBLE_BLUR_KERNEL_SIZES;
+	MemoryCopy(renderingState->worldGenParams.blurKernelSizeOptions, blurKernelSizeOptions, sizeof(blurKernelSizeOptions));
+
+	renderingState->worldGenParamDebugMenu = DebugUICreateMenu();
+	RegisterDebugMenu(renderingState->worldGenParamDebugMenu);
+	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Blur Iterations", MIN_BLUR_ITERATIONS, MAX_BLUR_ITERATIONS, &renderingState->worldGenParams.blurIterations);
+	DebugUIAddSliderDiscrete(renderingState->worldGenParamDebugMenu, "Blur Kernel Size", renderingState->worldGenParams.blurKernelSizeOptions, POSSIBLE_BLUR_KERNEL_SIZES_COUNT, &renderingState->worldGenParams.blurKernelSize);
+	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Bezier tunnel count", MIN_BEZIER_TUNNEL_COUNT, MAX_BEZIER_TUNNEL_COUNT, &renderingState->worldGenParams.bezierDensityFuncSettings.bezierTunnelCount);
+	DebugUIAddSliderFloat(renderingState->worldGenParamDebugMenu, "Bezier tunnel radius", MIN_BEZIER_TUNNEL_RADIUS, MAX_BEZIER_TUNNEL_RADIUS, &renderingState->worldGenParams.bezierDensityFuncSettings.bezierTunnelRadius);
+	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Bezier tunnel control points", MIN_BEZIER_TUNNEL_CONTROL_POINTS, MAX_BEZIER_TUNNEL_CONTROL_POINTS, &renderingState->worldGenParams.bezierDensityFuncSettings.bezierTunnelControlPoints);
+	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Sphere hole count", MIN_SPHERE_HOLE_COUNT, MAX_SPHERE_HOLE_COUNT, &renderingState->worldGenParams.bezierDensityFuncSettings.sphereHoleCount);
+	DebugUIAddSliderFloat(renderingState->worldGenParamDebugMenu, "Sphere hole radius", MIN_SPHERE_HOLE_RADIUS, MAX_SPHERE_HOLE_RADIUS, &renderingState->worldGenParams.bezierDensityFuncSettings.sphereHoleRadius);
+
+	// Generating marching cubes terrain
     {
 		World* world = &renderingState->world;
         world->terrainSeed = 0;
@@ -209,35 +229,14 @@ void GameRenderingInit()
         world->densityMapDepth = DENSITY_MAP_SIZE;
         u32 densityMapValueCount = world->densityMapWidth * world->densityMapHeight * world->densityMapDepth;
         world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount, MEM_TAG_TEST);
-        DensityFuncBezierCurveHole(&world->terrainSeed, nullptr, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-		BlurDensityMap(3, 3, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+        DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+		BlurDensityMap(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 		world->marchingCubesMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
     }
-
-    // Setting up debug ui's for shader parameters and terrain generation settings
-    renderingState->shaderParamDebugMenu = DebugUICreateMenu();
-    RegisterDebugMenu(renderingState->shaderParamDebugMenu);
-    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
-    DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
-
-	renderingState->worldGenParams.discreteArray[0] = 3;
-	renderingState->worldGenParams.discreteArray[1] = 5;
-	renderingState->worldGenParams.discreteArray[2] = 7;
-
-	renderingState->worldGenParamDebugMenu = DebugUICreateMenu();
-	RegisterDebugMenu(renderingState->worldGenParamDebugMenu);
-	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "int slider test", -100, 200, &renderingState->worldGenParams.intTest);
-	DebugUIAddSliderDiscrete(renderingState->worldGenParamDebugMenu, "discrete slider test", renderingState->worldGenParams.discreteArray, 3, &renderingState->worldGenParams.discreteTest);
-	DebugUIAddSliderLog(renderingState->worldGenParamDebugMenu, "log slider test", 10, 0.01, 10, &renderingState->worldGenParams.logTest);
 }
 
 void GameRenderingRender()
 {
-
-	_DEBUG("Int test value		: %lli", renderingState->worldGenParams.intTest);
-	_DEBUG("Discrete test value	: %lli", renderingState->worldGenParams.discreteTest);
-	_DEBUG("Log test value		: %f", renderingState->worldGenParams.logTest);
-
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
     f32 roughness = 0;
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
@@ -367,7 +366,7 @@ void UnregisterDebugMenu(DebugMenu* debugMenu)
 void RegenerateMarchingCubesMesh()
 {
 	World* world = &renderingState->world;
-	DensityFuncBezierCurveHole(&world->terrainSeed, nullptr, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-	BlurDensityMap(3, 3, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+	DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+	BlurDensityMap(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 	MarchingCubesRegenerateMesh(&world->marchingCubesMesh, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 }
