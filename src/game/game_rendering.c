@@ -100,7 +100,7 @@ void GameRenderingInit()
     renderingState->sceneCamera.projection = mat4_perspective(DEFAULT_FOV, windowAspectRatio, DEFAULT_NEAR_PLANE, DEFAULT_FAR_PLANE);
     renderingState->uiCamera.projection = mat4_orthographic(0, UI_ORTHO_HEIGHT * windowAspectRatio, 0, UI_ORTHO_HEIGHT, UI_NEAR_PLANE, UI_FAR_PLANE);
 
-    RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
+    RegisterEventListener(EVCODE_SWAPCHAIN_RESIZED, OnWindowResize);
 
     renderingState->sceneCamera.position = vec3_create(0, 0, 0);
     renderingState->sceneCamera.rotation = vec3_create(0, 0, 0);
@@ -283,7 +283,7 @@ void GameRenderingRender()
 
 void GameRenderingShutdown()
 {
-    UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
+    UnregisterEventListener(EVCODE_SWAPCHAIN_RESIZED, OnWindowResize);
 
     // Destroying debug menu for shader params and darray for debug ui's
     UnregisterDebugMenu(renderingState->shaderParamDebugMenu);
