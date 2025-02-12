@@ -56,6 +56,7 @@ void DensityFuncSphereHole(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 map
     }
 }
 
+#define SAMPLES_PER_BEZIER 20
 
 void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generationSettings, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
 {
@@ -64,41 +65,50 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
     vec3 sphereCenter = vec3_from_float(mapWidth / 2);
     f32 sphereRadius = 20;
 
-// Generating a random bezier curve
-#define BEZIER_DEGREE_PLUS_ONE (50 + 1)
+	// Generating random bezier curves
+	u64 totalBezierCurvePoints = generationSettings->bezierTunnelControlPoints * generationSettings->bezierTunnelCount;
 
-    vec3 bezierCurvePoints[BEZIER_DEGREE_PLUS_ONE] = {};
+	vec3* bezierCurvePoints = ArenaAlloc(&gameState->frameArena, totalBezierCurvePoints * sizeof(*bezierCurvePoints));
 
-    bezierCurvePoints[0] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(seed), sphereRadius), sphereCenter);
-    bezierCurvePoints[BEZIER_DEGREE_PLUS_ONE - 1] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(seed), sphereRadius), sphereCenter);
+	for (int i = 0; i < generationSettings->bezierTunnelCount; i++)
+	{
+		for (int j = 0; j < generationSettings->bezierTunnelControlPoints; j++)
+		{
+			if (j == 0 || j + 1 == generationSettings->bezierTunnelControlPoints)
+				bezierCurvePoints[i * generationSettings->bezierTunnelControlPoints + j] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(seed), sphereRadius), sphereCenter);
+			else
+				bezierCurvePoints[i * generationSettings->bezierTunnelControlPoints + j] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(seed), sphereRadius), sphereCenter);
+		}
+	}
 
-    for (u32 i = 1; i < BEZIER_DEGREE_PLUS_ONE - 1; i++)
-    {
-        bezierCurvePoints[i] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(seed), sphereRadius), sphereCenter);
-    }
+	// Sampling the bezier curves
+	u64 totalBezierSamples = generationSettings->bezierTunnelCount * SAMPLES_PER_BEZIER;
+	vec3* bezierSamples = ArenaAlloc(&gameState->frameArena, totalBezierSamples * sizeof(*bezierSamples));
+	vec3* interpolatedCurvePoints = ArenaAlloc(&gameState->frameArena, generationSettings->bezierTunnelControlPoints * sizeof(*interpolatedCurvePoints));;
 
-    f32 bezierRadius = 8;
+	for (int i = 0; i < generationSettings->bezierTunnelCount; i++)
+	{
+		for (int j = 0; j < SAMPLES_PER_BEZIER; j++)
+		{
+			f32 progress = (f32)j / (f32)(SAMPLES_PER_BEZIER - 1);
+			MemoryCopy(interpolatedCurvePoints, bezierCurvePoints + (i * generationSettings->bezierTunnelControlPoints), generationSettings->bezierTunnelControlPoints * sizeof(*interpolatedCurvePoints));
+			for (int curvePointCount = generationSettings->bezierTunnelControlPoints; curvePointCount > 1; curvePointCount--)
+			{
+				for (int k = 0; k < curvePointCount - 1; k++)
+					interpolatedCurvePoints[k] = vec3_lerp(interpolatedCurvePoints[k], interpolatedCurvePoints[k + 1], progress);
+			}
 
-#define CURVE_POINTS (1 << 9)
-#define INITIAL_BEZIER_SAMPLE_POINTS_PLUS_ONE (1 << 8)
-    u32 distanceBetweenSamplePoints = CURVE_POINTS / INITIAL_BEZIER_SAMPLE_POINTS_PLUS_ONE;
-    vec3 bezierCurveSamples[CURVE_POINTS] = {};
+			bezierSamples[i * SAMPLES_PER_BEZIER + j] = interpolatedCurvePoints[0];
+		}
+	}
 
-    for (u32 i = 0; i < CURVE_POINTS; i++)
-    {
-        f32 progress = (f32)i / (f32)(CURVE_POINTS - 1);
-        vec3 interpolatedCurvePoints[BEZIER_DEGREE_PLUS_ONE] = {};
-		MemoryCopy(interpolatedCurvePoints, bezierCurvePoints, sizeof(interpolatedCurvePoints));
-        for (u32 curvePointCount = BEZIER_DEGREE_PLUS_ONE; curvePointCount > 1; curvePointCount--)
-        {
-            for (u32 j = 0; j < curvePointCount - 1; j++)
-            {
-				interpolatedCurvePoints[j] = vec3_lerp(interpolatedCurvePoints[j],interpolatedCurvePoints[j + 1], progress);;
-            }
-        }
+	// Generating random sphere holes
+	vec3* sphereHoleCenters = ArenaAlloc(&gameState->frameArena, generationSettings->sphereHoleCount * sizeof(*sphereHoleCenters));
 
-        bezierCurveSamples[i] = interpolatedCurvePoints[0];
-    }
+	for (int i = 0; i < generationSettings->sphereHoleCount; i++)
+	{
+		sphereHoleCenters[i] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(seed), sphereRadius), sphereCenter);
+	}
 
     // Looping over every density point and calculating the density.
     for (u32 x = 0; x < mapWidth; x++)
@@ -111,30 +121,55 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 
                 // Calculating whether the current point is in the sphere or in the bezier curve hole
                 f32 sphereValue = vec3_distance(currentPoint, sphereCenter) - sphereRadius;
+                if (sphereValue >= 0)
+				{
+					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1;
+					continue;
+				}
                 if (sphereValue <= -2)
                     sphereValue = -2;
-                if (sphereValue >= 0)
-                    sphereValue = 0;
+
+				f32 closestSphereDistanceSquared = 100000000000;
+				for (u32 i = 0; i < generationSettings->sphereHoleCount; i++)
+				{
+					f32 distanceSquared = vec3_distance_squared(currentPoint, sphereHoleCenters[i]);
+					if (distanceSquared < closestSphereDistanceSquared)
+						closestSphereDistanceSquared = distanceSquared;
+				}
+
+				f32 closestSphereDistance = sqrtf(closestSphereDistanceSquared);
+				closestSphereDistance -= generationSettings->sphereHoleRadius;
+				if (closestSphereDistance <= -2)
+				{
+					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1 + sphereValue - closestSphereDistance;
+					continue;
+				}
 
                 f32 closestBezierDistanceSquared = 100000000000;
-                for (u32 sampleIndex = distanceBetweenSamplePoints - 1; sampleIndex < CURVE_POINTS; sampleIndex += distanceBetweenSamplePoints)
+                for (u64 sampleIndex = 0; sampleIndex < totalBezierSamples; sampleIndex++)
                 {
-                    f32 distanceSquared = vec3_distance_squared(currentPoint, bezierCurveSamples[sampleIndex]);
+                    f32 distanceSquared = vec3_distance_squared(currentPoint, bezierSamples[sampleIndex]);
                     if (distanceSquared < closestBezierDistanceSquared)
                     {
                         closestBezierDistanceSquared = distanceSquared;
                     }
                 }
 
-                f32 closestBezierDistance = sqrt(closestBezierDistanceSquared) - bezierRadius;
+                f32 closestBezierDistance = sqrt(closestBezierDistanceSquared) - generationSettings->bezierTunnelRadius;
 
                 if (closestBezierDistance <= -2)
-                    closestBezierDistance = -2;
+				{
+					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1 + sphereValue - closestBezierDistance;
+					continue;
+				}
+				
                 if (closestBezierDistance >= 0)
                     closestBezierDistance = 0;
 
+				f32 closestAirDistance = fmin(closestSphereDistance, closestBezierDistance);
+
                 // Calculating the density value
-                *GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1 + sphereValue - closestBezierDistance;
+                *GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1 + sphereValue - closestAirDistance;
             }
         }
     }
