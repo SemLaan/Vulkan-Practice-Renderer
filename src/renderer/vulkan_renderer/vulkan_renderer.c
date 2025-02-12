@@ -972,6 +972,9 @@ void RecreateSwapchain()
 
     vk_state->shouldRecreateSwapchain = false;
     _INFO("Vulkan Swapchain resized");
+
+	EventData eventData = {};
+	InvokeEvent(EVCODE_SWAPCHAIN_RESIZED, eventData);
 }
 
 bool BeginRendering()
