@@ -225,7 +225,7 @@ void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 
     }
 }
 
-void BlurDensityMap(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+void BlurDensityMapGaussian(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
 {
 	if (iterations == 0)
 		return;
@@ -323,4 +323,97 @@ void BlurDensityMap(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidt
 	// "Freeing" the kernel and temp density map because these allocations can be quite large
 	gameState->frameArena.arenaPointer = (void*)kernel;
 }
+
+void BlurDensityMapBokeh(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+{
+	if (iterations == 0)
+		return;
+
+	GRASSERT_DEBUG(kernelSize & 1);
+
+	f32* originalDensityMap = densityMap;
+
+	u32 densityMapHeightTimesDepth = mapHeight * mapDepth;
+    u32 densityMapValueCount = mapWidth * mapHeight * mapDepth;
+
+	// Bluring the density map
+	// Generating the kernel
+    u32 kernelSizeSquared = kernelSize * kernelSize;
+    u32 kernelSizeCubed = kernelSizeSquared * kernelSize;
+
+    f32* kernel = ArenaAlloc(&gameState->frameArena, kernelSizeCubed * sizeof(*kernel));
+    f32 kernelTotal = 0;
+
+    for (u32 x = 0; x < kernelSize; x++)
+    {
+        for (u32 y = 0; y < kernelSize; y++)
+        {
+            for (u32 z = 0; z < kernelSize; z++)
+            {
+                
+                f32 value = 1;
+
+                kernel[x * kernelSizeSquared + y * kernelSize + z] = value;
+                kernelTotal += value;
+            }
+        }
+    }
+
+    u32 padding = (kernelSize - 1) / 2;
+
+	// Convolving the density map using the kernel to blur the density map
+    f32* nonBlurredDensityMap = densityMap;
+    densityMap = ArenaAlloc(&gameState->frameArena, densityMapValueCount * sizeof(*densityMap));
+	MemoryCopy(densityMap, nonBlurredDensityMap, densityMapValueCount * sizeof(*densityMap));
+
+    // Looping over every kernel sized area in the density map
+    for (u32 i = 0; i < iterations; i++)
+    {
+        for (u32 x = padding; x < mapWidth - padding; x++)
+        {
+            for (u32 y = padding; y < mapHeight - padding; y++)
+            {
+                for (u32 z = padding; z < mapDepth - padding; z++)
+                {
+                    f32 sum = 0;
+
+                    // Looping over the kernel and multiplying each element of the kernel with its respective element of the kernel sized area in the density map
+                    for (u32 kx = 0; kx < kernelSize; kx++)
+                    {
+                        for (u32 ky = 0; ky < kernelSize; ky++)
+                        {
+                            for (u32 kz = 0; kz < kernelSize; kz++)
+                            {
+                                //                                        [                      x                      ]   [            y              ]   [       z        ]
+                                f32 preBlurDensity = nonBlurredDensityMap[(x + kx - padding) * densityMapHeightTimesDepth + (y + ky - padding) * mapDepth + (z + kz - padding)];
+                                sum += preBlurDensity * kernel[kx * kernelSizeSquared + ky * kernelSize + kz];
+                            }
+                        }
+                    }
+
+                    *GetDensityValueRef(densityMap, densityMapHeightTimesDepth, mapDepth, x, y, z) = sum / kernelTotal;
+                }
+            }
+        }
+
+        // Switching the nonBlurredDensityMap and the density map if there is another blur iteration
+		// The data in the densityMap (after the switch) doesn't have to be changed because it will be entirely overwritten and not read.
+		// Because during the blurring process only the nonBlurredDensity map gets read, which has just gone through a blur iteration.
+        if (i != iterations - 1)
+        {
+            f32* temp = nonBlurredDensityMap;
+            nonBlurredDensityMap = densityMap;
+            densityMap = temp;
+        }
+    }
+
+	if (originalDensityMap != densityMap)
+	{
+		MemoryCopy(originalDensityMap, densityMap, densityMapValueCount * sizeof(*densityMap));
+	}
+
+	// "Freeing" the kernel and temp density map because these allocations can be quite large
+	gameState->frameArena.arenaPointer = (void*)kernel;
+}
+
 
