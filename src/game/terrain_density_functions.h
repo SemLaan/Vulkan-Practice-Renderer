@@ -12,13 +12,13 @@ void DensityFuncSphereHole(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 map
 #define MIN_BEZIER_TUNNEL_COUNT 0
 #define MAX_BEZIER_TUNNEL_COUNT 10
 #define MIN_BEZIER_TUNNEL_RADIUS 1
-#define MAX_BEZIER_TUNNEL_RADIUS 100
+#define MAX_BEZIER_TUNNEL_RADIUS 10
 #define MIN_BEZIER_TUNNEL_CONTROL_POINTS 3
 #define MAX_BEZIER_TUNNEL_CONTROL_POINTS 10
 #define MIN_SPHERE_HOLE_COUNT 0
 #define MAX_SPHERE_HOLE_COUNT 5
 #define MIN_SPHERE_HOLE_RADIUS 1
-#define MAX_SPHERE_HOLE_RADIUS 100
+#define MAX_SPHERE_HOLE_RADIUS 10
 
 typedef struct BezierDensityFuncSettings
 {
@@ -40,5 +40,6 @@ void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 
 #define MAX_BLUR_ITERATIONS 20
 #define POSSIBLE_BLUR_KERNEL_SIZES {3, 5, 7}
 #define POSSIBLE_BLUR_KERNEL_SIZES_COUNT 3
-void BlurDensityMap(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth);
+void BlurDensityMapGaussian(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth);
+void BlurDensityMapBokeh(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth);
 

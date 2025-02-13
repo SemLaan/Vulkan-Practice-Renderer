@@ -230,7 +230,7 @@ void GameRenderingInit()
         u32 densityMapValueCount = world->densityMapWidth * world->densityMapHeight * world->densityMapDepth;
         world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount, MEM_TAG_TEST);
         DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-		BlurDensityMap(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+		BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 		world->marchingCubesMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
     }
 }
@@ -367,6 +367,6 @@ void RegenerateMarchingCubesMesh()
 {
 	World* world = &renderingState->world;
 	DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-	BlurDensityMap(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+	BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 	MarchingCubesRegenerateMesh(&world->marchingCubesMesh, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 }
