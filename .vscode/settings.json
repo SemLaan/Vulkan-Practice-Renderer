@@ -38,6 +38,7 @@
 		"tuple": "c",
 		"type_traits": "c",
 		"utility": "c",
-		"camera.h": "c"
+		"camera.h": "c",
+		"ttf_types.h": "c"
 	}
 }

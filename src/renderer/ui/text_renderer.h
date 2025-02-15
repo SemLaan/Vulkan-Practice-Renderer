@@ -3,7 +3,50 @@
 #include "math/math_types.h"
 #include "renderer/renderer.h"
 
-typedef struct Text Text;
+DEFINE_DARRAY_TYPE_REF(char);
+DEFINE_DARRAY_TYPE(u32);
+
+// TODO: remove if not needed
+// typedef struct Text
+//{
+// u64 id;
+// char* string;
+// bool enabled;
+//} Text;
+
+typedef struct GlyphInstanceData
+{
+    // Each pair of vec2's is sent to the gpu as a single vec4 to save on vertex attributes
+    vec2 localPosition;                // .xy = local position
+    vec2 localScale;                   // .zw = local scale
+    vec2 bottomLeftTextureCoordinates; // .xy = texture coordinates
+    vec2 topRightTextureCoordinates;   // .zw = texture coordinates
+} GlyphInstanceData;
+
+DEFINE_DARRAY_TYPE(GlyphInstanceData);
+
+#define MAX_RENDERABLE_CHARACTERS_PER_FONT 255
+
+/// @brief Struct with all the data necessary to render text with a font.
+typedef struct Font
+{
+	Texture textureMap;
+	u32 renderableCharacters[MAX_RENDERABLE_CHARACTERS_PER_FONT];
+	f32 advanceWidths[MAX_RENDERABLE_CHARACTERS_PER_FONT];
+	vec2 glyphSizes[MAX_RENDERABLE_CHARACTERS_PER_FONT];	// Glyph size is { 0, 0 } if it represents a character with no glyph, like space
+	u32 characterCount;
+} Font;
+
+typedef struct TextBatch
+{
+    GlyphInstanceDataDarray* glyphInstanceData;
+    VertexBuffer glyphInstancesBuffer;
+    charRefDarray* strings;
+    u32Darray* stringLengths;
+	Font* font;
+    Material textMaterial;         //
+    u32 gpuBufferInstanceCapacity; // TODO: remove once vertex buffer resizing is a thing
+} TextBatch;
 
 /// @brief Initializes the text renderer, should be called by the engine after renderer startup.
 /// @return Bool that indicates whether startup was successful or not.
@@ -15,29 +58,25 @@ void ShutdownTextRenderer();
 /// @brief Loads a font for rendering text with.
 /// @param fontName What to name the font in the engine.
 /// @param fontFileString String with the filepath to the font file.
-void TextLoadFont(const char* fontName, const char* fontFileString);// TODO: add parameter for specifying how to load the font (as bezier or fill)
+void TextLoadFont(const char* fontName, const char* fontFileString);
 
-/// @brief Creates a text object for rendering text, will be rendered if it is active when TextRender is called. Is active by default after it's created.
-/// @param textString char* to the string.
-/// @param fontName String of the name of the font to use.
-/// @param transform Transformation matrix that should be applied when rendering this text (the user should combine the MVP on CPU as this matrix will be directly applied to the text).
-/// @param updateFrequency How often the user expects the text of this object to be changed.
-/// @return Text* to the object.
-Text* TextCreate(const char* textString, const char* fontName, mat4 transform, UpdateFrequency updateFrequency);
+// TODO: 
+void TextUnoadFont(const char* fontName);
 
+TextBatch* TextBatchCreate(const char* fontName);
+void TextBatchDestroy(TextBatch* textBatch);
 
-void TextDestroy();// TODO:
+/// @brief Adds text to a text batch
+/// @param textBatch
+/// @param text The text at the pointer will be copied, what happens to the text pointer after this function call doesn't matter
+/// @param position
+/// @return ID of the text added, used for removing specific texts from a text batch
+u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize);
 
+void TextBatchRemoveText(TextBatch* textBatch, u64 textId);
 
-void TextSetActive();//TODO:
+void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosition);
 
-/// @brief Updates the transform of a text object.
-/// @param text The text to update.
-/// @param transform The new transform.
-void TextUpdateTransform(Text* text, mat4 transform);
+void TextBatchSetTextActive(TextBatch* textBatch, u64 textId, bool active);
 
-/// @brief Renders all the text objects that are currently active.
-/// Should be called after rendering the scene, the user should decide whether to call it before or after rendering post processing effects.
-/// Should be called ONLY while rendering to a render target with color and depth.
-void TextRender();
-
+void TextBatchRender(TextBatch* textBatch, mat4 viewProjection);

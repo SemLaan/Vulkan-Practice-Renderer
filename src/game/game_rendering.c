@@ -77,8 +77,8 @@ typedef struct GameRenderingState
     ShaderParameters shaderParameters;
 	WorldGenParameters worldGenParams;
 
-    // Text, THIS IS TEMPORARY, this needs to be changed once the text system is finished
-    Text* textTest;
+    // Text,  TODO: THIS IS TEMPORARY, this needs to be changed once the text system is finished
+    TextBatch* textBatchTest;
 } GameRenderingState;
 
 static GameRenderingState* renderingState = nullptr;
@@ -129,7 +129,8 @@ void GameRenderingInit()
     // Creating test text
     // TODO: this will be replaced once the text rendering system is finished
     const char* testString = "Beefy text testing!?.";
-    renderingState->textTest = TextCreate(testString, FONT_NAME_ROBOTO, renderingState->uiCamera.projection, UPDATE_FREQUENCY_STATIC);
+	renderingState->textBatchTest = TextBatchCreate(FONT_NAME_ROBOTO);
+	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(5, 5), 2);
 
     // Creating render targets
     {
@@ -282,16 +283,13 @@ void GameRenderingRender()
 		Draw(1, &renderingState->world.marchingCubesMesh.vertexBuffer, renderingState->world.marchingCubesMesh.indexBuffer, &identity, 1);
     }
 
-    // TODO: remove this test
+    // Rendering the marching cubes mesh outline
     MaterialBind(renderingState->outlineMaterial);
     MeshData* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
     Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
 
     // Rendering text as a demo of the text system
-    mat4 bezierModel = mat4_2Dtranslate(vec2_create(0, 4));
-    // TextUpdateTransform(gameState->textTest, mat4_mul_mat4(gameState->uiViewProj, bezierModel));
-    TextUpdateTransform(renderingState->textTest, mat4_mul_mat4(renderingState->sceneCamera.viewProjection, bezierModel));
-    TextRender();
+	TextBatchRender(renderingState->textBatchTest, renderingState->uiCamera.projection);
 
     // Rendering the debug menu's
     for (u32 i = 0; i < renderingState->debugMenuDarray->size; i++)
@@ -308,6 +306,9 @@ void GameRenderingRender()
 void GameRenderingShutdown()
 {
     UnregisterEventListener(EVCODE_SWAPCHAIN_RESIZED, OnWindowResize);
+
+	// Destroying text test // TODO: remove
+	TextBatchDestroy(renderingState->textBatchTest);
 
     // Destroying debug menu for shader params and darray for debug ui's
     UnregisterDebugMenu(renderingState->shaderParamDebugMenu);
