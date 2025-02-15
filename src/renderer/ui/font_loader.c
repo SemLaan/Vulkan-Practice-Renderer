@@ -129,7 +129,7 @@ GlyphData* LoadFont(const char* filename)
 
                     // Find all indices for charcodes we care about
                     for (u32 charCode = 0; charCode < CHAR_COUNT; charCode++)
-                    {                         
+                    {
                         for (int segment = 0; segment < segCount; segment++)
                         {
                             if (charCode <= endCode[segment])
@@ -208,6 +208,10 @@ GlyphData* LoadFont(const char* filename)
         GRASSERT(0 == fseek(file, glyphOffset, SEEK_SET));
 
         GlyphHeader glyphHeader = readGlyphHeader(file);
+
+		// Filling in glyph sizes
+		glyphData->glyphSizes[charCode].x = (f32)((i32)glyphHeader.xMax - (i32)glyphHeader.xMin) / (f32)ttfData.fontHeaderTable.unitsPerEm;
+		glyphData->glyphSizes[charCode].y = (f32)((i32)glyphHeader.yMax - (i32)glyphHeader.yMin) / (f32)ttfData.fontHeaderTable.unitsPerEm;
 
         GRASSERT(glyphHeader.numberOfContours < MAX_CONTOURS);
 
