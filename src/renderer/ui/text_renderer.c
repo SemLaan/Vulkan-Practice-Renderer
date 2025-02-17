@@ -1,8 +1,10 @@
 #include "text_renderer.h"
+#include "msdf_helper_functions.h"
 
 #include "containers/simplemap.h"
 #include "math/lin_alg.h"
 #include "renderer/ui/font_loader.h"
+#include "renderer/texture.h"
 #include <string.h>
 
 // For determining the size of the allocations in the text pool allocator.
@@ -94,6 +96,14 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     Font* font = Alloc(GetGlobalAllocator(), sizeof(*font), MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(font, sizeof(*font));
 
+	u32 textureMapWidth = 32;
+	u32 textureMapHeight = 32;
+	u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight, MEM_TAG_TEST);
+	for (u32 i = 0; i < TEXTURE_CHANNELS * textureMapWidth * textureMapHeight; i++)
+	{
+		texturePixelData[i] = 255;
+	}
+
 	// Looping over the amount of renderable characters.
     // Getting the character at the index and making an array of its bezier curves.
     for (int i = 0; i < charCount; i++)
@@ -103,13 +113,29 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 		
 		font->advanceWidths[i] = glyphData->advanceWidths[c];
 		font->glyphSizes[i] = glyphData->glyphSizes[c];
+
+		if (c == 'A')
+		{
+			vec2i bottomLeft = { 1, 1 };
+			vec2i topRight = { textureMapWidth - 2, textureMapHeight - 2 };
+			CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureMapWidth, textureMapHeight, font, glyphData, i, bottomLeft, topRight);
+		}
 	}
 
 	font->characterCount = charCount;
 
+	font->textureMap = TextureCreate(textureMapWidth, textureMapHeight, texturePixelData);
+
+	Free(GetGlobalAllocator(), texturePixelData);
+
 	// TODO: unload glyphData
 
 	SimpleMapInsert(state->fontMap, fontName, font);
+}
+
+Font* TextGetFont(const char* fontName)
+{
+	return SimpleMapLookup(state->fontMap, fontName);
 }
 
 #define INITIAL_GPU_BUFFER_INSTANCE_CAPACITY 100

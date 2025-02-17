@@ -212,6 +212,8 @@ GlyphData* LoadFont(const char* filename)
 		// Filling in glyph sizes
 		glyphData->glyphSizes[charCode].x = (f32)((i32)glyphHeader.xMax - (i32)glyphHeader.xMin) / (f32)ttfData.fontHeaderTable.unitsPerEm;
 		glyphData->glyphSizes[charCode].y = (f32)((i32)glyphHeader.yMax - (i32)glyphHeader.yMin) / (f32)ttfData.fontHeaderTable.unitsPerEm;
+		glyphData->glyphBottomLeftAnchor[charCode].x = (f32)glyphHeader.xMin / (f32)ttfData.fontHeaderTable.unitsPerEm;
+		glyphData->glyphBottomLeftAnchor[charCode].y = (f32)glyphHeader.yMin / (f32)ttfData.fontHeaderTable.unitsPerEm;
 
         GRASSERT(glyphHeader.numberOfContours < MAX_CONTOURS);
 
