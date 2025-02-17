@@ -12,6 +12,7 @@
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
 #define NORMAL_SHADER_NAME "normal_shader"
 #define OUTLINE_SHADER_NAME "outline_shader"
+#define UI_TEXTURE_NAME "ui_texture_shader"
 #define FONT_NAME_ROBOTO "roboto"
 #define FONT_NAME_ADORABLE_HANDMADE "adorable"
 #define FONT_NAME_NICOLAST "nicolast"
@@ -62,6 +63,7 @@ typedef struct GameRenderingState
     Material marchingCubesMaterial;
     Material normalRenderingMaterial;
     Material outlineMaterial;
+	Material uiTextureMaterial;
 
     // Render targets
     RenderTarget normalAndDepthRenderTarget;
@@ -82,6 +84,9 @@ typedef struct GameRenderingState
 } GameRenderingState;
 
 static GameRenderingState* renderingState = nullptr;
+
+// TODO: remove this
+static Font* tempFontRef = nullptr;
 
 static bool OnWindowResize(EventCode type, EventData data)
 {
@@ -125,6 +130,8 @@ void GameRenderingInit()
     TextLoadFont(FONT_NAME_ROBOTO, "Roboto-Black.ttf");
     TextLoadFont(FONT_NAME_ADORABLE_HANDMADE, "Adorable Handmade.ttf");
     TextLoadFont(FONT_NAME_NICOLAST, "Nicolast.ttf");
+
+	tempFontRef = TextGetFont(FONT_NAME_ROBOTO);
 
     // Creating test text
     // TODO: this will be replaced once the text rendering system is finished
@@ -183,6 +190,22 @@ void GameRenderingInit()
             shaderCreateInfo.fragmentShaderName = "outline";
             ShaderCreate(OUTLINE_SHADER_NAME, &shaderCreateInfo);
         }
+
+		{
+            ShaderCreateInfo shaderCreateInfo = {};
+            shaderCreateInfo.renderTargetColor = true;
+            shaderCreateInfo.renderTargetDepth = false;
+            shaderCreateInfo.renderTargetStencil = false;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributeCount = 3;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
+            shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;
+            shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
+
+            shaderCreateInfo.vertexShaderName = "ui_texture";
+            shaderCreateInfo.fragmentShaderName = "ui_texture";
+            ShaderCreate(UI_TEXTURE_NAME, &shaderCreateInfo);
+        }
     }
 
     // Creating materials
@@ -190,6 +213,7 @@ void GameRenderingInit()
         renderingState->marchingCubesMaterial = MaterialCreate(ShaderGetRef(MARCHING_CUBES_SHADER_NAME));
         renderingState->normalRenderingMaterial = MaterialCreate(ShaderGetRef(NORMAL_SHADER_NAME));
         renderingState->outlineMaterial = MaterialCreate(ShaderGetRef(OUTLINE_SHADER_NAME));
+		renderingState->uiTextureMaterial = MaterialCreate(ShaderGetRef(UI_TEXTURE_NAME));
     }
 
     // Initializing material state
@@ -200,6 +224,7 @@ void GameRenderingInit()
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
         MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
         MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+		MaterialUpdateTexture(renderingState->uiTextureMaterial, "tex", tempFontRef->textureMap, SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
     }
 
     // Setting up debug ui's for shader parameters and terrain generation settings
@@ -250,6 +275,7 @@ void GameRenderingRender()
     MaterialUpdateProperty(renderingState->outlineMaterial, "screenWidth", &windowSize.x);
     MaterialUpdateProperty(renderingState->outlineMaterial, "screenHeight", &windowSize.y);
     MaterialUpdateProperty(renderingState->outlineMaterial, "normalEdgeThreshold", &renderingState->shaderParameters.normalEdgeThreshold);
+	MaterialUpdateProperty(renderingState->uiTextureMaterial, "uiProjection", &renderingState->uiCamera.projection);
 	mat4 identity = mat4_identity();
 
     // ================== Camera calculations
@@ -296,6 +322,11 @@ void GameRenderingRender()
     {
         DebugUIRenderMenu(renderingState->debugMenuDarray->data[i]);
     }
+
+	MeshData* quadMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);
+	mat4 quadModelMatrix = mat4_mul_mat4(mat4_2Dtranslate(vec2_create(4, 4)), mat4_2Dscale(vec2_create(3, 3)));
+	MaterialBind(renderingState->uiTextureMaterial);
+	Draw(1, &quadMesh->vertexBuffer, quadMesh->indexBuffer, &quadModelMatrix, 1);
 
     RenderTargetStopRendering(GetMainRenderTarget());
 

@@ -60,8 +60,10 @@ void ShutdownTextRenderer();
 /// @param fontFileString String with the filepath to the font file.
 void TextLoadFont(const char* fontName, const char* fontFileString);
 
-// TODO: 
-void TextUnoadFont(const char* fontName);
+void TextUnloadFont(const char* fontName); //TODO: 
+
+Font* TextGetFont(const char* fontName);
+
 
 TextBatch* TextBatchCreate(const char* fontName);
 void TextBatchDestroy(TextBatch* textBatch);
