@@ -27,5 +27,16 @@ void main()
     //float linearDepth = linearize_depth(rawDepth, ubo.zNear, ubo.zFar);
     //float depthColor = 1 - rawDepth;
     //outColor = vec4(depthColor, depthColor, depthColor, 1);
+
+	float sdfValue = texture(tex, texCoord).x;
+
+	vec4 colorValue = vec4(0, 0, 0, 0);
+
+	if (sdfValue < 0.55)
+		colorValue = vec4(0, 0, 0, 1);
+	if (sdfValue < 0.45)
+		colorValue = vec4(0, 1, 1, 1);
+
+	outColor = colorValue;
 	outColor = vec4(texture(tex, texCoord).xyz, 1);
 }

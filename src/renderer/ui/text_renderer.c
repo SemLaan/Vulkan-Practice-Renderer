@@ -96,8 +96,8 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     Font* font = Alloc(GetGlobalAllocator(), sizeof(*font), MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(font, sizeof(*font));
 
-	u32 textureMapWidth = 32;
-	u32 textureMapHeight = 32;
+	u32 textureMapWidth = 128;
+	u32 textureMapHeight = 128;
 	u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight, MEM_TAG_TEST);
 	for (u32 i = 0; i < TEXTURE_CHANNELS * textureMapWidth * textureMapHeight; i++)
 	{
@@ -114,7 +114,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 		font->advanceWidths[i] = glyphData->advanceWidths[c];
 		font->glyphSizes[i] = glyphData->glyphSizes[c];
 
-		if (c == 'A')
+		if (c == 'S')
 		{
 			vec2i bottomLeft = { 1, 1 };
 			vec2i topRight = { textureMapWidth - 2, textureMapHeight - 2 };

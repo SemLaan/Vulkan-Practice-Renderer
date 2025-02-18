@@ -39,6 +39,8 @@
 		"type_traits": "c",
 		"utility": "c",
 		"camera.h": "c",
-		"ttf_types.h": "c"
+		"ttf_types.h": "c",
+		"random": "cpp",
+		"iterator": "cpp"
 	}
 }

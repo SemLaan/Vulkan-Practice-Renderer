@@ -131,7 +131,7 @@ void GameRenderingInit()
     TextLoadFont(FONT_NAME_ADORABLE_HANDMADE, "Adorable Handmade.ttf");
     TextLoadFont(FONT_NAME_NICOLAST, "Nicolast.ttf");
 
-	tempFontRef = TextGetFont(FONT_NAME_ROBOTO);
+	tempFontRef = TextGetFont(FONT_NAME_NICOLAST);
 
     // Creating test text
     // TODO: this will be replaced once the text rendering system is finished
@@ -224,7 +224,7 @@ void GameRenderingInit()
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
         MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
         MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
-		MaterialUpdateTexture(renderingState->uiTextureMaterial, "tex", tempFontRef->textureMap, SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
+		MaterialUpdateTexture(renderingState->uiTextureMaterial, "tex", tempFontRef->textureMap, SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
     }
 
     // Setting up debug ui's for shader parameters and terrain generation settings
