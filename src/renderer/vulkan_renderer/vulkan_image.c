@@ -88,7 +88,7 @@ bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask)
 	return true;
 }
 
-Texture TextureCreate(u32 width, u32 height, void* pixels)
+Texture TextureCreate(u32 width, u32 height, void* pixels, TextureStorageType textureStorageType)
 {
 	Texture out_texture = {};
 	out_texture.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanImage), MEM_TAG_TEXTURE);
@@ -109,7 +109,10 @@ Texture TextureCreate(u32 width, u32 height, void* pixels)
 	VulkanCreateImageParameters createImageParameters = {};
 	createImageParameters.width = width;
 	createImageParameters.height = height;
-	createImageParameters.format = VK_FORMAT_R8G8B8A8_SRGB;
+	if (textureStorageType == TEXTURE_STORAGE_RGBA8SRGB)
+		createImageParameters.format = VK_FORMAT_R8G8B8A8_SRGB;
+	else 
+		createImageParameters.format = VK_FORMAT_R8G8B8A8_UNORM;
 	createImageParameters.tiling = VK_IMAGE_TILING_OPTIMAL;
 	createImageParameters.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	createImageParameters.properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;

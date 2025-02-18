@@ -708,7 +708,7 @@ bool InitializeRenderer()
             }
         }
 
-        vk_state->defaultTexture = TextureCreate(DEFAULT_TEXTURE_SIZE, DEFAULT_TEXTURE_SIZE, defaultTexturePixels);
+        vk_state->defaultTexture = TextureCreate(DEFAULT_TEXTURE_SIZE, DEFAULT_TEXTURE_SIZE, defaultTexturePixels, TEXTURE_STORAGE_RGBA8SRGB);
     }
 
     // ============================================================================================================================================================
