@@ -44,6 +44,17 @@ static vec2 vec2_add_vec2(vec2 a, vec2 b)
 	return (vec2){a.x + b.x, a.y + b.y};
 }
 
+static f32 vec2_dot_vec2(vec2 a, vec2 b)
+{
+	return a.x * b.x + a.y * b.y;
+}
+
+// There is no 2d cross product, but this implements it the way it's defined in the msdf paper.
+static f32 vec2_cross_vec2(vec2 a, vec2 b)
+{
+	return a.x * b.y - a.y * b.x;
+}
+
 static vec2 vec2_sub_vec2(vec2 a, vec2 b)
 {
 	return (vec2){a.x - b.x, a.y - b.y};
@@ -57,6 +68,12 @@ static vec2 vec2_div_float(vec2 vec, f32 value)
 static f32 vec2_magnitude(vec2 a)
 {
 	return sqrtf(a.x * a.x + a.y * a.y);
+}
+
+static vec2 vec2_normalize(vec2 a)
+{
+	f32 length = vec2_magnitude(a);
+	return vec2_create(a.x / length, a.y / length);
 }
 
 static vec2 vec2_mul_f32(vec2 a, f32 b)
