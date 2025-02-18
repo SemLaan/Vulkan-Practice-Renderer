@@ -124,7 +124,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
 	font->characterCount = charCount;
 
-	font->textureMap = TextureCreate(textureMapWidth, textureMapHeight, texturePixelData);
+	font->textureMap = TextureCreate(textureMapWidth, textureMapHeight, texturePixelData, TEXTURE_STORAGE_RGBA8UNORM);
 
 	Free(GetGlobalAllocator(), texturePixelData);
 
