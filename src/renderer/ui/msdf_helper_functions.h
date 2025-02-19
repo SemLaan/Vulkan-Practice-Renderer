@@ -369,7 +369,8 @@ void QuickSort(u32* indices, vec2i* objectSizes, u32 low, u32 high)
 /// @param vec2i* objectPositions 
 /// @param vec2i* objectSizes
 /// @param u32 objectCount
-void Calculate2DBinPacking(vec2i* objectPositions, vec2i* objectSizes, u32 objectCount, u32 binWidth)
+/// @returns u32 that represents the height required for the packed layout
+u32 Calculate2DBinPacking(vec2i* objectPositions, vec2i* objectSizes, u32 objectCount, u32 binWidth)
 {
 	GRASSERT_DEBUG(objectCount <= MAX_BIN_PACKING_OBJECTS);
 
@@ -422,6 +423,8 @@ void Calculate2DBinPacking(vec2i* objectPositions, vec2i* objectSizes, u32 objec
 			binCount++;
 		}
 	}
+
+	return (u32)binHeights[binCount];
 }
 
 
