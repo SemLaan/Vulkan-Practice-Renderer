@@ -321,3 +321,107 @@ void CreateGlyphSDF(u8* textureData, u32 textureChannels, u32 textureWidth, u32 
         }
     }
 }
+
+u32 Partition(u32* indices, vec2i* objectSizes, u32 low, u32 high)
+{
+	i32 partitionValue = objectSizes[indices[high]].y;
+	
+	i32 i = low - 1;
+	i32 j = low;
+	for (; j < high; j++)
+	{
+		if (objectSizes[indices[j]].y > partitionValue)
+		{
+			i++;
+			u32 temp = indices[i];
+			indices[i] = indices[j];
+			indices[j] = temp;
+		}
+	}
+
+	i++;
+	u32 temp = indices[i];
+	indices[i] = indices[j];
+	indices[j] = temp;
+
+	return i;
+}
+
+void QuickSort(u32* indices, vec2i* objectSizes, u32 low, u32 high)
+{
+	// If there is more than one element in the given range
+	if (low < high)
+	{
+		u32 partitionIndex = Partition(indices, objectSizes, low, high);
+
+		if (partitionIndex != 0)
+			QuickSort(indices, objectSizes, low, partitionIndex - 1);
+		if (partitionIndex + 1 != high)
+			QuickSort(indices, objectSizes, partitionIndex + 1, high);
+	}
+}
+
+
+#define MAX_BIN_PACKING_OBJECTS 200
+#define MAX_BIN_COUNT 10
+
+/// @brief Calculates a 2d bin packing for the given objects
+/// @param vec2i* objectPositions 
+/// @param vec2i* objectSizes
+/// @param u32 objectCount
+void Calculate2DBinPacking(vec2i* objectPositions, vec2i* objectSizes, u32 objectCount, u32 binWidth)
+{
+	GRASSERT_DEBUG(objectCount <= MAX_BIN_PACKING_OBJECTS);
+
+	// Sort the objects on decreasing height
+	u32 sortedIndices[MAX_BIN_PACKING_OBJECTS] = {};
+	for (u32 i = 0; i < objectCount; i++)
+		sortedIndices[i] = i;
+
+	QuickSort(sortedIndices, objectSizes, 0, objectCount-1);
+
+	u32 binCount = 0;
+	u32 binsSpaceLeft[MAX_BIN_COUNT] = {};
+	i32 binHeights[MAX_BIN_COUNT+1] = {};
+	
+	// Adding the first object and initializing the first bin
+	objectPositions[sortedIndices[0]].x = 0;
+	objectPositions[sortedIndices[0]].y = 0;
+	binsSpaceLeft[binCount] = binWidth - objectSizes[sortedIndices[0]].x;
+	binHeights[binCount + 1] = objectSizes[sortedIndices[0]].y;
+	binCount++;
+
+	for (u32 i = 1; i < objectCount; i++)
+	{
+		vec2i objectSize = objectSizes[sortedIndices[i]];
+		bool objectPlaced = false;
+		for (u32 j = 0; j < binCount; j++)
+		{
+			if (objectSize.x <= binsSpaceLeft[j])
+			{
+				objectPositions[sortedIndices[i]].x = binWidth - binsSpaceLeft[j];
+				objectPositions[sortedIndices[i]].y = binHeights[j];
+				binsSpaceLeft[j] -= objectSize.x;
+
+				objectPlaced = true;
+				break;
+			}
+		}
+
+		// If the object didn't fit into any existing bin, create a new one
+		if (!objectPlaced)
+		{
+			// Initializing the values of the new bin
+			binHeights[binCount + 1] = binHeights[binCount] + objectSize.y;
+			binsSpaceLeft[binCount] = binWidth;
+
+			objectPositions[sortedIndices[i]].x = binWidth - binsSpaceLeft[binCount];
+			objectPositions[sortedIndices[i]].y = binHeights[binCount];
+			binsSpaceLeft[binCount] -= objectSizes[sortedIndices[i]].x;
+			
+			binCount++;
+		}
+	}
+}
+
+
