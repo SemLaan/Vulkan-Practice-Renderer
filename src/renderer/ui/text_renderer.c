@@ -104,15 +104,8 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
 	u32 textureMapGlyphsPerRow = (u32)ceilf(sqrtf((f32)charCount));
 
-	u32 textureMapWidth = textureMapGlyphsPerRow * glyphResolution;
-	u32 textureMapHeight = textureMapGlyphsPerRow * glyphResolution;
-	u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight, MEM_TAG_TEST);
-	MemoryZero(texturePixelData, sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight);
-
 	// Looping over the amount of renderable characters.
     // Getting the character at the index and storing it's advance width and size and calculating the size in pixels it takes up in the texture atlas.
-	u32 xGlyphIndex = 0;
-	u32 yGlyphIndex = 0;
 	vec2i paddedPixelGlyphSizes[255] = {};
     for (int i = 0; i < charCount; i++)
     {
@@ -128,7 +121,14 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 	
 	// Generating a packing for the texture atlas
 	vec2i glyphAnchorPositions[255] = {};
-	Calculate2DBinPacking(glyphAnchorPositions, paddedPixelGlyphSizes, charCount, glyphResolution * 10);
+	u32 binPackedHeight = Calculate2DBinPacking(glyphAnchorPositions, paddedPixelGlyphSizes, charCount, glyphResolution * textureMapGlyphsPerRow);
+
+	u32 textureMapWidth = glyphResolution * textureMapGlyphsPerRow;
+	u32 textureMapHeight = binPackedHeight;
+	u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight, MEM_TAG_TEST);
+	MemoryZero(texturePixelData, sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight);
+	for (u32 i = 0; i < textureMapHeight * textureMapWidth; i++)
+		texturePixelData[i * TEXTURE_CHANNELS] = 255;
 
 	// Generating the signed distance fields for the characters in the correct position in the texture atlas (in place)
 	for (int i = 0; i < charCount; i++)
@@ -136,13 +136,6 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 		vec2i topRight = { glyphAnchorPositions[i].x + paddedPixelGlyphSizes[i].x, glyphAnchorPositions[i].y + paddedPixelGlyphSizes[i].y };
 
 		CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureMapWidth, textureMapHeight, font, glyphData, i, glyphAnchorPositions[i], topRight, paddingEm);
-
-		xGlyphIndex++;
-		if (xGlyphIndex == textureMapGlyphsPerRow)
-		{
-			xGlyphIndex = 0;
-			yGlyphIndex++;
-		}
 	}
 
 	font->characterCount = charCount;
