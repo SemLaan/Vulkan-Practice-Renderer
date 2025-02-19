@@ -96,16 +96,23 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     Font* font = Alloc(GetGlobalAllocator(), sizeof(*font), MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(font, sizeof(*font));
 
-	u32 textureMapWidth = 128;
-	u32 textureMapHeight = 128;
+	u32 glyphResolution = 32;
+	u32 paddingPixels = 2;
+	u32 emToPixels = glyphResolution - paddingPixels * 2;
+	f32 pixelsToEm = 1.f / (f32)emToPixels;
+	f32 paddingEm = pixelsToEm * (f32)paddingPixels;
+
+	u32 textureMapGlyphsPerRow = (u32)ceilf(sqrtf((f32)charCount));
+
+	u32 textureMapWidth = textureMapGlyphsPerRow * glyphResolution;
+	u32 textureMapHeight = textureMapGlyphsPerRow * glyphResolution;
 	u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight, MEM_TAG_TEST);
-	for (u32 i = 0; i < TEXTURE_CHANNELS * textureMapWidth * textureMapHeight; i++)
-	{
-		texturePixelData[i] = 255;
-	}
+	MemoryZero(texturePixelData, sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight);
 
 	// Looping over the amount of renderable characters.
     // Getting the character at the index and making an array of its bezier curves.
+	u32 xGlyphIndex = 0;
+	u32 yGlyphIndex = 0;
     for (int i = 0; i < charCount; i++)
     {
 		u32 c = renderableCharacters[i]; // Current char value
@@ -114,11 +121,20 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 		font->advanceWidths[i] = glyphData->advanceWidths[c];
 		font->glyphSizes[i] = glyphData->glyphSizes[c];
 
-		if (c == 'S')
+		vec2i paddedPixelGlyphSize = {};
+    	paddedPixelGlyphSize.x = glyphData->glyphSizes[c].x * emToPixels + paddingPixels * 2;
+    	paddedPixelGlyphSize.y = glyphData->glyphSizes[c].y * emToPixels + paddingPixels * 2;
+
+		vec2i bottomLeft = { xGlyphIndex * glyphResolution, yGlyphIndex * glyphResolution };
+		vec2i topRight = { bottomLeft.x + paddedPixelGlyphSize.x, bottomLeft.y + paddedPixelGlyphSize.y };
+
+		CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureMapWidth, textureMapHeight, font, glyphData, i, bottomLeft, topRight, paddingEm);
+
+		xGlyphIndex++;
+		if (xGlyphIndex == textureMapGlyphsPerRow)
 		{
-			vec2i bottomLeft = { 1, 1 };
-			vec2i topRight = { textureMapWidth - 2, textureMapHeight - 2 };
-			CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureMapWidth, textureMapHeight, font, glyphData, i, bottomLeft, topRight);
+			xGlyphIndex = 0;
+			yGlyphIndex++;
 		}
 	}
 
