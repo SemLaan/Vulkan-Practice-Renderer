@@ -131,7 +131,7 @@ void GameRenderingInit()
     TextLoadFont(FONT_NAME_ADORABLE_HANDMADE, "Adorable Handmade.ttf");
     TextLoadFont(FONT_NAME_NICOLAST, "Nicolast.ttf");
 
-	tempFontRef = TextGetFont(FONT_NAME_NICOLAST);
+	tempFontRef = TextGetFont(FONT_NAME_ROBOTO);
 
     // Creating test text
     // TODO: this will be replaced once the text rendering system is finished

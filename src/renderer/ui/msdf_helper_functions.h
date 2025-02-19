@@ -148,7 +148,7 @@ static inline f32 AbsoluteFloat(f32 value)
     return value;
 }
 
-void CreateGlyphSDF(u8* textureData, u32 textureChannels, u32 textureWidth, u32 textureHeight, Font* font, GlyphData* glyphData, u32 glyphIndex, vec2i bottomLeftTextureCoord, vec2i topRightTextureCoord)
+void CreateGlyphSDF(u8* textureData, u32 textureChannels, u32 textureWidth, u32 textureHeight, Font* font, GlyphData* glyphData, u32 glyphIndex, vec2i bottomLeftTextureCoord, vec2i topRightTextureCoord, f32 padding)
 {
     f32 maxDistance = MAX_SDF_DISTANCE;
     f32 distanceRange = maxDistance * 2;
@@ -189,11 +189,11 @@ void CreateGlyphSDF(u8* textureData, u32 textureChannels, u32 textureWidth, u32 
     // ====================================================== Calculating signed distances for each texel
     // Calculating how to transform local glyph texel coordinates to glyph space coordinates
     vec2 paddedGlyphAnchorValue = glyphData->glyphBottomLeftAnchor[charValue];
-    paddedGlyphAnchorValue.x -= maxDistance;
-    paddedGlyphAnchorValue.y -= maxDistance;
+    paddedGlyphAnchorValue.x -= padding;
+    paddedGlyphAnchorValue.y -= padding;
     vec2 paddedGlyphSize = glyphData->glyphSizes[charValue];
-    paddedGlyphSize.x += distanceRange;
-    paddedGlyphSize.y += distanceRange;
+    paddedGlyphSize.x += padding * 2;
+    paddedGlyphSize.y += padding * 2;
 
     // Looping over every texel
     for (u32 x = 0; x < horizontalPixelCount; x++)

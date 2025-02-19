@@ -38,5 +38,5 @@ void main()
 		colorValue = vec4(0, 1, 1, 1);
 
 	outColor = colorValue;
-	outColor = vec4(texture(tex, texCoord).xyz, 1);
+	//outColor = vec4(texture(tex, texCoord).xyz, 1);
 }
