@@ -110,9 +110,10 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 	MemoryZero(texturePixelData, sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight);
 
 	// Looping over the amount of renderable characters.
-    // Getting the character at the index and making an array of its bezier curves.
+    // Getting the character at the index and storing it's advance width and size and calculating the size in pixels it takes up in the texture atlas.
 	u32 xGlyphIndex = 0;
 	u32 yGlyphIndex = 0;
+	vec2i paddedPixelGlyphSizes[255] = {};
     for (int i = 0; i < charCount; i++)
     {
 		u32 c = renderableCharacters[i]; // Current char value
@@ -120,15 +121,21 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 		
 		font->advanceWidths[i] = glyphData->advanceWidths[c];
 		font->glyphSizes[i] = glyphData->glyphSizes[c];
+		
+    	paddedPixelGlyphSizes[i].x = glyphData->glyphSizes[c].x * emToPixels + paddingPixels * 2;
+    	paddedPixelGlyphSizes[i].y = glyphData->glyphSizes[c].y * emToPixels + paddingPixels * 2;
+	}
+	
+	// Generating a packing for the texture atlas
+	vec2i glyphAnchorPositions[255] = {};
+	Calculate2DBinPacking(glyphAnchorPositions, paddedPixelGlyphSizes, charCount, glyphResolution * 10);
 
-		vec2i paddedPixelGlyphSize = {};
-    	paddedPixelGlyphSize.x = glyphData->glyphSizes[c].x * emToPixels + paddingPixels * 2;
-    	paddedPixelGlyphSize.y = glyphData->glyphSizes[c].y * emToPixels + paddingPixels * 2;
+	// Generating the signed distance fields for the characters in the correct position in the texture atlas (in place)
+	for (int i = 0; i < charCount; i++)
+	{
+		vec2i topRight = { glyphAnchorPositions[i].x + paddedPixelGlyphSizes[i].x, glyphAnchorPositions[i].y + paddedPixelGlyphSizes[i].y };
 
-		vec2i bottomLeft = { xGlyphIndex * glyphResolution, yGlyphIndex * glyphResolution };
-		vec2i topRight = { bottomLeft.x + paddedPixelGlyphSize.x, bottomLeft.y + paddedPixelGlyphSize.y };
-
-		CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureMapWidth, textureMapHeight, font, glyphData, i, bottomLeft, topRight, paddingEm);
+		CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureMapWidth, textureMapHeight, font, glyphData, i, glyphAnchorPositions[i], topRight, paddingEm);
 
 		xGlyphIndex++;
 		if (xGlyphIndex == textureMapGlyphsPerRow)
