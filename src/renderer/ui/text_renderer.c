@@ -222,14 +222,14 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 		// If the glyph is a tab, dont add it to the glyph instance array
 		if (text[i] == '\t')
 		{
-			nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * TAB_SIZE;
+			nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * TAB_SIZE * fontSize;
 			continue;
 		}
 
 		// If the glyph is a space, dont add it to the glyph instance array
 		if (text[i] == ' ')
 		{
-			nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth;
+			nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * fontSize;
 			continue;
 		}
 
