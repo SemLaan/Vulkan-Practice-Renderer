@@ -135,7 +135,7 @@ void GameRenderingInit()
 
     // Creating test text
     // TODO: this will be replaced once the text rendering system is finished
-    const char* testString = "Beefy text testing!?.";
+    const char* testString = "Beefy text te\tsting!?.";
 	renderingState->textBatchTest = TextBatchCreate(FONT_NAME_ROBOTO);
 	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 5), 0.5f);
 

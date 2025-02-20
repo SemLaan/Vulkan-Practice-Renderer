@@ -34,6 +34,7 @@ typedef struct Font
 	vec2 glyphSizes[MAX_RENDERABLE_CHARACTERS_PER_FONT];	// Glyph size is { 0, 0 } if it represents a character with no glyph, like space
 	u32 renderableCharacters[MAX_RENDERABLE_CHARACTERS_PER_FONT];
 	f32 advanceWidths[MAX_RENDERABLE_CHARACTERS_PER_FONT];
+	f32 spaceAdvanceWidth;
 	u32 characterCount;
 } Font;
 

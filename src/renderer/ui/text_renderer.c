@@ -14,6 +14,7 @@
 #define RECT_VERTEX_COUNT 4
 #define RECT_INDEX_COUNT 6
 #define MAX_FONTMAP_ENTRIES 16
+#define TAB_SIZE 4
 
 typedef struct TextRendererState
 {
@@ -89,12 +90,14 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 	// Loading glyph data
     GlyphData* glyphData = LoadFont(fontFileString);
 
-	const char* renderableCharacters = " \tabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ<>,./\\?|_-=+1234567890!@#$&*()~`";
+	const char* renderableCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ<>,./\\?|_-=+1234567890!@#$&*()~`";
     u32 charCount = strlen(renderableCharacters);
 
 	// Creating font struct
     Font* font = Alloc(GetGlobalAllocator(), sizeof(*font), MEM_TAG_RENDERER_SUBSYS);
     MemoryZero(font, sizeof(*font));
+
+	font->spaceAdvanceWidth = glyphData->advanceWidths[' '];
 
 	u32 glyphResolution = 32;
 	u32 paddingPixels = 2;
@@ -212,9 +215,25 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 	MemoryCopy(string, text, sizeof(*text) * stringLengthPlusNullTerminator);
 	charRefDarrayPushback(textBatch->strings, &string);
 
+	// Looping through every char in the text and constructing the instance data for all the chars (position, scale, texture coords)
 	vec2 nextGlyphPosition = position;
 	for (int i = 0; i < stringLength; i++)
 	{
+		// If the glyph is a tab, dont add it to the glyph instance array
+		if (text[i] == '\t')
+		{
+			nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * TAB_SIZE;
+			continue;
+		}
+
+		// If the glyph is a space, dont add it to the glyph instance array
+		if (text[i] == ' ')
+		{
+			nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth;
+			continue;
+		}
+
+		// Finding the index for the glyph to get it's data from the font
 		u32 glyphIndex = UINT32_MAX;
 		for (int j = 0; j < textBatch->font->characterCount; j++)
 		{
@@ -227,6 +246,7 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 
 		GRASSERT_DEBUG(glyphIndex != UINT32_MAX);
 
+		// If the glyph size is 0 by 0, don't add it to the glyph instance array, only add its advance width
 		if (0 == (textBatch->font->glyphSizes[glyphIndex].x + textBatch->font->glyphSizes[glyphIndex].y))
 		{
 			nextGlyphPosition.x += textBatch->font->advanceWidths[glyphIndex];
