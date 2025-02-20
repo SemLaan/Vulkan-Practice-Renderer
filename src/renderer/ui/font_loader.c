@@ -9,6 +9,7 @@
 
 #define FORMAT_4_MAX_SEGMENTS 200
 
+
 typedef struct RawGlyphData
 {
     u32 pointCounts[255];           // Amount of points in the glyph, index from 0 - 255
@@ -30,13 +31,17 @@ GlyphData* LoadFont(const char* filename)
 
     GRASSERT(ttfData.offsetTable.numTables < MAX_TABLE_RECORDS);
 
+#ifdef DEBUG_FONT_LOADER
     _DEBUG("tables: %i", ttfData.offsetTable.numTables);
+#endif
 
     // =============================================================================== Reading out tables =========================================================================
     for (int i = 0; i < ttfData.offsetTable.numTables; i++)
     {
         ttfData.tableRecords[i] = readTableRecord(file);
+		#ifdef DEBUG_FONT_LOADER
         _DEBUG(ttfData.tableRecords[i].tag);
+		#endif
 
         i64 nextRecordStreamPos = ftell(file);
 
@@ -45,8 +50,10 @@ GlyphData* LoadFont(const char* filename)
             GRASSERT(0 == fseek(file, ttfData.tableRecords[i].offset, SEEK_SET));
             ttfData.horizontalHeaderTable = readHorizontalHeaderTable(file);
             GRASSERT(ttfData.horizontalHeaderTable.numOfLongHorMetrics < MAX_LONG_HOR_METRICS);
+			#ifdef DEBUG_FONT_LOADER
             _DEBUG("Entries: %i", ttfData.horizontalHeaderTable.numOfLongHorMetrics);
             _DEBUG("Max advance width: %u", ttfData.horizontalHeaderTable.advanceWidthMax);
+			#endif
         }
         else if (0 == strncmp(ttfData.tableRecords[i].tag, "loca", 4))                  // Getting the table that translates glyphID to glyph data address in the glyf table, used later to read out glyphs
         {
@@ -61,13 +68,17 @@ GlyphData* LoadFont(const char* filename)
             GRASSERT(0 == fseek(file, ttfData.tableRecords[i].offset, SEEK_SET));
             ttfData.maxP = readMaxP(file);
             GRASSERT(ttfData.maxP.numGlyphs < MAX_LONG_HOR_METRICS);
+			#ifdef DEBUG_FONT_LOADER
             _DEBUG("Num glyphs: %u", ttfData.maxP.numGlyphs);
+			#endif
         }
         else if (0 == strncmp(ttfData.tableRecords[i].tag, "head", 4))                  // Reading font header table
         {
             GRASSERT(0 == fseek(file, ttfData.tableRecords[i].offset, SEEK_SET));
             ttfData.fontHeaderTable = readFontHeaderTable(file);
+			#ifdef DEBUG_FONT_LOADER
             _DEBUG("indexToLocFormat: %i", ttfData.fontHeaderTable.indexToLocFormat);
+			#endif
         }
         else if (0 == strncmp(ttfData.tableRecords[i].tag, "hmtx", 4))                  // Getting advance widths and lefs side bearings from hmtx
         {
@@ -75,8 +86,10 @@ GlyphData* LoadFont(const char* filename)
             for (int j = 0; j < ttfData.horizontalHeaderTable.numOfLongHorMetrics; j++)
             {
                 ttfData.longHorMetrics[j] = readLongHorMetric(file);
-                //if (j % 20 == 0)
-                    //_DEBUG("Advance width: %u, lsb: %i", ttfData.longHorMetrics[j].advanceWidth, ttfData.longHorMetrics[j].leftSideBearing);
+				#ifdef DEBUG_FONT_LOADER
+                if (j % 20 == 0)
+                    _DEBUG("Advance width: %u, lsb: %i", ttfData.longHorMetrics[j].advanceWidth, ttfData.longHorMetrics[j].leftSideBearing);
+				#endif
             }
 
             u16 finalAdvanceWidth = ttfData.longHorMetrics[ttfData.horizontalHeaderTable.numOfLongHorMetrics - 1].advanceWidth;
@@ -102,12 +115,16 @@ GlyphData* LoadFont(const char* filename)
                 GRASSERT(0 == fseek(file, nextCmapEncoding, SEEK_SET));
                 ttfData.cmapEncodings[j] = readCmapEncoding(file);
                 nextCmapEncoding = ftell(file);
+				#ifdef DEBUG_FONT_LOADER
                 _DEBUG("Platform ID: %u", ttfData.cmapEncodings[j].platformID);
+				#endif
 
                 GRASSERT(0 == fseek(file, ttfData.tableRecords[i].offset + ttfData.cmapEncodings[j].offset, SEEK_SET));
 
                 u16 format = readU16(file);
+				#ifdef DEBUG_FONT_LOADER
                 _DEBUG("format: %u", format);
+				#endif
 
                 if (format == 4)
                 {
@@ -115,7 +132,6 @@ GlyphData* LoadFont(const char* filename)
                     ttfData.cmap = readCmapFormat4(file);
 
                     u32 segCount = ttfData.cmap.segCountX2 / 2;
-                    _DEBUG("seg count: %u", segCount);
                     GRASSERT(segCount < FORMAT_4_MAX_SEGMENTS);
                     u16 endCode[FORMAT_4_MAX_SEGMENTS] = {};
                     u16 startCode[FORMAT_4_MAX_SEGMENTS] = {};
@@ -134,9 +150,6 @@ GlyphData* LoadFont(const char* filename)
                         {
                             if (charCode <= endCode[segment])
                             {
-                                if (charCode == 32 || charCode == 95)
-                                    _DEBUG("test");
-
                                 // This means the font doesn't have this character
                                 if (charCode < startCode[segment])
                                 {
@@ -182,10 +195,8 @@ GlyphData* LoadFont(const char* filename)
 
     for (u32 charCode = 0; charCode < CHAR_COUNT; charCode++)
     {
-        if (charCode == 9) // TODO: check why this one (tab) doesn't work
+        if (charCode == 9) // tab doesn't work
             continue;
-        if (charCode == 32)
-            _DEBUG("test");
         u32 glyphID = ttfData.glyphIndices[charCode];
 
         // Filling in advance widths and left side bearings
@@ -303,22 +314,10 @@ GlyphData* LoadFont(const char* filename)
 
                 rawGlyphData->pointsArrays[charCode][pointIndex].y = (f32)relativePosition / (f32)ttfData.fontHeaderTable.unitsPerEm;
             }
-
-            // Debug printing
-            u32 contourIndex = 0;
-            for (int pointIndex = 0; pointIndex < totalPoints; pointIndex++)
-            {
-                //_DEBUG("x: %f, y: %f", rawGlyphData->pointsArrays[charCode][pointIndex].x, rawGlyphData->pointsArrays[charCode][pointIndex].y);
-                if (endPtsOfContours[contourIndex] == pointIndex)
-                {
-                    //_DEBUG("End of contour");
-                    contourIndex++;
-                }
-            }
         }
         else    // if complex glyph ==============================================================================
         {
-
+			// TODO:
         }
     }
 
@@ -384,3 +383,17 @@ GlyphData* LoadFont(const char* filename)
 
     return glyphData;
 }
+
+void FreeGlyphData(GlyphData* glyphData)
+{
+	for (u32 charCode = 0; charCode < CHAR_COUNT; charCode++)
+	{
+		if (glyphData->pointArrays[charCode])
+			Free(GetGlobalAllocator(), glyphData->pointArrays[charCode]);
+	}
+
+	Free(GetGlobalAllocator(), glyphData);
+}
+
+
+

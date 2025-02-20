@@ -351,7 +351,6 @@ void UpdateDebugUI()
         {
             // Checking if the mouse is even in this menu
             bool mouseInMenu = PointInRect(menu->position, menu->size, vec4_xy(mouseWorldPos));
-            _DEBUG("Menu clicked: %s", mouseInMenu ? "true" : "false");
 
             // If the mouse is in this menu, loop through all the elements in this menu to see which one needs to be interacted with.
             if (mouseInMenu)

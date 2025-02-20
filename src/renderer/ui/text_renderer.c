@@ -98,6 +98,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     MemoryZero(font, sizeof(*font));
 
 	font->spaceAdvanceWidth = glyphData->advanceWidths[' '];
+	font->refCount = 0;
 
 	u32 glyphResolution = 52;
 	u32 paddingPixels = 20;
@@ -160,9 +161,16 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
 	Free(GetGlobalAllocator(), texturePixelData);
 
-	// TODO: unload glyphData
+	FreeGlyphData(glyphData);
 
 	SimpleMapInsert(state->fontMap, fontName, font);
+}
+
+void TextUnloadFont(const char* fontName)
+{
+	Font* font = SimpleMapLookup(state->fontMap, fontName);
+	GRASSERT_DEBUG(font->refCount == 0);
+	Free(GetGlobalAllocator(), font);
 }
 
 Font* TextGetFont(const char* fontName)
@@ -178,6 +186,7 @@ TextBatch* TextBatchCreate(const char* fontName)
 	TextBatch* textBatch = Alloc(GetGlobalAllocator(), sizeof(*textBatch), MEM_TAG_RENDERER_SUBSYS);
 
 	textBatch->font = SimpleMapLookup(state->fontMap, fontName);
+	textBatch->font->refCount++;
 
 	textBatch->strings = charRefDarrayCreate(INITIAL_TEXT_BATCH_CAPACITY, GetGlobalAllocator());
 	textBatch->stringLengths = u32DarrayCreate(INITIAL_TEXT_BATCH_CAPACITY, GetGlobalAllocator());
@@ -193,6 +202,8 @@ TextBatch* TextBatchCreate(const char* fontName)
 
 void TextBatchDestroy(TextBatch* textBatch)
 {
+	textBatch->font->refCount--;
+
 	// loop through all strings in the string darray and free them
 	for (int i = 0; i < textBatch->strings->size; i++)
 	{

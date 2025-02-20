@@ -38,6 +38,7 @@ typedef struct Font
 	f32 xPadding;
 	f32 spaceAdvanceWidth;
 	u32 characterCount;
+	u32 refCount;
 } Font;
 
 typedef struct TextBatch
@@ -63,10 +64,9 @@ void ShutdownTextRenderer();
 /// @param fontFileString String with the filepath to the font file.
 void TextLoadFont(const char* fontName, const char* fontFileString);
 
-void TextUnloadFont(const char* fontName); //TODO: 
+void TextUnloadFont(const char* fontName);
 
 Font* TextGetFont(const char* fontName);
-
 
 TextBatch* TextBatchCreate(const char* fontName);
 void TextBatchDestroy(TextBatch* textBatch);

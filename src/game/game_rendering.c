@@ -342,6 +342,10 @@ void GameRenderingShutdown()
 	// Destroying text test // TODO: remove
 	TextBatchDestroy(renderingState->textBatchTest);
 
+	TextUnloadFont(FONT_NAME_ROBOTO);
+    TextUnloadFont(FONT_NAME_ADORABLE_HANDMADE);
+    TextUnloadFont(FONT_NAME_NICOLAST);
+
     // Destroying debug menu for shader params and darray for debug ui's
     UnregisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIDestroyMenu(renderingState->shaderParamDebugMenu);
