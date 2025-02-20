@@ -316,6 +316,7 @@ void GameRenderingRender()
 
     // Rendering text as a demo of the text system
 	TextBatchRender(renderingState->textBatchTest, renderingState->uiCamera.projection);
+	//TextBatchRender(renderingState->textBatchTest, renderingState->sceneCamera.viewProjection);
 
     // Rendering the debug menu's
     for (u32 i = 0; i < renderingState->debugMenuDarray->size; i++)
