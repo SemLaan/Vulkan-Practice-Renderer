@@ -100,8 +100,8 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 	font->spaceAdvanceWidth = glyphData->advanceWidths[' '];
 	font->refCount = 0;
 
-	u32 glyphResolution = 52;
-	u32 paddingPixels = 20;
+	u32 glyphResolution = 32;
+	u32 paddingPixels = 2;
 	u32 emToPixels = glyphResolution - paddingPixels * 2;
 	f32 pixelsToEm = 1.f / (f32)emToPixels;
 	f32 paddingEm = pixelsToEm * (f32)paddingPixels;
