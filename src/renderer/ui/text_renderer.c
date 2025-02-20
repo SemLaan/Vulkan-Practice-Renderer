@@ -122,6 +122,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     	paddedPixelGlyphSizes[i].y = glyphData->glyphSizes[c].y * emToPixels + paddingPixels * 2;
 		font->glyphSizes[i].x = glyphData->glyphSizes[c].x + paddingEm * 2;
 		font->glyphSizes[i].y = glyphData->glyphSizes[c].y + paddingEm * 2;
+		font->yOffsets[i] = glyphData->glyphBottomLeftAnchor[c].y;
 	}
 	
 	// Generating a packing for the texture atlas
@@ -255,6 +256,7 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 
 		GlyphInstanceData glyphInstance = {};
 		glyphInstance.localPosition = nextGlyphPosition;
+		glyphInstance.localPosition.y += textBatch->font->yOffsets[glyphIndex] * fontSize;
 		glyphInstance.localScale = vec2_mul_f32(textBatch->font->glyphSizes[glyphIndex], fontSize);
 		glyphInstance.textureCoordinatePair = textBatch->font->textureCoordinates[glyphIndex];
 
