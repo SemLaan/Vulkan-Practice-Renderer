@@ -59,7 +59,7 @@ bool InitializeTextRenderer()
     // Creating the bezier shader and material
     ShaderCreateInfo shaderCreateInfo = {};
     shaderCreateInfo.renderTargetStencil = false;
-    shaderCreateInfo.renderTargetDepth = true;
+    shaderCreateInfo.renderTargetDepth = false;
     shaderCreateInfo.renderTargetColor = true;
     shaderCreateInfo.vertexShaderName = "text_sdf";
     shaderCreateInfo.fragmentShaderName = "text_sdf";
@@ -117,6 +117,8 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 		
     	paddedPixelGlyphSizes[i].x = glyphData->glyphSizes[c].x * emToPixels + paddingPixels * 2;
     	paddedPixelGlyphSizes[i].y = glyphData->glyphSizes[c].y * emToPixels + paddingPixels * 2;
+		font->glyphSizes[i].x = glyphData->glyphSizes[c].x + paddingEm * 2;
+		font->glyphSizes[i].y = glyphData->glyphSizes[c].y + paddingEm * 2;
 	}
 	
 	// Generating a packing for the texture atlas
@@ -130,12 +132,20 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 	for (u32 i = 0; i < textureMapHeight * textureMapWidth; i++)
 		texturePixelData[i * TEXTURE_CHANNELS] = 255;
 
+	f32 xAxisPixelToTextureCoord = 1.f / (f32)textureMapWidth;
+	f32 yAxisPixelToTextureCoord = 1.f / (f32)textureMapHeight;
+
 	// Generating the signed distance fields for the characters in the correct position in the texture atlas (in place)
 	for (int i = 0; i < charCount; i++)
 	{
 		vec2i topRight = { glyphAnchorPositions[i].x + paddedPixelGlyphSizes[i].x, glyphAnchorPositions[i].y + paddedPixelGlyphSizes[i].y };
-
 		CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureMapWidth, textureMapHeight, font, glyphData, i, glyphAnchorPositions[i], topRight, paddingEm);
+		
+		// XY is bottom left texture coord, ZW is top right texture coord
+		font->textureCoordinates[i].x = glyphAnchorPositions[i].x * xAxisPixelToTextureCoord;
+		font->textureCoordinates[i].y = glyphAnchorPositions[i].y * yAxisPixelToTextureCoord;
+		font->textureCoordinates[i].z = topRight.x * xAxisPixelToTextureCoord;
+		font->textureCoordinates[i].w = topRight.y * yAxisPixelToTextureCoord;
 	}
 
 	font->characterCount = charCount;
@@ -170,6 +180,7 @@ TextBatch* TextBatchCreate(const char* fontName)
 
 	textBatch->glyphInstancesBuffer = VertexBufferCreate(textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity);
 	textBatch->textMaterial = MaterialCreate(ShaderGetRef(TEXT_SHADER_NAME));
+	MaterialUpdateTexture(textBatch->textMaterial, "tex", textBatch->font->textureMap, SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
 
 	return textBatch;
 }
@@ -225,8 +236,7 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 		GlyphInstanceData glyphInstance = {};
 		glyphInstance.localPosition = nextGlyphPosition;
 		glyphInstance.localScale = vec2_mul_f32(textBatch->font->glyphSizes[glyphIndex], fontSize);
-		glyphInstance.bottomLeftTextureCoordinates = vec2_create(0, 0);
-		glyphInstance.topRightTextureCoordinates = vec2_create(0, 0);
+		glyphInstance.textureCoordinatePair = textBatch->font->textureCoordinates[glyphIndex];
 
 		GlyphInstanceDataDarrayPushback(textBatch->glyphInstanceData, &glyphInstance);
 

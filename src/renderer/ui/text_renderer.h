@@ -19,8 +19,7 @@ typedef struct GlyphInstanceData
     // Each pair of vec2's is sent to the gpu as a single vec4 to save on vertex attributes
     vec2 localPosition;                // .xy = local position
     vec2 localScale;                   // .zw = local scale
-    vec2 bottomLeftTextureCoordinates; // .xy = texture coordinates
-    vec2 topRightTextureCoordinates;   // .zw = texture coordinates
+    vec4 textureCoordinatePair; // .xy = texture coordinates  .zw = texture coordinates
 } GlyphInstanceData;
 
 DEFINE_DARRAY_TYPE(GlyphInstanceData);
@@ -31,9 +30,10 @@ DEFINE_DARRAY_TYPE(GlyphInstanceData);
 typedef struct Font
 {
 	Texture textureMap;
+	vec4 textureCoordinates[MAX_RENDERABLE_CHARACTERS_PER_FONT];
+	vec2 glyphSizes[MAX_RENDERABLE_CHARACTERS_PER_FONT];	// Glyph size is { 0, 0 } if it represents a character with no glyph, like space
 	u32 renderableCharacters[MAX_RENDERABLE_CHARACTERS_PER_FONT];
 	f32 advanceWidths[MAX_RENDERABLE_CHARACTERS_PER_FONT];
-	vec2 glyphSizes[MAX_RENDERABLE_CHARACTERS_PER_FONT];	// Glyph size is { 0, 0 } if it represents a character with no glyph, like space
 	u32 characterCount;
 } Font;
 
