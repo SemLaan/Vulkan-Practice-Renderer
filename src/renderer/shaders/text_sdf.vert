@@ -5,9 +5,9 @@
 layout(location = 0) in vec2 v_modelVertexPosition;
 
 layout(location = 1) in vec4 i_positionAndScale; // .xy = position, .zw = scale
-layout(location = 2) in vec4 i_texCoords;
+layout(location = 2) in vec4 i_texCoords; // .xy = bottom left tex coord, .zw = top right tex coord
 
-layout(location = 0) out vec2 texCoords;
+layout(location = 0) out vec2 texCoord;
 
 
 
@@ -21,5 +21,5 @@ void main() {
 	vec4 positionThatWorks = vec4((v_modelVertexPosition.xy * i_positionAndScale.zw) + i_positionAndScale.xy, 0.5, 1);
 	//positionThatWorks.y = -positionThatWorks.y;
 	gl_Position = pc.model * positionThatWorks;
-	texCoords = v_modelVertexPosition;
+	texCoord = vec2(i_texCoords.x * (1 - v_modelVertexPosition.x) + i_texCoords.z * v_modelVertexPosition.x, i_texCoords.y * (1 - v_modelVertexPosition.y) + i_texCoords.w * v_modelVertexPosition.y);
 }
