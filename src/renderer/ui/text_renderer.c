@@ -99,13 +99,15 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
 	font->spaceAdvanceWidth = glyphData->advanceWidths[' '];
 
-	u32 glyphResolution = 32;
-	u32 paddingPixels = 2;
+	u32 glyphResolution = 52;
+	u32 paddingPixels = 20;
 	u32 emToPixels = glyphResolution - paddingPixels * 2;
 	f32 pixelsToEm = 1.f / (f32)emToPixels;
 	f32 paddingEm = pixelsToEm * (f32)paddingPixels;
 
 	u32 textureMapGlyphsPerRow = (u32)ceilf(sqrtf((f32)charCount));
+
+	font->xPadding = paddingEm;
 
 	// Looping over the amount of renderable characters.
     // Getting the character at the index and storing it's advance width and size and calculating the size in pixels it takes up in the texture atlas.
@@ -122,7 +124,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     	paddedPixelGlyphSizes[i].y = glyphData->glyphSizes[c].y * emToPixels + paddingPixels * 2;
 		font->glyphSizes[i].x = glyphData->glyphSizes[c].x + paddingEm * 2;
 		font->glyphSizes[i].y = glyphData->glyphSizes[c].y + paddingEm * 2;
-		font->yOffsets[i] = glyphData->glyphBottomLeftAnchor[c].y;
+		font->yOffsets[i] = glyphData->glyphBottomLeftAnchor[c].y - paddingEm;
 	}
 	
 	// Generating a packing for the texture atlas
@@ -218,6 +220,7 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 
 	// Looping through every char in the text and constructing the instance data for all the chars (position, scale, texture coords)
 	vec2 nextGlyphPosition = position;
+	nextGlyphPosition.x -= textBatch->font->xPadding * fontSize;
 	for (int i = 0; i < stringLength; i++)
 	{
 		// If the glyph is a tab, dont add it to the glyph instance array

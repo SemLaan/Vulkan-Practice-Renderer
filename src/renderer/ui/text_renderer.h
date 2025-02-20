@@ -35,6 +35,7 @@ typedef struct Font
 	u32 renderableCharacters[MAX_RENDERABLE_CHARACTERS_PER_FONT];
 	f32 advanceWidths[MAX_RENDERABLE_CHARACTERS_PER_FONT];
 	f32 yOffsets[MAX_RENDERABLE_CHARACTERS_PER_FONT];
+	f32 xPadding;
 	f32 spaceAdvanceWidth;
 	u32 characterCount;
 } Font;
