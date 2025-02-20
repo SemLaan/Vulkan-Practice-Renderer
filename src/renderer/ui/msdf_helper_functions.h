@@ -396,6 +396,8 @@ u32 Calculate2DBinPacking(vec2i* objectPositions, vec2i* objectSizes, u32 object
 	{
 		vec2i objectSize = objectSizes[sortedIndices[i]];
 		bool objectPlaced = false;
+
+		// Finding the first bin in which the object fits and puttin it there
 		for (u32 j = 0; j < binCount; j++)
 		{
 			if (objectSize.x <= binsSpaceLeft[j])
