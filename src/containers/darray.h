@@ -25,6 +25,7 @@ void DarrayDestroy(void* darray);
 void DarrayPushback(void* darray, void* ptrToElement);
 void DarrayPop(void* darray);
 void DarrayPopAt(void* darray, u32 index);
+void DarrayPopRange(void* darray, u32 firstIndex, u32 count);
 
 // Sets the size value of the darray, increases capacity if necessary
 void DarraySetSize(void* darray, u32 size);

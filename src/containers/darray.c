@@ -68,6 +68,18 @@ void DarrayPopAt(void* darray, u32 index)
     state->size--;
 }
 
+void DarrayPopRange(void* darray, u32 firstIndex, u32 count)
+{
+	Darray* state = (Darray*)darray;
+
+	GRASSERT_DEBUG(state->size >= firstIndex + count);
+
+	u8* address = (u8*)state->data + (firstIndex * state->stride);
+    MemoryCopy(address, address + (state->stride * count), (state->size - (firstIndex + count)) * state->stride);
+
+	state->size -= count;
+}
+
 // Sets the size value of the darray, increases capacity if necessary
 void DarraySetSize(void* darray, u32 size)
 {
