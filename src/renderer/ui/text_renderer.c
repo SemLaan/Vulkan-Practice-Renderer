@@ -106,7 +106,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 	f32 pixelsToEm = 1.f / (f32)emToPixels;
 	f32 paddingEm = pixelsToEm * (f32)paddingPixels;
 
-	u32 textureMapGlyphsPerRow = (u32)ceilf(sqrtf((f32)charCount));
+	u32 textureAtlasGlyphsPerRow = (u32)ceilf(sqrtf((f32)charCount));
 
 	font->xPadding = paddingEm;
 
@@ -130,23 +130,23 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 	
 	// Generating a packing for the texture atlas
 	vec2i glyphAnchorPositions[255] = {};
-	u32 binPackedHeight = Calculate2DBinPacking(glyphAnchorPositions, paddedPixelGlyphSizes, charCount, glyphResolution * textureMapGlyphsPerRow);
+	u32 binPackedHeight = Calculate2DBinPacking(glyphAnchorPositions, paddedPixelGlyphSizes, charCount, glyphResolution * textureAtlasGlyphsPerRow);
 
-	u32 textureMapWidth = glyphResolution * textureMapGlyphsPerRow;
-	u32 textureMapHeight = binPackedHeight;
-	u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight, MEM_TAG_TEST);
-	MemoryZero(texturePixelData, sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureMapWidth * textureMapHeight);
-	for (u32 i = 0; i < textureMapHeight * textureMapWidth; i++)
+	u32 textureAtlasWidth = glyphResolution * textureAtlasGlyphsPerRow;
+	u32 textureAtlasHeight = binPackedHeight;
+	u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureAtlasWidth * textureAtlasHeight, MEM_TAG_TEST);
+	MemoryZero(texturePixelData, sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureAtlasWidth * textureAtlasHeight);
+	for (u32 i = 0; i < textureAtlasHeight * textureAtlasWidth; i++)
 		texturePixelData[i * TEXTURE_CHANNELS] = 255;
 
-	f32 xAxisPixelToTextureCoord = 1.f / (f32)textureMapWidth;
-	f32 yAxisPixelToTextureCoord = 1.f / (f32)textureMapHeight;
+	f32 xAxisPixelToTextureCoord = 1.f / (f32)textureAtlasWidth;
+	f32 yAxisPixelToTextureCoord = 1.f / (f32)textureAtlasHeight;
 
 	// Generating the signed distance fields for the characters in the correct position in the texture atlas (in place)
 	for (int i = 0; i < charCount; i++)
 	{
 		vec2i topRight = { glyphAnchorPositions[i].x + paddedPixelGlyphSizes[i].x, glyphAnchorPositions[i].y + paddedPixelGlyphSizes[i].y };
-		CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureMapWidth, textureMapHeight, font, glyphData, i, glyphAnchorPositions[i], topRight, paddingEm);
+		CreateGlyphSDF(texturePixelData, TEXTURE_CHANNELS, textureAtlasWidth, textureAtlasHeight, font, glyphData, i, glyphAnchorPositions[i], topRight, paddingEm);
 		
 		// XY is bottom left texture coord, ZW is top right texture coord
 		font->textureCoordinates[i].x = glyphAnchorPositions[i].x * xAxisPixelToTextureCoord;
@@ -157,7 +157,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
 	font->characterCount = charCount;
 
-	font->textureMap = TextureCreate(textureMapWidth, textureMapHeight, texturePixelData, TEXTURE_STORAGE_RGBA8UNORM);
+	font->glyphTextureAtlas = TextureCreate(textureAtlasWidth, textureAtlasHeight, texturePixelData, TEXTURE_STORAGE_RGBA8UNORM);
 
 	Free(GetGlobalAllocator(), texturePixelData);
 
@@ -188,14 +188,14 @@ TextBatch* TextBatchCreate(const char* fontName)
 	textBatch->font = SimpleMapLookup(state->fontMap, fontName);
 	textBatch->font->refCount++;
 
-	textBatch->strings = charRefDarrayCreate(INITIAL_TEXT_BATCH_CAPACITY, GetGlobalAllocator());
-	textBatch->stringLengths = u32DarrayCreate(INITIAL_TEXT_BATCH_CAPACITY, GetGlobalAllocator());
+	textBatch->textIdArray = u64DarrayCreate(INITIAL_TEXT_BATCH_CAPACITY, GetGlobalAllocator());
+	textBatch->textDataArray = TextDataDarrayCreate(INITIAL_TEXT_BATCH_CAPACITY, GetGlobalAllocator());
 	textBatch->glyphInstanceData = GlyphInstanceDataDarrayCreate(INITIAL_GPU_BUFFER_INSTANCE_CAPACITY, GetGlobalAllocator());
 	textBatch->gpuBufferInstanceCapacity = INITIAL_GPU_BUFFER_INSTANCE_CAPACITY;
 
 	textBatch->glyphInstancesBuffer = VertexBufferCreate(textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity);
 	textBatch->textMaterial = MaterialCreate(ShaderGetRef(TEXT_SHADER_NAME));
-	MaterialUpdateTexture(textBatch->textMaterial, "tex", textBatch->font->textureMap, SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
+	MaterialUpdateTexture(textBatch->textMaterial, "tex", textBatch->font->glyphTextureAtlas, SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
 
 	return textBatch;
 }
@@ -205,13 +205,13 @@ void TextBatchDestroy(TextBatch* textBatch)
 	textBatch->font->refCount--;
 
 	// loop through all strings in the string darray and free them
-	for (int i = 0; i < textBatch->strings->size; i++)
+	for (int i = 0; i < textBatch->textDataArray->size; i++)
 	{
-		Free(state->textStringAllocator, textBatch->strings->data[i]);
+		Free(state->textStringAllocator, textBatch->textDataArray->data[i].string);
 	}
 
-	DarrayDestroy(textBatch->strings);
-	DarrayDestroy(textBatch->stringLengths);
+	DarrayDestroy(textBatch->textIdArray);
+	DarrayDestroy(textBatch->textDataArray);
 	DarrayDestroy(textBatch->glyphInstanceData);
 	VertexBufferDestroy(textBatch->glyphInstancesBuffer);
 	MaterialDestroy(textBatch->textMaterial);
@@ -222,17 +222,17 @@ void TextBatchDestroy(TextBatch* textBatch)
 u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize)
 {
 	// Storing the string and string length in the darrays for those, string length is stored without accounting for the null terminator but strings do have them.
-	u32 stringLength = strlen(text);
-	u32 stringLengthPlusNullTerminator = stringLength + 1;
-	u32DarrayPushback(textBatch->stringLengths, &stringLength);
-	char* string = Alloc(state->textStringAllocator, sizeof(*text) * stringLengthPlusNullTerminator, MEM_TAG_TEST);
-	MemoryCopy(string, text, sizeof(*text) * stringLengthPlusNullTerminator);
-	charRefDarrayPushback(textBatch->strings, &string);
+	TextData textData = {};
+	textData.stringLength = strlen(text);
+	u32 stringLengthPlusNullTerminator = textData.stringLength + 1;
+	textData.string = Alloc(state->textStringAllocator, sizeof(*text) * stringLengthPlusNullTerminator, MEM_TAG_TEST);
+	MemoryCopy(textData.string, text, sizeof(*text) * stringLengthPlusNullTerminator);
+	textData.firstGlyphInstanceIndex = textBatch->glyphInstanceData->size;
 
 	// Looping through every char in the text and constructing the instance data for all the chars (position, scale, texture coords)
 	vec2 nextGlyphPosition = position;
 	nextGlyphPosition.x -= textBatch->font->xPadding * fontSize;
-	for (int i = 0; i < stringLength; i++)
+	for (int i = 0; i < textData.stringLength; i++)
 	{
 		// If the glyph is a tab, dont add it to the glyph instance array
 		if (text[i] == '\t')
@@ -279,6 +279,9 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 		nextGlyphPosition.x += textBatch->font->advanceWidths[glyphIndex] * fontSize;
 	}
 
+	textData.glyphInstanceCount = textBatch->glyphInstanceData->size - textData.firstGlyphInstanceIndex;
+	TextDataDarrayPushback(textBatch->textDataArray, &textData);
+
 	// If the gpu vertex buffer is too small, recreate it and upload the buffer again TODO: add gpu buffer resizing
 	if (textBatch->glyphInstanceData->size > textBatch->gpuBufferInstanceCapacity)
 	{
@@ -291,12 +294,33 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 		VertexBufferUpdate(textBatch->glyphInstancesBuffer, textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity);
 	}
 
-	return 0; //TODO: fix
+	// Giving the text an id and returning its id
+	u64DarrayPushback(textBatch->textIdArray, &state->nextTextId);
+	state->nextTextId++;
+	return state->nextTextId - 1;
 }
 
 void TextBatchRemoveText(TextBatch* textBatch, u64 textId)
 {
+	// Getting the index of the text that corresponds to the given text id
+	u32 textIndex = UINT32_MAX;
+	for (u32 i = 0; i < textBatch->textIdArray->size; i++)
+	{
+		if (textBatch->textIdArray->data[i] == textId)
+		{
+			textIndex = i;
+			break;
+		}
+	}
 
+	// Removing the texts' glyph instances from the instances buffer
+	DarrayPopRange(textBatch->glyphInstanceData, textBatch->textDataArray->data[textIndex].firstGlyphInstanceIndex, textBatch->textDataArray->data[textIndex].glyphInstanceCount);
+	VertexBufferUpdate(textBatch->glyphInstancesBuffer, textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity); // TODO: allow uploading only to a range rather than from 0 to a given point
+
+	// Freeing the string and removing the text from text data and text id arrays
+	Free(state->textStringAllocator, textBatch->textDataArray->data[textIndex].string);
+	DarrayPopAt(textBatch->textDataArray, textIndex);
+	DarrayPopAt(textBatch->textIdArray, textIndex);
 }
 
 

@@ -3,22 +3,11 @@
 #include "math/math_types.h"
 #include "renderer/renderer.h"
 
-DEFINE_DARRAY_TYPE_REF(char);
-DEFINE_DARRAY_TYPE(u32);
-
-// TODO: remove if not needed
-// typedef struct Text
-//{
-// u64 id;
-// char* string;
-// bool enabled;
-//} Text;
-
 typedef struct GlyphInstanceData
 {
     // Each pair of vec2's is sent to the gpu as a single vec4 to save on vertex attributes
-    vec2 localPosition;                // .xy = local position
-    vec2 localScale;                   // .zw = local scale
+    vec2 localPosition;         // .xy = local position
+    vec2 localScale;            // .zw = local scale
     vec4 textureCoordinatePair; // .xy = texture coordinates  .zw = texture coordinates
 } GlyphInstanceData;
 
@@ -29,27 +18,38 @@ DEFINE_DARRAY_TYPE(GlyphInstanceData);
 /// @brief Struct with all the data necessary to render text with a font.
 typedef struct Font
 {
-	Texture textureMap;
-	vec4 textureCoordinates[MAX_RENDERABLE_CHARACTERS_PER_FONT];
-	vec2 glyphSizes[MAX_RENDERABLE_CHARACTERS_PER_FONT];	// Glyph size is { 0, 0 } if it represents a character with no glyph, like space
-	u32 renderableCharacters[MAX_RENDERABLE_CHARACTERS_PER_FONT];
-	f32 advanceWidths[MAX_RENDERABLE_CHARACTERS_PER_FONT];
-	f32 yOffsets[MAX_RENDERABLE_CHARACTERS_PER_FONT];
-	f32 xPadding;
-	f32 spaceAdvanceWidth;
-	u32 characterCount;
-	u32 refCount;
+    Texture glyphTextureAtlas;                                    // Texture handle
+    vec4 textureCoordinates[MAX_RENDERABLE_CHARACTERS_PER_FONT];  // Coordinates of the glyph location in the texture atlas for each glyph
+    vec2 glyphSizes[MAX_RENDERABLE_CHARACTERS_PER_FONT];          // Glyph size of each glyph, size is in em space. Glyph size is { 0, 0 } if it represents a character with no glyph, like space
+    u32 renderableCharacters[MAX_RENDERABLE_CHARACTERS_PER_FONT]; // array of ascii values of all the renderable characters for this font
+    f32 advanceWidths[MAX_RENDERABLE_CHARACTERS_PER_FONT];        // Advance width of each glyph
+    f32 yOffsets[MAX_RENDERABLE_CHARACTERS_PER_FONT];             // Y offsets of each glyph
+    f32 xPadding;                                                 // Padding in the x direction, used to position an entire text instance at the correct position
+    f32 spaceAdvanceWidth;                                        // Advance width of the space character, also used to calculate the advance width of tab
+    u32 characterCount;                                           // Amount of characters this font can render
+    u32 refCount;                                                 // References to this font, only used to check if all text batches are deleted before this font is deleted, doesn't automatically delete this font
 } Font;
+
+typedef struct TextData
+{
+    char* string;                // The batch this textdata belongs to has ownership over this string
+    u32 stringLength;            // String length, null terminator not included
+    u32 firstGlyphInstanceIndex; // Index of the first glyph instance in the glyphInstanceData array of the batch this text belongs to
+    u32 glyphInstanceCount;      // Amount of glyphs needed to render this text (this is different from string length because spaces don't have to be rendered but do add to the string length)
+} TextData;
+
+DEFINE_DARRAY_TYPE(TextData);
+DEFINE_DARRAY_TYPE(u64);
 
 typedef struct TextBatch
 {
-    GlyphInstanceDataDarray* glyphInstanceData;
-    VertexBuffer glyphInstancesBuffer;
-    charRefDarray* strings;
-    u32Darray* stringLengths;
-	Font* font;
-    Material textMaterial;         //
-    u32 gpuBufferInstanceCapacity; // TODO: remove once vertex buffer resizing is a thing
+    GlyphInstanceDataDarray* glyphInstanceData; // CPU side data for the gpu glyph quad instancing buffer, needs to be kept on CPU because text might need to be changed
+    VertexBuffer glyphInstancesBuffer;          // GPU side buffer for instancing quads with glyphs
+    TextDataDarray* textDataArray;              // Darray of all text elements in this batch
+    u64Darray* textIdArray;                     // Darray of ids of all text elements in this batch
+    Font* font;                                 // Reference to the font used to render text in this batch
+    Material textMaterial;                      // Reference to material used for rendering all the text in this batch
+    u32 gpuBufferInstanceCapacity;              // TODO: remove once vertex buffer resizing is a thing
 } TextBatch;
 
 /// @brief Initializes the text renderer, should be called by the engine after renderer startup.

@@ -137,7 +137,11 @@ void GameRenderingInit()
     // TODO: this will be replaced once the text rendering system is finished
     const char* testString = "Beefy text te\tsting!?.";
 	renderingState->textBatchTest = TextBatchCreate(FONT_NAME_ROBOTO);
-	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 5), 0.5f);
+	u64 id = TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 5), 0.5f);
+	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 7), 1.5f);
+	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 3), 1.0f);
+
+	TextBatchRemoveText(renderingState->textBatchTest, id);
 
     // Creating render targets
     {
@@ -224,7 +228,7 @@ void GameRenderingInit()
         MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
         MaterialUpdateTexture(renderingState->outlineMaterial, "depthTex", GetDepthAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
         MaterialUpdateTexture(renderingState->outlineMaterial, "normalTex", GetColorAsTexture(renderingState->normalAndDepthRenderTarget), SAMPLER_TYPE_NEAREST_CLAMP_EDGE);
-		MaterialUpdateTexture(renderingState->uiTextureMaterial, "tex", tempFontRef->textureMap, SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
+		MaterialUpdateTexture(renderingState->uiTextureMaterial, "tex", tempFontRef->glyphTextureAtlas, SAMPLER_TYPE_LINEAR_CLAMP_EDGE);
     }
 
     // Setting up debug ui's for shader parameters and terrain generation settings
