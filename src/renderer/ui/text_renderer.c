@@ -228,6 +228,7 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 	textData.string = Alloc(state->textStringAllocator, sizeof(*text) * stringLengthPlusNullTerminator, MEM_TAG_TEST);
 	MemoryCopy(textData.string, text, sizeof(*text) * stringLengthPlusNullTerminator);
 	textData.firstGlyphInstanceIndex = textBatch->glyphInstanceData->size;
+	textData.position = position;
 
 	// Looping through every char in the text and constructing the instance data for all the chars (position, scale, texture coords)
 	vec2 nextGlyphPosition = position;
@@ -331,13 +332,31 @@ void TextBatchRemoveText(TextBatch* textBatch, u64 textId)
 	DarrayPopAt(textBatch->textIdArray, textIndex);
 }
 
+void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosition)
+{
+	// Getting the index of the text that corresponds to the given text id
+	u32 textIndex = UINT32_MAX;
+	for (u32 i = 0; i < textBatch->textIdArray->size; i++)
+	{
+		if (textBatch->textIdArray->data[i] == textId)
+		{
+			textIndex = i;
+			break;
+		}
+	}
+
+	vec2 positionDelta = vec2_sub_vec2(newPosition, textBatch->textDataArray->data[textIndex].position);
+	for (int i = textBatch->textDataArray->data[textIndex].firstGlyphInstanceIndex; i < textBatch->textDataArray->data[textIndex].firstGlyphInstanceIndex + textBatch->textDataArray->data[textIndex].glyphInstanceCount; i++)
+	{
+		textBatch->glyphInstanceData->data[i].localPosition = vec2_add_vec2(textBatch->glyphInstanceData->data[i].localPosition, positionDelta);
+	}
+	VertexBufferUpdate(textBatch->glyphInstancesBuffer, textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity); // TODO: allow uploading only to a range rather than from 0 to a given point
+}
 
 
 
 
 
-
-void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosition);
 void TextBatchSetTextActive(TextBatch* textBatch, u64 textId, bool active);
 
 

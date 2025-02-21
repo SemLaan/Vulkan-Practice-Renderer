@@ -141,7 +141,8 @@ void GameRenderingInit()
 	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 7), 1.5f);
 	u64 id2 = TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 3), 1.0f);
 
-	TextBatchRemoveText(renderingState->textBatchTest, id);
+	TextBatchUpdateTextPosition(renderingState->textBatchTest, id, vec2_create(9, 5));
+	//TextBatchRemoveText(renderingState->textBatchTest, id);
 	TextBatchRemoveText(renderingState->textBatchTest, id2);
 
     // Creating render targets

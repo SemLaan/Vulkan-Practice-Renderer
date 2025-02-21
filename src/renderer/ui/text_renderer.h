@@ -33,6 +33,7 @@ typedef struct Font
 typedef struct TextData
 {
     char* string;                // The batch this textdata belongs to has ownership over this string
+    vec2 position;               // Position
     u32 stringLength;            // String length, null terminator not included
     u32 firstGlyphInstanceIndex; // Index of the first glyph instance in the glyphInstanceData array of the batch this text belongs to
     u32 glyphInstanceCount;      // Amount of glyphs needed to render this text (this is different from string length because spaces don't have to be rendered but do add to the string length)
