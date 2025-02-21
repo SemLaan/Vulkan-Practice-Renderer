@@ -317,6 +317,14 @@ void TextBatchRemoveText(TextBatch* textBatch, u64 textId)
 	DarrayPopRange(textBatch->glyphInstanceData, textBatch->textDataArray->data[textIndex].firstGlyphInstanceIndex, textBatch->textDataArray->data[textIndex].glyphInstanceCount);
 	VertexBufferUpdate(textBatch->glyphInstancesBuffer, textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity); // TODO: allow uploading only to a range rather than from 0 to a given point
 
+	// Updating the firstGlyphInstanceIndex for all the texts after the one thats getting deleted
+	u32 currentFirstInstanceIndex = textBatch->textDataArray->data[textIndex].firstGlyphInstanceIndex;
+	for (u32 i = textIndex + 1; i < textBatch->textDataArray->size; i++)
+	{
+		textBatch->textDataArray->data[i].firstGlyphInstanceIndex = currentFirstInstanceIndex;
+		currentFirstInstanceIndex += textBatch->textDataArray->data[i].glyphInstanceCount;
+	}
+
 	// Freeing the string and removing the text from text data and text id arrays
 	Free(state->textStringAllocator, textBatch->textDataArray->data[textIndex].string);
 	DarrayPopAt(textBatch->textDataArray, textIndex);

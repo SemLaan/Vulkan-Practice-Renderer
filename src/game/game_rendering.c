@@ -139,9 +139,10 @@ void GameRenderingInit()
 	renderingState->textBatchTest = TextBatchCreate(FONT_NAME_ROBOTO);
 	u64 id = TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 5), 0.5f);
 	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 7), 1.5f);
-	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 3), 1.0f);
+	u64 id2 = TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 3), 1.0f);
 
 	TextBatchRemoveText(renderingState->textBatchTest, id);
+	TextBatchRemoveText(renderingState->textBatchTest, id2);
 
     // Creating render targets
     {
