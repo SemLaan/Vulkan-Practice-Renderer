@@ -25,6 +25,7 @@ void EndRendering();
 
 void UpdateGlobalUniform(GlobalUniformObject* properties);
 void Draw(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer clientIndexBuffer, mat4* pushConstantValues, u32 instanceCount);
+void DrawBufferRange(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, u64* vbOffsets, IndexBuffer clientIndexBuffer, mat4* pushConstantValues, u32 instanceCount);
 
 RenderTarget GetMainRenderTarget();
 
