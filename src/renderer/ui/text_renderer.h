@@ -42,6 +42,12 @@ typedef struct TextData
 DEFINE_DARRAY_TYPE(TextData);
 DEFINE_DARRAY_TYPE(u64);
 
+typedef struct GlyphInstanceRange
+{
+	u64 startIndexInBytes;
+	u64 instanceCount;
+} GlyphInstanceRange;
+
 typedef struct TextBatch
 {
     GlyphInstanceDataDarray* glyphInstanceData; // CPU side data for the gpu glyph quad instancing buffer, needs to be kept on CPU because text might need to be changed
@@ -49,8 +55,10 @@ typedef struct TextBatch
     TextDataDarray* textDataArray;              // Darray of all text elements in this batch
     u64Darray* textIdArray;                     // Darray of ids of all text elements in this batch
     Font* font;                                 // Reference to the font used to render text in this batch
+	GlyphInstanceRange* glyphInstanceRanges;	// Ranges of glyph instances to render
     Material textMaterial;                      // Reference to material used for rendering all the text in this batch
     u32 gpuBufferInstanceCapacity;              // TODO: remove once vertex buffer resizing is a thing
+	u32 instanceRangeCount;						// amount of glyph instance ranges
 } TextBatch;
 
 /// @brief Initializes the text renderer, should be called by the engine after renderer startup.
