@@ -137,9 +137,12 @@ void GameRenderingInit()
     // TODO: this will be replaced once the text rendering system is finished
     const char* testString = "Beefy text te\tsting!?.";
 	renderingState->textBatchTest = TextBatchCreate(FONT_NAME_ROBOTO);
-	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 5), 0.5f);
-	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 7), 1.5f);
-	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 3), 1.0f);
+	u64 id = TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 5), 0.5f, true);
+	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 7), 1.5f, true);
+	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 3), 1.0f, false);
+
+	const char* testString2 = "baefy t xt te         ";
+	TextBatchUpdateTextString(renderingState->textBatchTest, id, testString2);
 
     // Creating render targets
     {

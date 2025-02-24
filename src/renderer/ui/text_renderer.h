@@ -37,6 +37,7 @@ typedef struct TextData
     u32 stringLength;            // String length, null terminator not included
     u32 firstGlyphInstanceIndex; // Index of the first glyph instance in the glyphInstanceData array of the batch this text belongs to
     u32 glyphInstanceCount;      // Amount of glyphs needed to render this text (this is different from string length because spaces don't have to be rendered but do add to the string length)
+    f32 fontSize;                // Fontsize of the text, is negative if the text is static (i.e. the string that the text represents will never be updated)
 } TextData;
 
 DEFINE_DARRAY_TYPE(TextData);
@@ -44,8 +45,8 @@ DEFINE_DARRAY_TYPE(u64);
 
 typedef struct GlyphInstanceRange
 {
-	u64 startIndexInBytes;
-	u64 instanceCount;
+    u64 startIndexInBytes;
+    u64 instanceCount;
 } GlyphInstanceRange;
 
 typedef struct TextBatch
@@ -55,10 +56,10 @@ typedef struct TextBatch
     TextDataDarray* textDataArray;              // Darray of all text elements in this batch
     u64Darray* textIdArray;                     // Darray of ids of all text elements in this batch
     Font* font;                                 // Reference to the font used to render text in this batch
-	GlyphInstanceRange* glyphInstanceRanges;	// Ranges of glyph instances to render
+    GlyphInstanceRange* glyphInstanceRanges;    // Ranges of glyph instances to render
     Material textMaterial;                      // Reference to material used for rendering all the text in this batch
     u32 gpuBufferInstanceCapacity;              // TODO: remove once vertex buffer resizing is a thing
-	u32 instanceRangeCount;						// amount of glyph instance ranges
+    u32 instanceRangeCount;                     // amount of glyph instance ranges
 } TextBatch;
 
 /// @brief Initializes the text renderer, should be called by the engine after renderer startup.
@@ -84,12 +85,17 @@ void TextBatchDestroy(TextBatch* textBatch);
 /// @param textBatch
 /// @param text The text at the pointer will be copied, what happens to the text pointer after this function call doesn't matter
 /// @param position
+/// @param fontSize
+/// @param variableText Whether this text might be changed in the future or not
 /// @return ID of the text added, used for removing specific texts from a text batch
-u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize);
+u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize, bool variableText);
 
 void TextBatchRemoveText(TextBatch* textBatch, u64 textId);
 
 void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosition);
+
+// When updating text, the new texts' string length needs to be the same as the old texts' string length.
+void TextBatchUpdateTextString(TextBatch* textBatch, u64 textId, const char* newText);
 
 void TextBatchSetTextActive(TextBatch* textBatch, u64 textId, bool active);
 

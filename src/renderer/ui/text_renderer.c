@@ -227,7 +227,7 @@ void TextBatchDestroy(TextBatch* textBatch)
     Free(GetGlobalAllocator(), textBatch);
 }
 
-u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize)
+u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize, bool variableText)
 {
     // Storing the string and string length in the darrays for those, string length is stored without accounting for the null terminator but strings do have them.
     TextData textData = {};
@@ -237,22 +237,41 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
     MemoryCopy(textData.string, text, sizeof(*text) * stringLengthPlusNullTerminator);
     textData.firstGlyphInstanceIndex = textBatch->glyphInstanceData->size;
     textData.position = position;
+    textData.fontSize = variableText ? fontSize : -1.f;
 
     // Looping through every char in the text and constructing the instance data for all the chars (position, scale, texture coords)
     vec2 nextGlyphPosition = position;
     nextGlyphPosition.x -= textBatch->font->xPadding * fontSize;
     for (int i = 0; i < textData.stringLength; i++)
     {
-        // If the glyph is a tab, dont add it to the glyph instance array
+        // If the glyph is a tab, dont add it to the glyph instance array, or put a placeholder if the text is variable
         if (text[i] == '\t')
         {
+            if (variableText)
+            {
+                GlyphInstanceData glyphInstance = {};
+                glyphInstance.localPosition = nextGlyphPosition;
+                glyphInstance.localScale = vec2_create(0, 0);
+                glyphInstance.textureCoordinatePair = vec4_create(1, 1, 1, 1);
+
+                GlyphInstanceDataDarrayPushback(textBatch->glyphInstanceData, &glyphInstance);
+            }
             nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * TAB_SIZE * fontSize;
             continue;
         }
 
-        // If the glyph is a space, dont add it to the glyph instance array
+        // If the glyph is a space, dont add it to the glyph instance array, or put a placeholder if the text is variable
         if (text[i] == ' ')
         {
+            if (variableText)
+            {
+                GlyphInstanceData glyphInstance = {};
+                glyphInstance.localPosition = nextGlyphPosition;
+                glyphInstance.localScale = vec2_create(0, 0);
+                glyphInstance.textureCoordinatePair = vec4_create(1, 1, 1, 1);
+
+                GlyphInstanceDataDarrayPushback(textBatch->glyphInstanceData, &glyphInstance);
+            }
             nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * fontSize;
             continue;
         }
@@ -270,9 +289,18 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 
         GRASSERT_DEBUG(glyphIndex != UINT32_MAX);
 
-        // If the glyph size is 0 by 0, don't add it to the glyph instance array, only add its advance width
+        // If the glyph size is 0 by 0, don't add it to the glyph instance array, only add its advance width, or put a placeholder if the text is variable
         if (0 == (textBatch->font->glyphSizes[glyphIndex].x + textBatch->font->glyphSizes[glyphIndex].y))
         {
+            if (variableText)
+            {
+                GlyphInstanceData glyphInstance = {};
+                glyphInstance.localPosition = nextGlyphPosition;
+                glyphInstance.localScale = vec2_create(0, 0);
+                glyphInstance.textureCoordinatePair = vec4_create(1, 1, 1, 1);
+
+                GlyphInstanceDataDarrayPushback(textBatch->glyphInstanceData, &glyphInstance);
+            }
             nextGlyphPosition.x += textBatch->font->advanceWidths[glyphIndex];
             continue;
         }
@@ -412,6 +440,96 @@ void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosit
     VertexBufferUpdate(textBatch->glyphInstancesBuffer, textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity); // TODO: allow uploading only to a range rather than from 0 to a given point
 }
 
+void TextBatchUpdateTextString(TextBatch* textBatch, u64 textId, const char* newText)
+{
+    // Getting the index of the text that corresponds to the given text id
+    u32 textIndex = UINT32_MAX;
+    for (u32 i = 0; i < textBatch->textIdArray->size; i++)
+    {
+        if (textBatch->textIdArray->data[i] == textId)
+        {
+            textIndex = i;
+            break;
+        }
+    }
+
+    TextData* textData = &textBatch->textDataArray->data[textIndex];
+
+    GRASSERT_DEBUG(textData->fontSize >= 0);
+    GRASSERT(textData->stringLength == strlen(newText));
+
+    MemoryCopy(textData->string, newText, textData->stringLength + 1);
+
+    vec2 nextGlyphPosition = textData->position;
+    nextGlyphPosition.x -= textBatch->font->xPadding * textData->fontSize;
+    for (u32 i = 0; i < textData->glyphInstanceCount; i++)
+    {
+        // If the glyph is a tab, dont add it to the glyph instance array, or put a placeholder if the text is variable
+        if (newText[i] == '\t')
+        {
+            GlyphInstanceData glyphInstance = {};
+            glyphInstance.localPosition = nextGlyphPosition;
+            glyphInstance.localScale = vec2_create(0, 0);
+            glyphInstance.textureCoordinatePair = vec4_create(1, 1, 1, 1);
+
+            textBatch->glyphInstanceData->data[textData->firstGlyphInstanceIndex + i] = glyphInstance;
+            nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * TAB_SIZE * textData->fontSize;
+            continue;
+        }
+
+        // If the glyph is a space, dont add it to the glyph instance array, or put a placeholder if the text is variable
+        if (newText[i] == ' ')
+        {
+            GlyphInstanceData glyphInstance = {};
+            glyphInstance.localPosition = nextGlyphPosition;
+            glyphInstance.localScale = vec2_create(0, 0);
+            glyphInstance.textureCoordinatePair = vec4_create(1, 1, 1, 1);
+
+            textBatch->glyphInstanceData->data[textData->firstGlyphInstanceIndex + i] = glyphInstance;
+            nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * TAB_SIZE * textData->fontSize;
+            continue;
+        }
+
+        // Finding the index for the glyph to get it's data from the font
+        u32 glyphIndex = UINT32_MAX;
+        for (int j = 0; j < textBatch->font->characterCount; j++)
+        {
+            if (newText[i] == textBatch->font->renderableCharacters[j])
+            {
+                glyphIndex = j;
+                break;
+            }
+        }
+
+        GRASSERT_DEBUG(glyphIndex != UINT32_MAX);
+
+        // If the glyph size is 0 by 0, don't add it to the glyph instance array, only add its advance width, or put a placeholder if the text is variable
+        if (0 == (textBatch->font->glyphSizes[glyphIndex].x + textBatch->font->glyphSizes[glyphIndex].y))
+        {
+            GlyphInstanceData glyphInstance = {};
+            glyphInstance.localPosition = nextGlyphPosition;
+            glyphInstance.localScale = vec2_create(0, 0);
+            glyphInstance.textureCoordinatePair = vec4_create(1, 1, 1, 1);
+
+            textBatch->glyphInstanceData->data[textData->firstGlyphInstanceIndex + i] = glyphInstance;
+            nextGlyphPosition.x += textBatch->font->spaceAdvanceWidth * TAB_SIZE * textData->fontSize;
+            continue;
+        }
+
+        GlyphInstanceData glyphInstance = {};
+        glyphInstance.localPosition = nextGlyphPosition;
+        glyphInstance.localPosition.y += textBatch->font->yOffsets[glyphIndex] * textData->fontSize;
+        glyphInstance.localScale = vec2_mul_f32(textBatch->font->glyphSizes[glyphIndex], textData->fontSize);
+        glyphInstance.textureCoordinatePair = textBatch->font->textureCoordinates[glyphIndex];
+
+		textBatch->glyphInstanceData->data[textData->firstGlyphInstanceIndex + i] = glyphInstance;
+
+        nextGlyphPosition.x += textBatch->font->advanceWidths[glyphIndex] * textData->fontSize;
+    }
+	
+	VertexBufferUpdate(textBatch->glyphInstancesBuffer, textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity); // TODO: allow uploading only to a range rather than from 0 to a given point
+}
+
 void TextBatchSetTextActive(TextBatch* textBatch, u64 textId, bool active)
 {
     // Getting the index of the text that corresponds to the given text id
@@ -509,8 +627,8 @@ void TextBatchRender(TextBatch* textBatch, mat4 viewProjection)
 
 static inline void MergeInstanceRanges(GlyphInstanceRange** pGlyphInstanceRanges, u32* instanceRangeCount)
 {
-	if (*instanceRangeCount == 0)
-		return;
+    if (*instanceRangeCount == 0)
+        return;
 
     GlyphInstanceRange* glyphInstanceRanges = *pGlyphInstanceRanges;
     for (u32 i = 0; i < *instanceRangeCount - 1; i++)
