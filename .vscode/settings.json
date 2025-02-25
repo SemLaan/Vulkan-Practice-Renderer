@@ -42,6 +42,7 @@
 		"ttf_types.h": "c",
 		"random": "cpp",
 		"iterator": "cpp",
-		"string": "c"
+		"string": "c",
+		"input.h": "c"
 	}
 }

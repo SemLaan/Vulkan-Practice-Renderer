@@ -371,6 +371,7 @@ void GameRenderingShutdown()
     MaterialDestroy(renderingState->outlineMaterial);
     MaterialDestroy(renderingState->normalRenderingMaterial);
     MaterialDestroy(renderingState->marchingCubesMaterial);
+    MaterialDestroy(renderingState->uiTextureMaterial);
 
     RenderTargetDestroy(renderingState->normalAndDepthRenderTarget);
 

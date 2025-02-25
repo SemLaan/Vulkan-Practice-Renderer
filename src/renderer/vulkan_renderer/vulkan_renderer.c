@@ -842,7 +842,14 @@ void ShutdownRenderer()
     // ============================ Destroying global ubo stuff (arrays, buffers, memory, descriptor set layout, descriptor sets) =================================
     // ============================================================================================================================================================
     if (vk_state->globalDescriptorSetLayout)
+	{
         vkDestroyDescriptorSetLayout(vk_state->device, vk_state->globalDescriptorSetLayout, vk_state->vkAllocator);
+	}
+	
+	if (vk_state->globalDescriptorSetArray)
+	{
+		Free(vk_state->rendererAllocator, vk_state->globalDescriptorSetArray);
+	}
 
     for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {

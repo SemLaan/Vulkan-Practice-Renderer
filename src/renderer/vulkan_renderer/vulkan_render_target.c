@@ -146,6 +146,8 @@ void RenderTargetDestroy(RenderTarget clientRenderTarget)
         if (renderTarget->colorImage.memory)
             vkFreeMemory(vk_state->device, renderTarget->colorImage.memory, vk_state->vkAllocator);
     }
+
+	Free(vk_state->rendererAllocator, renderTarget);
 }
 
 void RenderTargetStartRendering(RenderTarget clientRenderTarget)

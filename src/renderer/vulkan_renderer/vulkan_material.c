@@ -156,6 +156,7 @@ void MaterialDestroy(Material clientMaterial)
         vkFreeMemory(vk_state->device, material->uniformBufferMemory, vk_state->vkAllocator);
     }
 
+	Free(vk_state->rendererAllocator, material->descriptorSetArray);
     Free(vk_state->rendererAllocator, material);
 }
 

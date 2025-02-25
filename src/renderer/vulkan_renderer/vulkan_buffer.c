@@ -161,8 +161,8 @@ VertexBuffer VertexBufferCreate(void* vertices, size_t size)
 
         acquireBufferInfo->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
         acquireBufferInfo->pNext = nullptr;
-        acquireBufferInfo->srcStageMask = 0;  // IGNORED because it is a queue family release operation
-        acquireBufferInfo->srcAccessMask = 0; // IGNORED because it is a queue family release operation
+        acquireBufferInfo->srcStageMask = 0;  // IGNORED because it is a queue family acquire operation
+        acquireBufferInfo->srcAccessMask = 0; // IGNORED because it is a queue family acquire operation
         acquireBufferInfo->dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
         acquireBufferInfo->dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
         acquireBufferInfo->srcQueueFamilyIndex = vk_state->transferQueue.index;
@@ -278,8 +278,8 @@ void VertexBufferUpdate(VertexBuffer clientBuffer, void* vertices, u64 size)
 
     acquireBufferInfo->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
     acquireBufferInfo->pNext = nullptr;
-    acquireBufferInfo->srcStageMask = 0;  // IGNORED because it is a queue family release operation
-    acquireBufferInfo->srcAccessMask = 0; // IGNORED because it is a queue family release operation
+    acquireBufferInfo->srcStageMask = 0;  // IGNORED because it is a queue family acquire operation
+    acquireBufferInfo->srcAccessMask = 0; // IGNORED because it is a queue family acquire operation
     acquireBufferInfo->dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
     acquireBufferInfo->dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
     acquireBufferInfo->srcQueueFamilyIndex = vk_state->transferQueue.index;

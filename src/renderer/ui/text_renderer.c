@@ -172,6 +172,7 @@ void TextUnloadFont(const char* fontName)
 {
     Font* font = SimpleMapLookup(state->fontMap, fontName);
     GRASSERT_DEBUG(font->refCount == 0);
+	TextureDestroy(font->glyphTextureAtlas);
     Free(GetGlobalAllocator(), font);
 }
 
