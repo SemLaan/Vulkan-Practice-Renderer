@@ -11,7 +11,6 @@
 
 typedef struct GameState
 {
-    Timer timer;
 	Arena frameArena;
 } GameState;
 
