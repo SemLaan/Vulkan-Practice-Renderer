@@ -43,4 +43,14 @@ void ArenaClear(Arena* arena)
 	arena->arenaPointer = arena->memoryBlock;
 }
 
+ArenaMarker ArenaGetMarker(Arena* arena)
+{
+	return (ArenaMarker)arena->arenaPointer;
+}
+
+void ArenaFreeMarker(Arena* arena, ArenaMarker marker)
+{
+	arena->arenaPointer = (void*)marker;
+}
+
 
