@@ -9,20 +9,13 @@
 #include "math/lin_alg.h"
 #include "player_controller.h"
 
-GameState* gameState = nullptr;
-
 int main()
 {
     // ================================================================== Startup
     EngineInit();
 
-    gameState = Alloc(GetGlobalAllocator(), sizeof(*gameState), MEM_TAG_GAME);
-
-    gameState->frameArena = ArenaCreate(GetGlobalAllocator(), MiB * 50);
     GameRenderingInit();
     PlayerControllerInit();
-
-    ArenaClear(&gameState->frameArena);
 
     // ================================================================= Game loop
     while (EngineUpdate())
@@ -35,17 +28,11 @@ int main()
 
         PlayerControllerUpdate();
         GameRenderingRender();
-
-        ArenaClear(&gameState->frameArena);
     }
 
     // ================================================================== Shutdown
     PlayerControllerShutdown();
     GameRenderingShutdown();
-
-    ArenaClear(&gameState->frameArena);
-    ArenaDestroy(&gameState->frameArena, GetGlobalAllocator());
-    Free(GetGlobalAllocator(), gameState);
 
     EngineShutdown();
 }

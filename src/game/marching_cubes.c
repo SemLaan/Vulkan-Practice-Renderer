@@ -6,6 +6,7 @@
 #include "math/lin_alg.h"
 #include "renderer/renderer.h"
 #include "game.h"
+#include "core/engine.h"
 
 #define INITIAL_VERT_RESERVATION 1000
 
@@ -35,8 +36,10 @@ static inline f32 GetDensityValueRaw(f32* densityMap, u32 mapHeightTimesDepth, u
 
 MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
 {
+	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
+
 	u32 reserved = INITIAL_VERT_RESERVATION;
-	MCVert* vertArray = ArenaAlloc(&gameState->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
+	MCVert* vertArray = ArenaAlloc(grGlobals->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
     u32 numberOfVertices = 0;
 
 	u32 densityMapHeightTimesDepth = densityMapHeight * densityMapDepth;
@@ -109,7 +112,7 @@ MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 den
 						if (numberOfVertices >= reserved)
 						{
 							reserved += INITIAL_VERT_RESERVATION;
-							ArenaAlloc(&gameState->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
+							ArenaAlloc(grGlobals->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
 						}
 
                         // If a triangle was completed this loop calculate and set the normal for all verts of that triangle
@@ -151,7 +154,7 @@ MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 den
     meshData.indexBuffer = IndexBufferCreate(indices, numberOfVertices);
 
 	// "Freeing" the memory from the temporary vert and indices array, because they could be quite large and this function might be run multiple times per frame
-	gameState->frameArena.arenaPointer = indices;
+	ArenaFreeMarker(grGlobals->frameArena, marker);
 
 	return meshData;
 }

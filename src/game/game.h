@@ -4,17 +4,6 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/ui/debug_ui.h"
-#include "core/timer.h"
-
-
-
-
-typedef struct GameState
-{
-	Arena frameArena;
-} GameState;
-
-extern GameState* gameState;
 
 
 void GameInit();

@@ -1,5 +1,6 @@
 #include "terrain_density_functions.h"
 
+#include "core/engine.h"
 #include "game.h"
 
 // Indexes into a densityMap
@@ -68,7 +69,7 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 	// Generating random bezier curves
 	u64 totalBezierCurvePoints = generationSettings->bezierTunnelControlPoints * generationSettings->bezierTunnelCount;
 
-	vec3* bezierCurvePoints = ArenaAlloc(&gameState->frameArena, totalBezierCurvePoints * sizeof(*bezierCurvePoints));
+	vec3* bezierCurvePoints = ArenaAlloc(grGlobals->frameArena, totalBezierCurvePoints * sizeof(*bezierCurvePoints));
 
 	for (int i = 0; i < generationSettings->bezierTunnelCount; i++)
 	{
@@ -83,8 +84,8 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 
 	// Sampling the bezier curves
 	u64 totalBezierSamples = generationSettings->bezierTunnelCount * SAMPLES_PER_BEZIER;
-	vec3* bezierSamples = ArenaAlloc(&gameState->frameArena, totalBezierSamples * sizeof(*bezierSamples));
-	vec3* interpolatedCurvePoints = ArenaAlloc(&gameState->frameArena, generationSettings->bezierTunnelControlPoints * sizeof(*interpolatedCurvePoints));;
+	vec3* bezierSamples = ArenaAlloc(grGlobals->frameArena, totalBezierSamples * sizeof(*bezierSamples));
+	vec3* interpolatedCurvePoints = ArenaAlloc(grGlobals->frameArena, generationSettings->bezierTunnelControlPoints * sizeof(*interpolatedCurvePoints));;
 
 	for (int i = 0; i < generationSettings->bezierTunnelCount; i++)
 	{
@@ -103,7 +104,7 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 	}
 
 	// Generating random sphere holes
-	vec3* sphereHoleCenters = ArenaAlloc(&gameState->frameArena, generationSettings->sphereHoleCount * sizeof(*sphereHoleCenters));
+	vec3* sphereHoleCenters = ArenaAlloc(grGlobals->frameArena, generationSettings->sphereHoleCount * sizeof(*sphereHoleCenters));
 
 	for (int i = 0; i < generationSettings->sphereHoleCount; i++)
 	{
@@ -227,6 +228,8 @@ void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 
 
 void BlurDensityMapGaussian(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
 {
+	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
+
 	if (iterations == 0)
 		return;
 
@@ -243,7 +246,7 @@ void BlurDensityMapGaussian(u32 iterations, u32 kernelSize, f32* densityMap, u32
     u32 kernelSizeSquared = kernelSize * kernelSize;
     u32 kernelSizeCubed = kernelSizeSquared * kernelSize;
 
-    f32* kernel = ArenaAlloc(&gameState->frameArena, kernelSizeCubed * sizeof(*kernel));
+    f32* kernel = ArenaAlloc(grGlobals->frameArena, kernelSizeCubed * sizeof(*kernel));
     f32 kernelTotal = 0;
 
     vec3 kernelCenter = vec3_from_float(kernelSizeMinusOne / 2);
@@ -271,7 +274,7 @@ void BlurDensityMapGaussian(u32 iterations, u32 kernelSize, f32* densityMap, u32
 
 	// Convolving the density map using the kernel to blur the density map
     f32* nonBlurredDensityMap = densityMap;
-    densityMap = ArenaAlloc(&gameState->frameArena, densityMapValueCount * sizeof(*densityMap));
+    densityMap = ArenaAlloc(grGlobals->frameArena, densityMapValueCount * sizeof(*densityMap));
 	MemoryCopy(densityMap, nonBlurredDensityMap, densityMapValueCount * sizeof(*densityMap));
 
     // Looping over every kernel sized area in the density map
@@ -321,13 +324,15 @@ void BlurDensityMapGaussian(u32 iterations, u32 kernelSize, f32* densityMap, u32
 	}
 
 	// "Freeing" the kernel and temp density map because these allocations can be quite large
-	gameState->frameArena.arenaPointer = (void*)kernel;
+	ArenaFreeMarker(grGlobals->frameArena, marker);
 }
 
 void BlurDensityMapBokeh(u32 iterations, u32 kernelSize, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
 {
 	if (iterations == 0)
 		return;
+
+	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
 
 	GRASSERT_DEBUG(kernelSize & 1);
 
@@ -341,7 +346,7 @@ void BlurDensityMapBokeh(u32 iterations, u32 kernelSize, f32* densityMap, u32 ma
     u32 kernelSizeSquared = kernelSize * kernelSize;
     u32 kernelSizeCubed = kernelSizeSquared * kernelSize;
 
-    f32* kernel = ArenaAlloc(&gameState->frameArena, kernelSizeCubed * sizeof(*kernel));
+    f32* kernel = ArenaAlloc(grGlobals->frameArena, kernelSizeCubed * sizeof(*kernel));
     f32 kernelTotal = 0;
 
     for (u32 x = 0; x < kernelSize; x++)
@@ -363,7 +368,7 @@ void BlurDensityMapBokeh(u32 iterations, u32 kernelSize, f32* densityMap, u32 ma
 
 	// Convolving the density map using the kernel to blur the density map
     f32* nonBlurredDensityMap = densityMap;
-    densityMap = ArenaAlloc(&gameState->frameArena, densityMapValueCount * sizeof(*densityMap));
+    densityMap = ArenaAlloc(grGlobals->frameArena, densityMapValueCount * sizeof(*densityMap));
 	MemoryCopy(densityMap, nonBlurredDensityMap, densityMapValueCount * sizeof(*densityMap));
 
     // Looping over every kernel sized area in the density map
@@ -413,7 +418,7 @@ void BlurDensityMapBokeh(u32 iterations, u32 kernelSize, f32* densityMap, u32 ma
 	}
 
 	// "Freeing" the kernel and temp density map because these allocations can be quite large
-	gameState->frameArena.arenaPointer = (void*)kernel;
+	ArenaFreeMarker(grGlobals->frameArena, marker);
 }
 
 

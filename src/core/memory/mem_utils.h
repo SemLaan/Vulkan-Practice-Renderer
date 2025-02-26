@@ -2,6 +2,8 @@
 #include "defines.h"
 
 
+#define CACHE_ALIGN 64
+
 // Copies memory from source to destination, can fail if blocks overlap
 void MemoryCopy(void* destination, const void* source, size_t size);
 

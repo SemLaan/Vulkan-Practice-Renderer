@@ -8,8 +8,6 @@ typedef struct Timer
 	f64 startTime;
 } Timer;
 
-extern Timer g_timer;
-extern f64 g_deltaTime;
 
 void StartOrResetTimer(Timer* timer);
 
