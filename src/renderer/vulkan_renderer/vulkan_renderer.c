@@ -39,10 +39,10 @@ bool InitializeRenderer(RendererInitSettings settings)
 
     vk_state = AlignedAlloc(GetGlobalAllocator(), sizeof(RendererState), 64 /*cache line*/);
     MemoryZero(vk_state, sizeof(*vk_state));
-    CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), MiB * 5, &vk_state->rendererAllocator);
-    CreateBumpAllocator("renderer bump allocator", vk_state->rendererAllocator, KiB * 5, &vk_state->rendererBumpAllocator);
-    CreatePoolAllocator("renderer resource destructor pool", vk_state->rendererAllocator, RENDER_POOL_BLOCK_SIZE_32, RENDERER_POOL_ALLOCATOR_32b_SIZE, &vk_state->poolAllocator32B);
-    CreatePoolAllocator("Renderer resource acquisition pool", vk_state->rendererAllocator, QUEUE_ACQUISITION_POOL_BLOCK_SIZE, RENDERER_RESOURCE_ACQUISITION_SIZE, &vk_state->resourceAcquisitionPool);
+    CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), MiB * 5, &vk_state->rendererAllocator, true);
+    CreateBumpAllocator("renderer bump allocator", vk_state->rendererAllocator, KiB * 5, &vk_state->rendererBumpAllocator, true);
+    CreatePoolAllocator("renderer resource destructor pool", vk_state->rendererAllocator, RENDER_POOL_BLOCK_SIZE_32, RENDERER_POOL_ALLOCATOR_32b_SIZE, &vk_state->poolAllocator32B, true);
+    CreatePoolAllocator("Renderer resource acquisition pool", vk_state->rendererAllocator, QUEUE_ACQUISITION_POOL_BLOCK_SIZE, RENDERER_RESOURCE_ACQUISITION_SIZE, &vk_state->resourceAcquisitionPool, true);
 
     vk_state->vkAllocator = nullptr; // TODO: add something that tracks vulkan API allocations in debug mode
 

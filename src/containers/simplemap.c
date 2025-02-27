@@ -40,7 +40,7 @@ SimpleMap* SimpleMapCreate(Allocator* allocator, u32 maxEntries)
 	MemoryZero(map->values, sizeof(*map->values) * maxEntries);
 
 	// Creating a pool allocator for the key strings.
-    CreatePoolAllocator("Simple Map keyPool", allocator, SIMPLEMAP_MAX_KEY_LEN, maxEntries, &map->keyPool);
+    CreatePoolAllocator("Simple Map keyPool", allocator, SIMPLEMAP_MAX_KEY_LEN, maxEntries, &map->keyPool, true);
 
 	return map;
 }

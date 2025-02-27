@@ -37,7 +37,7 @@ void DestroyGlobalAllocator(Allocator* allocator);
 // ================================== Freelist allocator =================================================================================================================================================
 // Creates a freelist allocator with the given name, uses parentAllocator to allocate this allocators memory, has arenaSize bytes
 // out_allocator is expected to be a pointer to the pointer to the allocator struct
-void CreateFreelistAllocator(const char* name, Allocator* parentAllocator, size_t arenaSize, Allocator** out_allocator);
+void CreateFreelistAllocator(const char* name, Allocator* parentAllocator, size_t arenaSize, Allocator** out_allocator, bool muteDestruction);
 void DestroyFreelistAllocator(Allocator* allocator);
 // Returns the amount of free nodes (fairly useless function tbh)
 size_t FreelistGetFreeNodes(void* backendState);
@@ -49,7 +49,7 @@ u64 GetFreelistAllocatorArenaUsage(Allocator* allocator);
 // ==================================== Bump allocator ================================================================================================================================================
 // Creates a bump (aka linear or scratch) allocator with the given name, uses parentAllocator to allocate this allocators memory, has arenaSize bytes
 // out_allocator is expected to be a pointer to the pointer to the allocator struct
-void CreateBumpAllocator(const char* name, Allocator* parentAllocator, size_t arenaSize, Allocator** out_allocator);
+void CreateBumpAllocator(const char* name, Allocator* parentAllocator, size_t arenaSize, Allocator** out_allocator, bool muteDestruction);
 void DestroyBumpAllocator(Allocator* allocator);
 // Returns how many bytes of this allocator are allocated // TODO: figure out if this includes headers or only memory available to the client
 u64 GetBumpAllocatorArenaUsage(Allocator* allocator);
@@ -57,7 +57,7 @@ u64 GetBumpAllocatorArenaUsage(Allocator* allocator);
 // ===================================== Pool allocator =============================================================================================================================================
 // Size of blocks this allocator returns, and amount of blocks in this allocator.
 // all blocks created by this allocator are aligned on allocSize (provided it is a power of two)
-void CreatePoolAllocator(const char* name, Allocator* parentAllocator, u32 blockSize, u32 poolSize, Allocator** out_allocator);
+void CreatePoolAllocator(const char* name, Allocator* parentAllocator, u32 blockSize, u32 poolSize, Allocator** out_allocator, bool muteDestruction);
 void DestroyPoolAllocator(Allocator* allocator);
 // Clears all allocations from this allocator, WARNING: this thus invalidates all pointers handed out by this allocator, this can be very fast but also dangerous, only use if you know what you're doing
 void FlushPoolAllocator(Allocator* allocator);

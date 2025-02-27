@@ -12,8 +12,8 @@ HashmapStr* MapStrCreate(Allocator* allocator, u32 backingArrayElementCount, u32
     hashmap->backingArray = (MapEntryStr*)(hashmap + 1);
     hashmap->backingArrayElementCount = backingArrayElementCount;
     hashmap->hashFunction = hashFunction;
-    CreatePoolAllocator("Map linked entry pool", allocator, sizeof(MapEntryStr), maxCollisions, &hashmap->linkedEntryPool);
-    CreatePoolAllocator("Map key pool", allocator, maxKeyLength, maxCollisions + backingArrayElementCount, &hashmap->keyPool);
+    CreatePoolAllocator("Map linked entry pool", allocator, sizeof(MapEntryStr), maxCollisions, &hashmap->linkedEntryPool, true);
+    CreatePoolAllocator("Map key pool", allocator, maxKeyLength, maxCollisions + backingArrayElementCount, &hashmap->keyPool, true);
     hashmap->parentAllocator = allocator;
     hashmap->maxKeyLength = maxKeyLength;
 

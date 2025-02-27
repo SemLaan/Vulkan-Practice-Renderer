@@ -51,7 +51,7 @@ static void* FreelistPrimitiveAlloc(void* backendState, size_t size);
 static bool FreelistPrimitiveTryReAlloc(void* backendState, void* block, size_t oldSize, size_t newSize);
 static void FreelistPrimitiveFree(void* backendState, void* block, size_t size);
 
-void CreateFreelistAllocator(const char* name, Allocator* parentAllocator, size_t arenaSize, Allocator** out_allocator)
+void CreateFreelistAllocator(const char* name, Allocator* parentAllocator, size_t arenaSize, Allocator** out_allocator, bool muteDestruction)
 {
     // Calculating the required nodes for an arena of the given size
     // Make one node for every "freelist node factor" nodes that fit in the arena
@@ -93,7 +93,7 @@ void CreateFreelistAllocator(const char* name, Allocator* parentAllocator, size_
 
     *out_allocator = allocator;
 
-    REGISTER_ALLOCATOR((u64)arenaStart, (u64)arenaStart + arenaSize, stateSize, &allocator->id, ALLOCATOR_TYPE_FREELIST, parentAllocator, name, allocator);
+    REGISTER_ALLOCATOR((u64)arenaStart, (u64)arenaStart + arenaSize, stateSize, &allocator->id, ALLOCATOR_TYPE_FREELIST, parentAllocator, name, allocator, muteDestruction);
 }
 
 void DestroyFreelistAllocator(Allocator* allocator)
@@ -415,7 +415,7 @@ static void* BumpReAlloc(Allocator* allocator, void* block, u64 size);
 static void BumpFree(Allocator* allocator, void* block);
 
 
-void CreateBumpAllocator(const char* name, Allocator* parentAllocator, size_t arenaSize, Allocator** out_allocator)
+void CreateBumpAllocator(const char* name, Allocator* parentAllocator, size_t arenaSize, Allocator** out_allocator, bool muteDestruction)
 {
     // Calculating required memory (client size + state size)
     size_t stateSize = sizeof(BumpAllocatorState);
@@ -446,7 +446,7 @@ void CreateBumpAllocator(const char* name, Allocator* parentAllocator, size_t ar
 
     *out_allocator = allocator;
 
-    REGISTER_ALLOCATOR((u64)arenaStart, (u64)arenaStart + arenaSize, stateSize, &allocator->id, ALLOCATOR_TYPE_BUMP, parentAllocator, name, allocator);
+    REGISTER_ALLOCATOR((u64)arenaStart, (u64)arenaStart + arenaSize, stateSize, &allocator->id, ALLOCATOR_TYPE_BUMP, parentAllocator, name, allocator, muteDestruction);
 }
 
 void DestroyBumpAllocator(Allocator* allocator)
@@ -537,7 +537,7 @@ static void* PoolAlignedAlloc(Allocator* allocator, u64 size, u32 alignment);
 static void* PoolReAlloc(Allocator* allocator, void* block, u64 size);
 static void PoolFree(Allocator* allocator, void* block);
 
-void CreatePoolAllocator(const char* name, Allocator* parentAllocator, u32 blockSize, u32 poolSize, Allocator** out_allocator)
+void CreatePoolAllocator(const char* name, Allocator* parentAllocator, u32 blockSize, u32 poolSize, Allocator** out_allocator, bool muteDestruction)
 {
     // Calculating required memory (client size + state size)
     u32 stateSize = sizeof(PoolAllocatorState);
@@ -570,7 +570,7 @@ void CreatePoolAllocator(const char* name, Allocator* parentAllocator, u32 block
 
     *out_allocator = allocator;
 
-    REGISTER_ALLOCATOR((u64)state->poolStart, (u64)state->poolStart + (blockSize * poolSize), stateSize + blockTrackerSize, &allocator->id, ALLOCATOR_TYPE_POOL, parentAllocator, name, allocator);
+    REGISTER_ALLOCATOR((u64)state->poolStart, (u64)state->poolStart + (blockSize * poolSize), stateSize + blockTrackerSize, &allocator->id, ALLOCATOR_TYPE_POOL, parentAllocator, name, allocator, muteDestruction);
 }
 
 void DestroyPoolAllocator(Allocator* allocator)
@@ -732,7 +732,7 @@ bool CreateGlobalAllocator(const char* name, size_t arenaSize, Allocator** out_a
 
     *out_allocator = allocator;
 
-    REGISTER_ALLOCATOR((u64)arenaStart, (u64)arenaStart + arenaSize, stateSize, &allocator->id, ALLOCATOR_TYPE_GLOBAL, nullptr, name, allocator);
+    REGISTER_ALLOCATOR((u64)arenaStart, (u64)arenaStart + arenaSize, stateSize, &allocator->id, ALLOCATOR_TYPE_GLOBAL, nullptr, name, allocator, true);
 
     return true;
 }

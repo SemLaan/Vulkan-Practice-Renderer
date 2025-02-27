@@ -36,7 +36,7 @@ void EngineInit(EngineInitSettings settings)
 	grGlobals->framerateLimit = settings.framerateLimit;
 	grGlobals->frameArena = Alloc(GetGlobalAllocator(), sizeof(*grGlobals->frameArena));
 	*grGlobals->frameArena = ArenaCreate(GetGlobalAllocator(), FRAME_ARENA_SIZE);
-	CreateFreelistAllocator("Game Allocator", GetGlobalAllocator(), GAME_ALLOCATOR_SIZE, &grGlobals->gameAllocator);
+	CreateFreelistAllocator("Game Allocator", GetGlobalAllocator(), GAME_ALLOCATOR_SIZE, &grGlobals->gameAllocator, false);
 
 	RendererInitSettings rendererInitSettings = {};
 	rendererInitSettings.presentMode = settings.presentMode;

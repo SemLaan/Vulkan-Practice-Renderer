@@ -11,7 +11,7 @@
 #include "../asserts.h"
 #define MARK_ALLOCATOR(allocator) GRASSERT_MSG(false, "Don't forget to remove allocator markers")
 
-#define REGISTER_ALLOCATOR(arenaStart, arenaEnd, stateSize, out_allocatorId, type, parentAllocator, name, allocator)
+#define REGISTER_ALLOCATOR(arenaStart, arenaEnd, stateSize, out_allocatorId, type, parentAllocator, name, allocator, muteDestruction)
 #define UNREGISTER_ALLOCATOR(allocatorId, allocatorType)
 #define DEBUG_FLUSH_ALLOCATOR(pAllocator)
 
@@ -66,16 +66,16 @@ void _MarkAllocator(Allocator* allocator);
 // TODO: This disables seeing how much of the allocator is being used (for now)
 #define MARK_ALLOCATOR(allocator) _MarkAllocator(allocator);
 
-void _RegisterAllocator(u64 arenaStart, u64 arenaEnd, u32 stateSize, u32* out_allocatorId, AllocatorType type, Allocator* parentAllocator, const char* name, Allocator* allocator);
+void _RegisterAllocator(u64 arenaStart, u64 arenaEnd, u32 stateSize, u32* out_allocatorId, AllocatorType type, Allocator* parentAllocator, const char* name, Allocator* allocator, bool muteDestruction);
 void _UnregisterAllocator(u32 allocatorId, AllocatorType allocatorType);
-u32 _DebugFlushAllocator(Allocator* allocator);
+u32 _DebugFlushAllocator(Allocator* allocator, bool muteWarnings);
 
 // Registers an allocator with the debug system, this is called by the allocators internally
-#define REGISTER_ALLOCATOR(arenaStart, arenaEnd, stateSize, out_allocatorId, type, parentAllocator, name, allocator) _RegisterAllocator(arenaStart, arenaEnd, stateSize, out_allocatorId, type, parentAllocator, name, allocator)
+#define REGISTER_ALLOCATOR(arenaStart, arenaEnd, stateSize, out_allocatorId, type, parentAllocator, name, allocator, muteDestruction) _RegisterAllocator(arenaStart, arenaEnd, stateSize, out_allocatorId, type, parentAllocator, name, allocator, muteDestruction)
 // Unregisters an allocator with the debug system, this is called by the allocators internally
 #define UNREGISTER_ALLOCATOR(allocatorId, allocatorType) _UnregisterAllocator(allocatorId, allocatorType)
 // Flushes all registered allocations from an allocator, this is called by the allocators inernally
-#define DEBUG_FLUSH_ALLOCATOR(pAllocator) _DebugFlushAllocator(pAllocator)
+#define DEBUG_FLUSH_ALLOCATOR(pAllocator) _DebugFlushAllocator(pAllocator, true)
 
 // These functions are called via macros and they intercept the regular allocations to be able to handle debug info about allocations
 // See the allocators.h script to see the macros where these are called

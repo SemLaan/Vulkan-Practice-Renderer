@@ -46,6 +46,7 @@ typedef struct RegisteredAllocatorInfo
     u32 allocatorId;        // Unique id of the allocator
     u32 parentAllocatorId;  // Id of the allocator that owns the allocator
     AllocatorType type;     // Type of allocator
+	bool muteDestruction;	// If there are any active allocations upon the destruction of this allocator, they will be ignored (normally this gives a warning)
 } RegisteredAllocatorInfo;
 
 DEFINE_DARRAY_TYPE(RegisteredAllocatorInfo);
@@ -83,7 +84,7 @@ void _StartMemoryDebugSubsys()
     state = Alloc(memoryDebugAllocator, sizeof(*state));
     MemoryZero(state, sizeof(*state));
     state->allocationsMap = MapU64Create(memoryDebugAllocator, ALLOCATIONS_MAP_SIZE, ALLOCATIONS_MAP_MAX_COLLISIONS, Hash6432Shift);
-    CreatePoolAllocator("Alloc info pool", memoryDebugAllocator, sizeof(AllocInfo), ALLOCATIONS_MAP_SIZE + ALLOCATIONS_MAP_MAX_COLLISIONS, &state->allocInfoPool);
+    CreatePoolAllocator("Alloc info pool", memoryDebugAllocator, sizeof(AllocInfo), ALLOCATIONS_MAP_SIZE + ALLOCATIONS_MAP_MAX_COLLISIONS, &state->allocInfoPool, true);
     state->totalUserAllocated = 0;
     state->totalUserAllocationCount = 0;
     state->arenaStart = memoryDebugArenaStart;
@@ -196,16 +197,6 @@ void _PrintMemoryStats()
     _INFO("Total user allocation count: %llu", state->totalUserAllocationCount);
     _INFO("Total user allocated: %.2f%s", (f32)state->totalUserAllocated / (f32)scale, scaleString);
 
-	// TODO: change to allocation stats per allocator
-	/*
-    // Printing allocation stats per tag
-    _INFO("Allocations by tag:");
-    for (u32 i = 0; i < MAX_MEMORY_TAGS; ++i)
-    {
-        _INFO("\t%s: %u", memTagToText[i], state->perTagAllocationCount[i]);
-    }
-	*/
-
     // Printing all active allocations
     // TODO: add a bool parameter to the function to specify whether to print this or not, because it's a lot
     AllocInfoRefDarray* allocInfoDarray = (AllocInfoRefDarray*)MapU64GetValueRefDarray(state->allocationsMap, memoryDebugAllocator);
@@ -257,7 +248,7 @@ static u32 _GetUniqueAllocatorId()
     return nextAllocatorId;
 }
 
-void _RegisterAllocator(u64 arenaStart, u64 arenaEnd, u32 stateSize, u32* out_allocatorId, AllocatorType type, Allocator* parentAllocator, const char* name, Allocator* allocator)
+void _RegisterAllocator(u64 arenaStart, u64 arenaEnd, u32 stateSize, u32* out_allocatorId, AllocatorType type, Allocator* parentAllocator, const char* name, Allocator* allocator, bool muteDestruction)
 {
     // Making sure debug allocators don't get registered, we also don't have to worry about them getting unregistered as
     // they will be cleaned up by the OS, and thus don't call unregister
@@ -278,6 +269,7 @@ void _RegisterAllocator(u64 arenaStart, u64 arenaEnd, u32 stateSize, u32* out_al
     allocatorInfo.arenaEnd = arenaEnd;
     allocatorInfo.stateSize = stateSize;
     allocatorInfo.type = type;
+	allocatorInfo.muteDestruction = muteDestruction;
     if (parentAllocator != nullptr)
         allocatorInfo.parentAllocatorId = parentAllocator->id;
     else
@@ -296,8 +288,8 @@ void _UnregisterAllocator(u32 allocatorId, AllocatorType allocatorType)
         if (state->registeredAllocatorDarray->data[i].allocatorId == allocatorId)
         {
             // Removing all the info about the allocations that the allocator still contained
-            u32 freedCount = _DebugFlushAllocator(state->registeredAllocatorDarray->data[i].allocator);
-            if (freedCount > 0)
+            u32 freedCount = _DebugFlushAllocator(state->registeredAllocatorDarray->data[i].allocator, state->registeredAllocatorDarray->data[i].muteDestruction);
+            if (freedCount > 0 && !state->registeredAllocatorDarray->data[i].muteDestruction)
                 _WARN("Destroyed allocator with %u active allocation(s)", freedCount);
             DarrayPopAt(state->registeredAllocatorDarray, i);
             return;
@@ -311,7 +303,7 @@ void _UnregisterAllocator(u32 allocatorId, AllocatorType allocatorType)
 
 // =========================================== Flushing an allocator =======================================================
 // Returns the amount of allocations that were freed
-u32 _DebugFlushAllocator(Allocator* allocator)
+u32 _DebugFlushAllocator(Allocator* allocator, bool muteWarnings)
 {
     // Getting an array of all allocations
     MapEntryU64RefDarray* mapEntriesDarray = MapU64GetMapEntryRefDarray(state->allocationsMap, memoryDebugAllocator);
@@ -326,6 +318,9 @@ u32 _DebugFlushAllocator(Allocator* allocator)
 
         if (allocator->id == allocInfo->allocatorId)
         {
+			if (!muteWarnings)
+				_WARN("Freed allocation from allocator! Size: %u, File: %s:%u", allocInfo->allocSize, allocInfo->file, allocInfo->line);
+
             state->totalUserAllocationCount--;
             state->totalUserAllocated -= allocInfo->allocSize;
             Free(state->allocInfoPool, allocInfo);

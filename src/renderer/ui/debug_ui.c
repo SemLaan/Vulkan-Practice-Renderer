@@ -225,7 +225,7 @@ bool InitializeDebugUI()
     MemoryZero(state, sizeof(*state));
 
     // Creating interactable internal data allocator
-    CreateFreelistAllocator("DebugUI interactable internal data", GetGlobalAllocator(), ITERACTABLE_INTERNAL_DATA_ALLOCATOR_SIZE, &state->interactableInternalDataAllocator);
+    CreateFreelistAllocator("DebugUI interactable internal data", GetGlobalAllocator(), ITERACTABLE_INTERNAL_DATA_ALLOCATOR_SIZE, &state->interactableInternalDataAllocator, true);
 
     // Creating the quad shader and material
     ShaderCreateInfo shaderCreateInfo = {};

@@ -39,7 +39,7 @@ bool InitializeTextRenderer()
     MemoryZero(state, sizeof(*state));
 
     state->fontMap = SimpleMapCreate(GetGlobalAllocator(), MAX_FONTMAP_ENTRIES);
-    CreateFreelistAllocator("Text renderer text strings", GetGlobalAllocator(), TEXT_STRING_ARENA_SIZE, &state->textStringAllocator);
+    CreateFreelistAllocator("Text renderer text strings", GetGlobalAllocator(), TEXT_STRING_ARENA_SIZE, &state->textStringAllocator, true);
     state->nextTextId = 1;
 
     // Creating the char rect geometry for instancing characters
