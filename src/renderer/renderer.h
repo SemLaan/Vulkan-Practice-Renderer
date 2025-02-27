@@ -12,8 +12,19 @@ typedef enum UpdateFrequency
     UPDATE_FREQUENCY_DYNAMIC,
 } UpdateFrequency;
 
+typedef enum GrPresentMode
+{
+	GR_PRESENT_MODE_FIFO,
+	GR_PRESENT_MODE_MAILBOX,
+} GrPresentMode;
+
+typedef struct RendererInitSettings
+{
+	GrPresentMode presentMode;
+} RendererInitSettings;
+
 // ============================================= Engine functions ====================================================
-bool InitializeRenderer();
+bool InitializeRenderer(RendererInitSettings settings);
 void ShutdownRenderer();
 
 void WaitForGPUIdle();

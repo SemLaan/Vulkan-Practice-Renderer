@@ -23,12 +23,12 @@ static bool OnResize(EventCode type, EventData data);
 #define FRAME_ARENA_SIZE (100 * MiB)
 #define GAME_ALLOCATOR_SIZE (100 * MiB)
 
-void EngineInit()
+void EngineInit(EngineInitSettings settings)
 {
-    // ============================================ Startup ============================================
+	// ============================================ Startup ============================================
 	// Initializing memory system first
-    START_MEMORY_DEBUG_SUBSYS();
-    InitializeMemory(ENGINE_TOTAL_MEMORY_RESERVE);
+	START_MEMORY_DEBUG_SUBSYS();
+	InitializeMemory(ENGINE_TOTAL_MEMORY_RESERVE);
 
 	// Setting up engine globals, before initializing the other subsystems because they might need the globals
 	grGlobals = AlignedAlloc(GetGlobalAllocator(), sizeof(*grGlobals), CACHE_ALIGN, MEM_TAG_TEST);
@@ -37,20 +37,23 @@ void EngineInit()
 	*grGlobals->frameArena = ArenaCreate(GetGlobalAllocator(), FRAME_ARENA_SIZE);
 	CreateFreelistAllocator("Game Allocator", GetGlobalAllocator(), GAME_ALLOCATOR_SIZE, &grGlobals->gameAllocator);
 
-    InitializeEvent();
-    InitializeInput();
-    InitializePlatform("Beef", 200, 100);
-    InitializeRenderer();
-    InitializeTextRenderer();
-    InitializeDebugUI();
+	RendererInitSettings rendererInitSettings = {};
+	rendererInitSettings.presentMode = settings.presentMode;
 
-    grGlobals->appRunning = true;
-    grGlobals->appSuspended = false;
+	InitializeEvent();
+	InitializeInput();
+	InitializePlatform(settings.windowTitle, settings.startResolution.x, settings.startResolution.y);
+	InitializeRenderer(rendererInitSettings);
+	InitializeTextRenderer();
+	InitializeDebugUI();
+
+	grGlobals->appRunning = true;
+	grGlobals->appSuspended = false;
 	StartOrResetTimer(&grGlobals->timer);
 	grGlobals->previousFrameTime = TimerSecondsSinceStart(grGlobals->timer);
 
-    RegisterEventListener(EVCODE_QUIT, OnQuit);
-    RegisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
+	RegisterEventListener(EVCODE_QUIT, OnQuit);
+	RegisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
 }
 
 bool EngineUpdate()
@@ -63,23 +66,23 @@ bool EngineUpdate()
     UpdateInput();
     PlatformProcessMessage();
 
-    // TODO: sleep platform every loop if app suspended to not waste pc resources
-    while (grGlobals->appSuspended)
-    {
+	// TODO: sleep platform every loop if app suspended to not waste pc resources
+	while (grGlobals->appSuspended)
+	{
 		UpdateInput();
-    	PlatformProcessMessage();
-    }
+		PlatformProcessMessage();
+	}
 
-    if (GetKeyDown(KEY_F11) && !GetKeyDownPrevious(KEY_F11))
-        ToggleFullscreen();
+	if (GetKeyDown(KEY_F11) && !GetKeyDownPrevious(KEY_F11))
+		ToggleFullscreen();
 
-    UpdateDebugUI();
+	UpdateDebugUI();
 
-    if (GetKeyDown(KEY_ESCAPE))
-    {
-        EventData evdata;
-        InvokeEvent(EVCODE_QUIT, evdata);
-    }
+	if (GetKeyDown(KEY_ESCAPE))
+	{
+		EventData evdata;
+		InvokeEvent(EVCODE_QUIT, evdata);
+	}
 
 	return grGlobals->appRunning;
 }
@@ -87,48 +90,48 @@ bool EngineUpdate()
 void EngineShutdown()
 {
 	// ============================================ Shutdown ============================================
-    WaitForGPUIdle();
+	WaitForGPUIdle();
 
-    UnregisterEventListener(EVCODE_QUIT, OnQuit);
-    UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
+	UnregisterEventListener(EVCODE_QUIT, OnQuit);
+	UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
 
-    ShutdownDebugUI();
-    ShutdownTextRenderer();
-    ShutdownRenderer();
-    ShutdownPlatform();
-    ShutdownInput();
-    ShutdownEvent();
+	ShutdownDebugUI();
+	ShutdownTextRenderer();
+	ShutdownRenderer();
+	ShutdownPlatform();
+	ShutdownInput();
+	ShutdownEvent();
 
 	ArenaDestroy(grGlobals->frameArena, GetGlobalAllocator());
 	Free(GetGlobalAllocator(), grGlobals->frameArena);
 	DestroyFreelistAllocator(grGlobals->gameAllocator);
 	Free(GetGlobalAllocator(), grGlobals);
 
-    ShutdownMemory();
-    SHUTDOWN_MEMORY_DEBUG_SUBSYS();
+	ShutdownMemory();
+	SHUTDOWN_MEMORY_DEBUG_SUBSYS();
 
-    WriteLogsToFile();
+	WriteLogsToFile();
 }
 
 
 static bool OnQuit(EventCode type, EventData data)
 {
 	WaitForGPUIdle();
-    grGlobals->appRunning = false;
-    return false;
+	grGlobals->appRunning = false;
+	return false;
 }
 
 static bool OnResize(EventCode type, EventData data)
 {
-    if (data.u32[0] == 0 || data.u32[1] == 0)
-    {
-        grGlobals->appSuspended = true;
-        _INFO("App suspended");
-    }
-    else if (grGlobals->appSuspended)
-    {
-        grGlobals->appSuspended = false;
-        _INFO("App unsuspended");
-    }
-    return false;
+	if (data.u32[0] == 0 || data.u32[1] == 0)
+	{
+		grGlobals->appSuspended = true;
+		_INFO("App suspended");
+	}
+	else if (grGlobals->appSuspended)
+	{
+		grGlobals->appSuspended = false;
+		_INFO("App unsuspended");
+	}
+	return false;
 }

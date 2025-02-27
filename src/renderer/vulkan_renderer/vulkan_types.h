@@ -5,6 +5,7 @@
 #include "../buffer.h"
 #include "../render_target.h"
 #include "containers/simplemap.h"
+#include "../renderer.h"
 
 typedef struct RendererState RendererState;
 extern RendererState* vk_state;
@@ -216,6 +217,7 @@ typedef struct RendererState
 	VkBuffer* globalUniformBufferArray;								// Global uniform buffer object
 	VkDeviceMemory* globalUniformMemoryArray;						// Global uniform memory
 	VkPhysicalDeviceProperties deviceProperties;					// Properties of the physical device
+	GrPresentMode requestedPresentMode;
 #ifndef GR_DIST
 	VkDebugUtilsMessengerEXT debugMessenger;						// Debug messenger, only exists in debug mode
 #endif // !GR_DIST

@@ -2,6 +2,14 @@
 #include "../defines.h"
 #include "memory/arena.h"
 #include "timer.h"
+#include "renderer/renderer.h"
+
+typedef struct EngineInitSettings 
+{
+	const char* windowTitle;
+	vec2i startResolution;
+	GrPresentMode presentMode;
+} EngineInitSettings;
 
 typedef struct GRGlobals
 {
@@ -16,7 +24,7 @@ typedef struct GRGlobals
 
 extern GRGlobals* grGlobals;
 
-void EngineInit();
+void EngineInit(EngineInitSettings settings);
 bool EngineUpdate();
 void EngineShutdown();
 

@@ -32,7 +32,7 @@ RendererState* vk_state = nullptr;
 
 static bool OnWindowResize(EventCode type, EventData data);
 
-bool InitializeRenderer()
+bool InitializeRenderer(RendererInitSettings settings)
 {
     GRASSERT_DEBUG(vk_state == nullptr); // If this triggers init got called twice
     _INFO("Initializing renderer subsystem...");
@@ -49,6 +49,7 @@ bool InitializeRenderer()
     vk_state->currentFrameIndex = 0;
     vk_state->currentInFlightFrameIndex = 0;
     vk_state->shouldRecreateSwapchain = false;
+	vk_state->requestedPresentMode = settings.presentMode;
 
     RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
@@ -516,7 +517,7 @@ bool InitializeRenderer()
     // ============================================================================================================================================================
     // ======================== Creating the swapchain ============================================================================================================
     // ============================================================================================================================================================
-    if (!CreateSwapchain(vk_state))
+    if (!CreateSwapchain(settings.presentMode))
         return false;
 
     // ============================================================================================================================================================
@@ -975,7 +976,7 @@ void RecreateSwapchain()
 
     DestroySwapchain(vk_state);
 
-    CreateSwapchain(vk_state);
+    CreateSwapchain(vk_state->requestedPresentMode);
 
     vk_state->shouldRecreateSwapchain = false;
     _INFO("Vulkan Swapchain resized");

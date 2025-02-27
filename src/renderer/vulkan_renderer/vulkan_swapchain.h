@@ -5,6 +5,6 @@
 
 SwapchainSupportDetails QuerySwapchainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 
-bool CreateSwapchain(RendererState* state);
+bool CreateSwapchain(GrPresentMode requestedPresentMode);
 
-void DestroySwapchain(RendererState* state);
+void DestroySwapchain();

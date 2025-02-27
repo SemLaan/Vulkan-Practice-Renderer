@@ -12,7 +12,11 @@
 int main()
 {
     // ================================================================== Startup
-    EngineInit();
+	EngineInitSettings engineSettings = {};
+	engineSettings.presentMode = GR_PRESENT_MODE_FIFO;
+	engineSettings.startResolution = (vec2i){ .x = 200, .y = 200};
+	engineSettings.windowTitle = "Beefbal Beefer 44";
+    EngineInit(engineSettings);
 
     GameRenderingInit();
     PlayerControllerInit();
