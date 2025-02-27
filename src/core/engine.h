@@ -9,6 +9,7 @@ typedef struct EngineInitSettings
 	const char* windowTitle;
 	vec2i startResolution;
 	GrPresentMode presentMode;
+	u32 framerateLimit;
 } EngineInitSettings;
 
 typedef struct GRGlobals
@@ -18,6 +19,7 @@ typedef struct GRGlobals
 	Timer timer;
 	f64 deltaTime;
 	f64 previousFrameTime;
+	u32 framerateLimit;
 	bool appRunning;
 	bool appSuspended;
 } GRGlobals;

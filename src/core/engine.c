@@ -33,6 +33,7 @@ void EngineInit(EngineInitSettings settings)
 	// Setting up engine globals, before initializing the other subsystems because they might need the globals
 	grGlobals = AlignedAlloc(GetGlobalAllocator(), sizeof(*grGlobals), CACHE_ALIGN, MEM_TAG_TEST);
 	grGlobals->deltaTime = 0.f;
+	grGlobals->framerateLimit = settings.framerateLimit;
 	grGlobals->frameArena = Alloc(GetGlobalAllocator(), sizeof(*grGlobals->frameArena), MEM_TAG_TEST);
 	*grGlobals->frameArena = ArenaCreate(GetGlobalAllocator(), FRAME_ARENA_SIZE);
 	CreateFreelistAllocator("Game Allocator", GetGlobalAllocator(), GAME_ALLOCATOR_SIZE, &grGlobals->gameAllocator);
@@ -61,6 +62,11 @@ bool EngineUpdate()
 	ArenaClear(grGlobals->frameArena);
 	f64 currentTime = TimerSecondsSinceStart(grGlobals->timer);
 	grGlobals->deltaTime = currentTime - grGlobals->previousFrameTime;
+	while (grGlobals->deltaTime <= 1.f / (f32)grGlobals->framerateLimit)
+	{
+		currentTime = TimerSecondsSinceStart(grGlobals->timer);
+		grGlobals->deltaTime = currentTime - grGlobals->previousFrameTime;
+	}
 	grGlobals->previousFrameTime = currentTime;
 
 	PreMessagesInputUpdate();
