@@ -257,7 +257,8 @@ bool InitializeInput();
 void ShutdownInput();
 
 // Copies the current input to the input of the previous frame, needs to happen before processing platform messages
-void UpdateInput();
+void PreMessagesInputUpdate();
+void PostMessagesInputUpdate();
 
 // Will center the mouse every frame if set to true
 void InputSetMouseCentered(bool enabled);

@@ -63,14 +63,16 @@ bool EngineUpdate()
 	grGlobals->deltaTime = currentTime - grGlobals->previousFrameTime;
 	grGlobals->previousFrameTime = currentTime;
 
-    UpdateInput();
-    PlatformProcessMessage();
+	PreMessagesInputUpdate();
+	PlatformProcessMessage();
+	PostMessagesInputUpdate();
 
 	// TODO: sleep platform every loop if app suspended to not waste pc resources
 	while (grGlobals->appSuspended)
 	{
-		UpdateInput();
+		PreMessagesInputUpdate();
 		PlatformProcessMessage();
+		PostMessagesInputUpdate();
 	}
 
 	if (GetKeyDown(KEY_F11) && !GetKeyDownPrevious(KEY_F11))

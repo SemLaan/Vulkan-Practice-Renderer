@@ -48,12 +48,16 @@ void ShutdownInput()
 	Free(GetGlobalAllocator(), state);
 }
 
-void UpdateInput()
+void PreMessagesInputUpdate()
 {
 	MemoryCopy(&state->previousKeyStates, &state->keyStates, sizeof(state->keyStates));
 	MemoryCopy(&state->previousButtonStates, &state->buttonStates, sizeof(state->buttonStates));
 	state->previousMousePosX = state->mousePosX;
 	state->previousMousePosY = state->mousePosY;
+}
+
+void PostMessagesInputUpdate()
+{
 	if (state->mouseCentered)
 	{
 		vec2i centerOfScreen = { .x = GetPlatformWindowSize().x / 2, .y = GetPlatformWindowSize().y / 2 };
@@ -155,15 +159,12 @@ void ProcessButton(bool down, ButtonCode button)
 
 void ProcessMouseMove(i32 x, i32 y)
 {
-	if (state->mousePosX != x || state->mousePosY != y)
-	{
-		state->mousePosX = x;
-		state->mousePosY = y;
-		EventData data = {};
-		data.i32[0] = state->mousePosX;
-		data.i32[1] = state->mousePosY;
-		data.i32[2] = state->previousMousePosX;
-		data.i32[3] = state->previousMousePosY;
-		InvokeEvent(EVCODE_MOUSE_MOVED, data);
-	}
+	state->mousePosX = x;
+	state->mousePosY = y;
+	EventData data = {};
+	data.i32[0] = state->mousePosX;
+	data.i32[1] = state->mousePosY;
+	data.i32[2] = state->previousMousePosX;
+	data.i32[3] = state->previousMousePosY;
+	InvokeEvent(EVCODE_MOUSE_MOVED, data);
 }
