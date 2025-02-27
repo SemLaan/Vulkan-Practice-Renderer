@@ -35,7 +35,7 @@ bool InitializeTextRenderer()
     _INFO("Initializing text renderer subsystem...");
 
     // Creating the text renderer state struct and creating the basic data structures in it.
-    state = Alloc(GetGlobalAllocator(), sizeof(*state), MEM_TAG_RENDERER_SUBSYS);
+    state = Alloc(GetGlobalAllocator(), sizeof(*state));
     MemoryZero(state, sizeof(*state));
 
     state->fontMap = SimpleMapCreate(GetGlobalAllocator(), MAX_FONTMAP_ENTRIES);
@@ -96,7 +96,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     u32 charCount = strlen(renderableCharacters);
 
     // Creating font struct
-    Font* font = Alloc(GetGlobalAllocator(), sizeof(*font), MEM_TAG_RENDERER_SUBSYS);
+    Font* font = Alloc(GetGlobalAllocator(), sizeof(*font));
     MemoryZero(font, sizeof(*font));
 
     font->spaceAdvanceWidth = glyphData->advanceWidths[' '];
@@ -136,7 +136,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
     u32 textureAtlasWidth = glyphResolution * textureAtlasGlyphsPerRow;
     u32 textureAtlasHeight = binPackedHeight;
-    u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureAtlasWidth * textureAtlasHeight, MEM_TAG_TEST);
+    u8* texturePixelData = Alloc(GetGlobalAllocator(), sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureAtlasWidth * textureAtlasHeight);
     MemoryZero(texturePixelData, sizeof(*texturePixelData) * TEXTURE_CHANNELS * textureAtlasWidth * textureAtlasHeight);
     for (u32 i = 0; i < textureAtlasHeight * textureAtlasWidth; i++)
         texturePixelData[i * TEXTURE_CHANNELS] = 255;
@@ -186,12 +186,12 @@ Font* TextGetFont(const char* fontName)
 
 TextBatch* TextBatchCreate(const char* fontName)
 {
-    TextBatch* textBatch = Alloc(GetGlobalAllocator(), sizeof(*textBatch), MEM_TAG_RENDERER_SUBSYS);
+    TextBatch* textBatch = Alloc(GetGlobalAllocator(), sizeof(*textBatch));
 
     textBatch->font = SimpleMapLookup(state->fontMap, fontName);
     textBatch->font->refCount++;
 
-    textBatch->glyphInstanceRanges = Alloc(GetGlobalAllocator(), sizeof(*textBatch->glyphInstanceRanges), MEM_TAG_TEST);
+    textBatch->glyphInstanceRanges = Alloc(GetGlobalAllocator(), sizeof(*textBatch->glyphInstanceRanges));
     textBatch->glyphInstanceRanges[0].startIndexInBytes = 0;
     textBatch->glyphInstanceRanges[0].instanceCount = 0;
     textBatch->instanceRangeCount = 1;
@@ -234,7 +234,7 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
     TextData textData = {};
     textData.stringLength = strlen(text);
     u32 stringLengthPlusNullTerminator = textData.stringLength + 1;
-    textData.string = Alloc(state->textStringAllocator, sizeof(*text) * stringLengthPlusNullTerminator, MEM_TAG_TEST);
+    textData.string = Alloc(state->textStringAllocator, sizeof(*text) * stringLengthPlusNullTerminator);
     MemoryCopy(textData.string, text, sizeof(*text) * stringLengthPlusNullTerminator);
     textData.firstGlyphInstanceIndex = textBatch->glyphInstanceData->size;
     textData.position = position;

@@ -14,25 +14,6 @@
 #define ALLOCATIONS_MAP_MAX_COLLISIONS 1000
 
 
-// Can turn a memory tag into a string, used for printing/logging
-static const char* memTagToText[MAX_MEMORY_TAGS] = {
-    "ALLOCATOR STATE    ",
-    "SUB ARENA          ",
-    "MEMORY SUBSYS      ",
-    "LOGGING SUBSYS     ",
-    "PLATFORM SUBSYS    ",
-    "EVENT SUBSYS       ",
-    "RENDERER SUBSYS    ",
-    "INPUT SUBSYS       ",
-    "GAME               ",
-    "TEST               ",
-    "DARRAY             ",
-    "VERTEX BUFFER      ",
-    "INDEX BUFFER       ",
-    "TEXTURE            ",
-    "HASHMAP            ",
-    "MEMORY DEBUG       ",
-};
 
 // Allocator type to string, can be used for printing/logging
 static const char* allocatorTypeToString[ALLOCATOR_TYPE_MAX_VALUE] = {
@@ -45,10 +26,9 @@ static const char* allocatorTypeToString[ALLOCATOR_TYPE_MAX_VALUE] = {
 // Info about an allocation, this is stored for every allocation the game makes
 typedef struct AllocInfo
 {
+	const char* file;       // File where this allocation was created
     u32 allocatorId;        // Id of the allocator that owns this allocation
-    const char* file;       // File where this allocation was created
     u32 line;               // Line where this allocation was created
-    MemTag tag;             // Tag of this allocation
     u32 allocSize;          // Size of the alloction (ONLY the client size, state used by the allocator is not counted)
     u32 alignment;          // Alignment of the allocation
 } AllocInfo;
@@ -82,8 +62,6 @@ typedef struct MemoryDebugState
     Allocator* allocInfoPool;                               // Pool allocator that contains all the alloc info structs
     u64 totalUserAllocated;                                 // Amount of memory allocated by the game
     u64 totalUserAllocationCount;                           // Amount of allocations done by the game
-    u32 perTagAllocationCount[MAX_MEMORY_TAGS];             // Amount of allocations done per tag
-    u32 perTagAllocated[MAX_MEMORY_TAGS];                   // Amount of memory allocated per tag
 } MemoryDebugState;
 
 static bool memoryDebuggingAllocatorsCreated = false;
@@ -102,9 +80,9 @@ void _StartMemoryDebugSubsys()
         GRASSERT_MSG(false, "Creating memory debug allocator failed");
 
     // Allocating and creating the memory debug state
-    state = Alloc(memoryDebugAllocator, sizeof(*state), MEM_TAG_MEMORY_DEBUG);
+    state = Alloc(memoryDebugAllocator, sizeof(*state));
     MemoryZero(state, sizeof(*state));
-    state->allocationsMap = MapU64Create(memoryDebugAllocator, MEM_TAG_MEMORY_DEBUG, ALLOCATIONS_MAP_SIZE, ALLOCATIONS_MAP_MAX_COLLISIONS, Hash6432Shift);
+    state->allocationsMap = MapU64Create(memoryDebugAllocator, ALLOCATIONS_MAP_SIZE, ALLOCATIONS_MAP_MAX_COLLISIONS, Hash6432Shift);
     CreatePoolAllocator("Alloc info pool", memoryDebugAllocator, sizeof(AllocInfo), ALLOCATIONS_MAP_SIZE + ALLOCATIONS_MAP_MAX_COLLISIONS, &state->allocInfoPool);
     state->totalUserAllocated = 0;
     state->totalUserAllocationCount = 0;
@@ -153,7 +131,7 @@ static const char* GetMemoryScaleString(u64 bytes, u64* out_scale)
 static void PrintAllocatorStatsRecursively(RegisteredAllocatorInfo* root, u32 registeredAllocatorCount, u32 depth)
 {
     // Creating a string with "depth" number of tabs
-    char* tabs = Alloc(memoryDebugAllocator, depth + 1 /*null terminator*/, MEM_TAG_MEMORY_DEBUG);
+    char* tabs = Alloc(memoryDebugAllocator, depth + 1 /*null terminator*/);
     MemorySet(tabs, '\t', depth);
     tabs[depth] = 0;
 
@@ -218,12 +196,15 @@ void _PrintMemoryStats()
     _INFO("Total user allocation count: %llu", state->totalUserAllocationCount);
     _INFO("Total user allocated: %.2f%s", (f32)state->totalUserAllocated / (f32)scale, scaleString);
 
+	// TODO: change to allocation stats per allocator
+	/*
     // Printing allocation stats per tag
     _INFO("Allocations by tag:");
     for (u32 i = 0; i < MAX_MEMORY_TAGS; ++i)
     {
         _INFO("\t%s: %u", memTagToText[i], state->perTagAllocationCount[i]);
     }
+	*/
 
     // Printing all active allocations
     // TODO: add a bool parameter to the function to specify whether to print this or not, because it's a lot
@@ -347,8 +328,6 @@ u32 _DebugFlushAllocator(Allocator* allocator)
         {
             state->totalUserAllocationCount--;
             state->totalUserAllocated -= allocInfo->allocSize;
-            state->perTagAllocated[allocInfo->tag] -= allocInfo->allocSize;
-            state->perTagAllocationCount[allocInfo->tag]--;
             Free(state->allocInfoPool, allocInfo);
             MapU64Delete(state->allocationsMap, mapEntry->key);
             freedAllocations++;
@@ -361,7 +340,7 @@ u32 _DebugFlushAllocator(Allocator* allocator)
 }
 
 // ============================================= Debug alloc, realloc and free hook-ins =====================================
-void* DebugAlignedAlloc(Allocator* allocator, u64 size, u32 alignment, MemTag memtag, const char* file, u32 line)
+void* DebugAlignedAlloc(Allocator* allocator, u64 size, u32 alignment, const char* file, u32 line)
 {
     // If debug allocation
     if (allocator->id == 0)
@@ -373,8 +352,6 @@ void* DebugAlignedAlloc(Allocator* allocator, u64 size, u32 alignment, MemTag me
         // Updating total game allocation state
         state->totalUserAllocated += size;
         state->totalUserAllocationCount++;
-        state->perTagAllocated[memtag] += size;
-        state->perTagAllocationCount[memtag]++;
 
         // Letting the allocator handle the actual allocation
         void* allocation;
@@ -385,11 +362,10 @@ void* DebugAlignedAlloc(Allocator* allocator, u64 size, u32 alignment, MemTag me
             allocation = allocator->BackendAlloc(allocator, size, alignment);
 
         // Storing alloc info about the allocation
-        AllocInfo* allocInfo = Alloc(state->allocInfoPool, sizeof(AllocInfo), MEM_TAG_MEMORY_DEBUG);
+        AllocInfo* allocInfo = Alloc(state->allocInfoPool, sizeof(AllocInfo));
         allocInfo->allocatorId = allocator->id;
         allocInfo->alignment = alignment;
         allocInfo->allocSize = size;
-        allocInfo->tag = memtag;
         allocInfo->file = file;
         allocInfo->line = line;
         MapU64Insert(state->allocationsMap, (u64)allocation, allocInfo);
@@ -446,7 +422,6 @@ void* DebugRealloc(Allocator* allocator, void* block, u64 newSize, const char* f
 
         // Updating total game allocation info
         state->totalUserAllocated -= (oldAllocInfo->allocSize - newSize);
-        state->perTagAllocated[oldAllocInfo->tag] -= (oldAllocInfo->allocSize - newSize);
 
         // Letting the allocator handle the actual reallocation
         void* reallocation;
@@ -457,10 +432,9 @@ void* DebugRealloc(Allocator* allocator, void* block, u64 newSize, const char* f
             reallocation = allocator->BackendRealloc(allocator, block, newSize);
 
         // Recreating a new alloc info for the changed allocation (the old alloc info gets deleted earlier in this function)
-        AllocInfo* newAllocInfo = Alloc(state->allocInfoPool, sizeof(AllocInfo), MEM_TAG_MEMORY_DEBUG);
+        AllocInfo* newAllocInfo = Alloc(state->allocInfoPool, sizeof(AllocInfo));
         newAllocInfo->allocatorId = oldAllocInfo->allocatorId;
         newAllocInfo->allocSize = newSize;
-        newAllocInfo->tag = oldAllocInfo->tag;
         newAllocInfo->file = oldAllocInfo->file;
         newAllocInfo->line = oldAllocInfo->line;
         MapU64Insert(state->allocationsMap, (u64)reallocation, newAllocInfo);
@@ -519,8 +493,6 @@ void DebugFree(Allocator* allocator, void* block, const char* file, u32 line)
         // Updating total game memory info
         state->totalUserAllocationCount--;
         state->totalUserAllocated -= allocInfo->allocSize;
-        state->perTagAllocated[allocInfo->tag] -= allocInfo->allocSize;
-        state->perTagAllocationCount[allocInfo->tag]--;
         Free(state->allocInfoPool, allocInfo);
 
         // Letting the allocator do the actual freeing

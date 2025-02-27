@@ -20,9 +20,9 @@ u32 Hash6432Shift(u64 key)
 
 
 // ====================================== Hash map
-HashmapU64* MapU64Create(Allocator* allocator, MemTag memtag, u32 backingArrayCapacity, u32 maxCollisions, HashFunctionU64 hashFunction)
+HashmapU64* MapU64Create(Allocator* allocator, u32 backingArrayCapacity, u32 maxCollisions, HashFunctionU64 hashFunction)
 {
-    HashmapU64* hashmap = Alloc(allocator, sizeof(*hashmap) + backingArrayCapacity * sizeof(MapEntryU64), memtag);
+    HashmapU64* hashmap = Alloc(allocator, sizeof(*hashmap) + backingArrayCapacity * sizeof(MapEntryU64));
     hashmap->backingArray = (MapEntryU64*)(hashmap + 1);
     hashmap->backingArrayCapacity = backingArrayCapacity;
     hashmap->hashFunction = hashFunction;
@@ -58,7 +58,7 @@ void MapU64Insert(HashmapU64* hashmap, u64 key, void* value)
         }
         else
         {
-            currentEntry->next = Alloc(hashmap->linkedEntryPool, sizeof(MapEntryU64), MEM_TAG_HASHMAP);
+            currentEntry->next = Alloc(hashmap->linkedEntryPool, sizeof(MapEntryU64));
             MemoryZero(currentEntry->next, sizeof(MapEntryU64));
             currentEntry = currentEntry->next;
         }

@@ -79,7 +79,7 @@ u32 _DebugFlushAllocator(Allocator* allocator);
 
 // These functions are called via macros and they intercept the regular allocations to be able to handle debug info about allocations
 // See the allocators.h script to see the macros where these are called
-void* DebugAlignedAlloc(Allocator* allocator, u64 size, u32 alignment, MemTag memtag, const char* file, u32 line);
+void* DebugAlignedAlloc(Allocator* allocator, u64 size, u32 alignment, const char* file, u32 line);
 void* DebugRealloc(Allocator* allocator, void* block, u64 newSize, const char* file, u32 line);
 void DebugFree(Allocator* allocator, void* block, const char* file, u32 line);
 

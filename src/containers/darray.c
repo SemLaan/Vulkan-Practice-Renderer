@@ -4,9 +4,9 @@
 
 void* DarrayCreate(u32 stride, u32 startCapacity, Allocator* allocator)
 {
-    Darray* darray = Alloc(allocator, sizeof(*darray), MEM_TAG_DARRAY);
+    Darray* darray = Alloc(allocator, sizeof(*darray));
 
-    darray->data = AlignedAlloc(allocator, stride * startCapacity, DARRAY_MIN_ALIGNMENT, MEM_TAG_DARRAY);
+    darray->data = AlignedAlloc(allocator, stride * startCapacity, DARRAY_MIN_ALIGNMENT);
 	darray->allocator = allocator;
     darray->size = 0;
     darray->capacity = startCapacity;
@@ -17,9 +17,9 @@ void* DarrayCreate(u32 stride, u32 startCapacity, Allocator* allocator)
 
 void* DarrayCreateWithSize(u32 stride, u32 startCapacityAndSize, Allocator* allocator)
 {
-    Darray* darray = Alloc(allocator, sizeof(*darray), MEM_TAG_DARRAY);
+    Darray* darray = Alloc(allocator, sizeof(*darray));
 
-    darray->data = AlignedAlloc(allocator, stride * startCapacityAndSize, DARRAY_MIN_ALIGNMENT, MEM_TAG_DARRAY);
+    darray->data = AlignedAlloc(allocator, stride * startCapacityAndSize, DARRAY_MIN_ALIGNMENT);
 	darray->allocator = allocator;
     darray->size = startCapacityAndSize;
     darray->capacity = startCapacityAndSize;

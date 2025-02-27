@@ -40,7 +40,7 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
     fseek(file, 0L, SEEK_END);
 
     u64 fileSize = ftell(file);
-    char* text = AlignedAlloc(GetGlobalAllocator(), fileSize, 64, MEM_TAG_RENDERER_SUBSYS);
+    char* text = AlignedAlloc(GetGlobalAllocator(), fileSize, 64);
 
     rewind(file);
     fread(text, sizeof(*text), fileSize, file);

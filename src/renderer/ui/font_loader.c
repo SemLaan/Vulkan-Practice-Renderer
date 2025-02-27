@@ -188,8 +188,8 @@ GlyphData* LoadFont(const char* filename)
     }
 
     // Filling in the raw glyph data by looping through all the required char codes
-    GlyphData* glyphData = Alloc(GetGlobalAllocator(), sizeof(*glyphData), MEM_TAG_RENDERER_SUBSYS);
-    RawGlyphData* rawGlyphData = Alloc(GetGlobalAllocator(), sizeof(*rawGlyphData), MEM_TAG_RENDERER_SUBSYS);
+    GlyphData* glyphData = Alloc(GetGlobalAllocator(), sizeof(*glyphData));
+    RawGlyphData* rawGlyphData = Alloc(GetGlobalAllocator(), sizeof(*rawGlyphData));
     MemoryZero(glyphData, sizeof(*glyphData));
     MemoryZero(rawGlyphData, sizeof(*rawGlyphData));
 
@@ -271,8 +271,8 @@ GlyphData* LoadFont(const char* filename)
 
             GRASSERT(flagIndex == totalPoints);
 
-            rawGlyphData->pointsArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(vec2) * totalPoints, MEM_TAG_RENDERER_SUBSYS);
-            rawGlyphData->onCurveArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(bool) * totalPoints, MEM_TAG_RENDERER_SUBSYS);
+            rawGlyphData->pointsArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(vec2) * totalPoints);
+            rawGlyphData->onCurveArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(bool) * totalPoints);
 
             // Reading x coordinates
             i32 relativePosition = 0;
@@ -371,7 +371,7 @@ GlyphData* LoadFont(const char* filename)
         GRASSERT(newPointCount < MAX_POINTS);
 
         glyphData->pointCounts[charCode] = newPointCount;
-        glyphData->pointArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(vec2) * newPointCount, MEM_TAG_RENDERER_SUBSYS);
+        glyphData->pointArrays[charCode] = Alloc(GetGlobalAllocator(), sizeof(vec2) * newPointCount);
         MemoryCopy(glyphData->pointArrays[charCode], tempPoints, sizeof(vec2) * newPointCount);
 
         // Free the raw glyph data for the current character

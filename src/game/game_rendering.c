@@ -108,7 +108,7 @@ static bool OnWindowResize(EventCode type, EventData data)
 
 void GameRenderingInit()
 {
-    renderingState = Alloc(GetGlobalAllocator(), sizeof(*renderingState), MEM_TAG_GAME);
+    renderingState = Alloc(GetGlobalAllocator(), sizeof(*renderingState));
 
     // Calculating camera projections and listening to the window resize event to recalculate projection on window resize
     vec2i windowSize = GetPlatformWindowSize();
@@ -259,7 +259,7 @@ void GameRenderingInit()
         world->densityMapHeight = DENSITY_MAP_SIZE;
         world->densityMapDepth = DENSITY_MAP_SIZE;
         u32 densityMapValueCount = world->densityMapWidth * world->densityMapHeight * world->densityMapDepth;
-        world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount, MEM_TAG_TEST);
+        world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount);
         DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 		BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 		world->marchingCubesMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);

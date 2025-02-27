@@ -31,10 +31,10 @@ void EngineInit(EngineInitSettings settings)
 	InitializeMemory(ENGINE_TOTAL_MEMORY_RESERVE);
 
 	// Setting up engine globals, before initializing the other subsystems because they might need the globals
-	grGlobals = AlignedAlloc(GetGlobalAllocator(), sizeof(*grGlobals), CACHE_ALIGN, MEM_TAG_TEST);
+	grGlobals = AlignedAlloc(GetGlobalAllocator(), sizeof(*grGlobals), CACHE_ALIGN);
 	grGlobals->deltaTime = 0.f;
 	grGlobals->framerateLimit = settings.framerateLimit;
-	grGlobals->frameArena = Alloc(GetGlobalAllocator(), sizeof(*grGlobals->frameArena), MEM_TAG_TEST);
+	grGlobals->frameArena = Alloc(GetGlobalAllocator(), sizeof(*grGlobals->frameArena));
 	*grGlobals->frameArena = ArenaCreate(GetGlobalAllocator(), FRAME_ARENA_SIZE);
 	CreateFreelistAllocator("Game Allocator", GetGlobalAllocator(), GAME_ALLOCATOR_SIZE, &grGlobals->gameAllocator);
 

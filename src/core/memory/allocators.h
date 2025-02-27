@@ -8,9 +8,9 @@
 #ifdef DIST
 
 // void* Alloc(Allocator* allocator, u64 size, MemTag memtag);
-#define Alloc(allocator, size, memtag) (allocator)->BackendAlloc((allocator), (size), MIN_ALIGNMENT)
+#define Alloc(allocator, size) (allocator)->BackendAlloc((allocator), (size), MIN_ALIGNMENT)
 // void* AlignedAlloc(Allocator* allocator, u64 size, u32 alignment, MemTag memtag);
-#define AlignedAlloc(allocator, size, alignment, memtag) (allocator)->BackendAlloc((allocator), (size), (alignment))
+#define AlignedAlloc(allocator, size, alignment) (allocator)->BackendAlloc((allocator), (size), (alignment))
 // void* Realloc(Allocator* allocator, void* block, u64 newSize);
 #define Realloc(allocator, block, newSize) (allocator)->BackendRealloc((allocator), (block), (newSize))
 // void Free(Allocator* allocator, void* block);
@@ -19,9 +19,9 @@
 #else // if not dist
 
 // void* Alloc(Allocator* allocator, u64 size, MemTag memtag);
-#define Alloc(allocator, size, memtag) DebugAlignedAlloc((allocator), (size), MIN_ALIGNMENT, (memtag), __FILE__, __LINE__)
+#define Alloc(allocator, size) DebugAlignedAlloc((allocator), (size), MIN_ALIGNMENT, __FILE__, __LINE__)
 // void* AlignedAlloc(Allocator* allocator, u64 size, u32 alignment, MemTag memtag);
-#define AlignedAlloc(allocator, size, alignment, memtag) DebugAlignedAlloc((allocator), (size), (alignment), (memtag), __FILE__, __LINE__)
+#define AlignedAlloc(allocator, size, alignment) DebugAlignedAlloc((allocator), (size), (alignment), __FILE__, __LINE__)
 // void* Realloc(Allocator* allocator, void* block, u64 newSize);
 #define Realloc(allocator, block, newSize) DebugRealloc((allocator), (block), (newSize), __FILE__, __LINE__)
 // void Free(Allocator* allocator, void* block);

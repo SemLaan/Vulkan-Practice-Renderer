@@ -12,7 +12,7 @@ Material MaterialCreate(Shader clientShader)
 
     // Allocating a material struct
     Material clientMaterial;
-    clientMaterial.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanMaterial), MEM_TAG_RENDERER_SUBSYS);
+    clientMaterial.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanMaterial));
     VulkanMaterial* material = clientMaterial.internalState;
     material->shader = shader;
 
@@ -41,7 +41,7 @@ Material MaterialCreate(Shader clientShader)
     descriptorSetAllocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
     descriptorSetAllocInfo.pSetLayouts = descriptorSetLayouts;
 
-    material->descriptorSetArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->descriptorSetArray), MEM_TAG_RENDERER_SUBSYS);
+    material->descriptorSetArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*material->descriptorSetArray));
 
     if (VK_SUCCESS != vkAllocateDescriptorSets(vk_state->device, &descriptorSetAllocInfo, material->descriptorSetArray))
     {

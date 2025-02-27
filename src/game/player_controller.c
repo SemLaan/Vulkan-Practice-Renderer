@@ -19,7 +19,7 @@ static ControllerState* controllerState = nullptr;
 
 void PlayerControllerInit()
 {
-    controllerState = Alloc(GetGlobalAllocator(), sizeof(*controllerState), MEM_TAG_TEST);
+    controllerState = Alloc(GetGlobalAllocator(), sizeof(*controllerState));
 
     controllerState->sceneCamera = GetGameCameras().sceneCamera;
     controllerState->mouseSensitivity = 0.5f;

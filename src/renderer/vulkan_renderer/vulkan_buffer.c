@@ -93,7 +93,7 @@ VertexBuffer VertexBufferCreate(void* vertices, size_t size)
 {
     // Allocating memory for the buffer (struct on CPU not vulkan)
     VertexBuffer clientBuffer;
-    clientBuffer.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanVertexBuffer), MEM_TAG_VERTEX_BUFFER);
+    clientBuffer.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanVertexBuffer));
     VulkanVertexBuffer* buffer = (VulkanVertexBuffer*)clientBuffer.internalState;
     buffer->size = size;
 
@@ -156,7 +156,7 @@ VertexBuffer VertexBufferCreate(void* vertices, size_t size)
         // Creating the buffer memory barrier for the queue family acquire operation
         // This is put in the requestedQueueAcquisitionOperations list and will be submitted as a command in the draw loop,
         // also synced with vertex upload semaphore, so ownership isn't acquired before it is released
-        VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2), MEM_TAG_RENDERER_SUBSYS);
+        VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2));
         VkBufferMemoryBarrier2* acquireBufferInfo = (VkBufferMemoryBarrier2*)(acquireDependencyInfo + 1);
 
         acquireBufferInfo->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -273,7 +273,7 @@ void VertexBufferUpdate(VertexBuffer clientBuffer, void* vertices, u64 size)
     // Creating the buffer memory barrier for the queue family acquire operation
     // This is put in the requestedQueueAcquisitionOperations list and will be submitted as a command in the draw loop,
     // also synced with vertex upload semaphore, so ownership isn't acquired before it is released
-    VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2), MEM_TAG_RENDERER_SUBSYS);
+    VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2));
     VkBufferMemoryBarrier2* acquireBufferInfo = (VkBufferMemoryBarrier2*)(acquireDependencyInfo + 1);
 
     acquireBufferInfo->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -338,7 +338,7 @@ void VertexBufferDestroy(VertexBuffer clientBuffer)
 IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount)
 {
     IndexBuffer clientBuffer;
-    clientBuffer.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanIndexBuffer), MEM_TAG_INDEX_BUFFER);
+    clientBuffer.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanIndexBuffer));
     VulkanIndexBuffer* buffer = (VulkanIndexBuffer*)clientBuffer.internalState;
     buffer->size = indexCount * sizeof(u32);
     buffer->indexCount = indexCount;
@@ -400,7 +400,7 @@ IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount)
     // Creating the buffer memory barrier for the queue family acquire operation
     // This is put in the requestedQueueAcquisitionOperations list and will be submitted as a command in the draw loop,
     // also synced with index upload semaphore, so ownership isn't acquired before it is released
-    VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2), MEM_TAG_RENDERER_SUBSYS);
+    VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2));
     VkBufferMemoryBarrier2* acquireBufferInfo = (VkBufferMemoryBarrier2*)(acquireDependencyInfo + 1);
 
     acquireBufferInfo->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;

@@ -30,12 +30,12 @@ typedef struct SimpleMap
 SimpleMap* SimpleMapCreate(Allocator* allocator, u32 maxEntries)
 {
 	// Allocating the struct and it's arrays.
-    SimpleMap* map = Alloc(allocator, sizeof(*map), MEM_TAG_HASHMAP);
+    SimpleMap* map = Alloc(allocator, sizeof(*map));
     map->allocator = allocator;
     map->backingArraySize = maxEntries;
 
-    map->keys = Alloc(allocator, sizeof(*map->keys) * maxEntries, MEM_TAG_HASHMAP);
-    map->values = Alloc(allocator, sizeof(*map->values) * maxEntries, MEM_TAG_HASHMAP);
+    map->keys = Alloc(allocator, sizeof(*map->keys) * maxEntries);
+    map->values = Alloc(allocator, sizeof(*map->values) * maxEntries);
 	MemoryZero(map->keys, sizeof(*map->keys) * maxEntries);
 	MemoryZero(map->values, sizeof(*map->values) * maxEntries);
 
@@ -77,7 +77,7 @@ void SimpleMapInsert(SimpleMap* map, const char* key, void* value)
 	GRASSERT_DEBUG(keyStringLength < SIMPLEMAP_MAX_KEY_LEN);
 
 	// Allocating memory for the key and storing it
-	map->keys[hash] = Alloc(map->keyPool, SIMPLEMAP_MAX_KEY_LEN, MEM_TAG_HASHMAP);
+	map->keys[hash] = Alloc(map->keyPool, SIMPLEMAP_MAX_KEY_LEN);
 	MemoryZero(map->keys[hash], SIMPLEMAP_MAX_KEY_LEN);
 	MemoryCopy(map->keys[hash], key, keyStringLength);
 

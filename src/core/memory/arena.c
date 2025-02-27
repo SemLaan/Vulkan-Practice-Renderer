@@ -8,7 +8,7 @@
 Arena ArenaCreate(Allocator* allocator, size_t size)
 {
 	Arena arena = {};
-	arena.memoryBlock = Alloc(allocator, size, MEM_TAG_TEST);
+	arena.memoryBlock = Alloc(allocator, size);
 	arena.arenaPointer = arena.memoryBlock;
 	arena.arenaCapacity = size;
 	return arena;

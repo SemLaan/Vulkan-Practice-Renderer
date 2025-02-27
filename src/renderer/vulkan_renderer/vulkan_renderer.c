@@ -37,7 +37,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     GRASSERT_DEBUG(vk_state == nullptr); // If this triggers init got called twice
     _INFO("Initializing renderer subsystem...");
 
-    vk_state = AlignedAlloc(GetGlobalAllocator(), sizeof(RendererState), 64 /*cache line*/, MEM_TAG_RENDERER_SUBSYS);
+    vk_state = AlignedAlloc(GetGlobalAllocator(), sizeof(RendererState), 64 /*cache line*/);
     MemoryZero(vk_state, sizeof(*vk_state));
     CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), MiB * 5, &vk_state->rendererAllocator);
     CreateBumpAllocator("renderer bump allocator", vk_state->rendererAllocator, KiB * 5, &vk_state->rendererBumpAllocator);
@@ -187,7 +187,7 @@ bool InitializeRenderer(RendererInitSettings settings)
             return false;
         }
 
-        VkPhysicalDevice* availableDevices = Alloc(vk_state->rendererAllocator, sizeof(*availableDevices) * deviceCount, MEM_TAG_RENDERER_SUBSYS);
+        VkPhysicalDevice* availableDevices = Alloc(vk_state->rendererAllocator, sizeof(*availableDevices) * deviceCount);
         vkEnumeratePhysicalDevices(vk_state->instance, &deviceCount, availableDevices);
 
         /// TODO: better device selection
@@ -242,7 +242,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     {
         u32 queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(vk_state->physicalDevice, &queueFamilyCount, nullptr);
-        VkQueueFamilyProperties* availableQueueFamilies = Alloc(vk_state->rendererAllocator, sizeof(*availableQueueFamilies) * queueFamilyCount, MEM_TAG_RENDERER_SUBSYS);
+        VkQueueFamilyProperties* availableQueueFamilies = Alloc(vk_state->rendererAllocator, sizeof(*availableQueueFamilies) * queueFamilyCount);
         vkGetPhysicalDeviceQueueFamilyProperties(vk_state->physicalDevice, &queueFamilyCount, availableQueueFamilies);
 
         vk_state->transferQueue.index = UINT32_MAX;
@@ -284,7 +284,7 @@ bool InitializeRenderer(RendererInitSettings settings)
 
         u32 uniqueQueueCount = uniqueQueueFamiliesDarray->size;
 
-        VkDeviceQueueCreateInfo* queueCreateInfos = Alloc(vk_state->rendererAllocator, sizeof(*queueCreateInfos) * uniqueQueueCount, MEM_TAG_RENDERER_SUBSYS);
+        VkDeviceQueueCreateInfo* queueCreateInfos = Alloc(vk_state->rendererAllocator, sizeof(*queueCreateInfos) * uniqueQueueCount);
 
         for (u32 i = 0; i < uniqueQueueCount; ++i)
         {
@@ -546,7 +546,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     // ============================================================================================================================================================
     // ======================== Creating samplers ============================================================================================================
     // ============================================================================================================================================================
-    vk_state->samplers = Alloc(vk_state->rendererAllocator, sizeof(*vk_state->samplers), MEM_TAG_RENDERER_SUBSYS);
+    vk_state->samplers = Alloc(vk_state->rendererAllocator, sizeof(*vk_state->samplers));
 
     {
         VkSamplerCreateInfo samplerCreateInfo = {};
@@ -624,9 +624,9 @@ bool InitializeRenderer(RendererInitSettings settings)
     // Creating backing buffer and memory and mapping the memory
     VkDeviceSize uniformBufferSize = sizeof(GlobalUniformObject);
 
-    vk_state->globalUniformBufferArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformBufferArray), MEM_TAG_RENDERER_SUBSYS);
-    vk_state->globalUniformMemoryArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformMemoryArray), MEM_TAG_RENDERER_SUBSYS);
-    vk_state->globalUniformBufferMappedArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformBufferMappedArray), MEM_TAG_RENDERER_SUBSYS);
+    vk_state->globalUniformBufferArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformBufferArray));
+    vk_state->globalUniformMemoryArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformMemoryArray));
+    vk_state->globalUniformBufferMappedArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformBufferMappedArray));
     for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
         CreateBuffer(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vk_state->globalUniformBufferArray[i], &vk_state->globalUniformMemoryArray[i]);
@@ -647,7 +647,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     descriptorSetAllocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
     descriptorSetAllocInfo.pSetLayouts = descriptorSetLayouts;
 
-    vk_state->globalDescriptorSetArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalDescriptorSetArray), MEM_TAG_RENDERER_SUBSYS);
+    vk_state->globalDescriptorSetArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalDescriptorSetArray));
 
     if (VK_SUCCESS != vkAllocateDescriptorSets(vk_state->device, &descriptorSetAllocInfo, vk_state->globalDescriptorSetArray))
     {
@@ -739,7 +739,7 @@ bool InitializeRenderer(RendererInitSettings settings)
 
 	u32 currentBasicMeshIndex = 0;
 
-	MeshData* basicMeshDataArray = Alloc(vk_state->rendererAllocator, sizeof(*basicMeshDataArray) * BASIC_MESH_COUNT, MEM_TAG_RENDERER_SUBSYS);
+	MeshData* basicMeshDataArray = Alloc(vk_state->rendererAllocator, sizeof(*basicMeshDataArray) * BASIC_MESH_COUNT);
 	LoadObj("models/quad.obj", &basicMeshDataArray[currentBasicMeshIndex].vertexBuffer, &basicMeshDataArray[currentBasicMeshIndex].indexBuffer, false);
 	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_QUAD, basicMeshDataArray + currentBasicMeshIndex);
 	currentBasicMeshIndex++;

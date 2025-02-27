@@ -6,9 +6,9 @@
 // TODO: WARNING this whole thing isn't finished
 
 
-HashmapStr* MapStrCreate(Allocator* allocator, MemTag memtag, u32 backingArrayElementCount, u32 maxCollisions, u32 maxKeyLength, HashFunctionStr hashFunction)
+HashmapStr* MapStrCreate(Allocator* allocator, u32 backingArrayElementCount, u32 maxCollisions, u32 maxKeyLength, HashFunctionStr hashFunction)
 {
-    HashmapStr* hashmap = Alloc(allocator, sizeof(*hashmap) + backingArrayElementCount * sizeof(MapEntryStr), memtag);
+    HashmapStr* hashmap = Alloc(allocator, sizeof(*hashmap) + backingArrayElementCount * sizeof(MapEntryStr));
     hashmap->backingArray = (MapEntryStr*)(hashmap + 1);
     hashmap->backingArrayElementCount = backingArrayElementCount;
     hashmap->hashFunction = hashFunction;
@@ -46,13 +46,13 @@ void MapStrInsert(HashmapStr* hashmap, const char* key, u32 keyLength, void* val
         }
         else
         {
-            currentEntry->next = Alloc(hashmap->linkedEntryPool, sizeof(MapEntryStr), MEM_TAG_HASHMAP);
+            currentEntry->next = Alloc(hashmap->linkedEntryPool, sizeof(MapEntryStr));
             MemoryZero(currentEntry->next, sizeof(MapEntryStr));
             currentEntry = currentEntry->next;
         }
     }
 
-    currentEntry->key = Alloc(hashmap->keyPool, hashmap->maxKeyLength, MEM_TAG_HASHMAP);
+    currentEntry->key = Alloc(hashmap->keyPool, hashmap->maxKeyLength);
     GRASSERT_DEBUG(keyLength < hashmap->maxKeyLength);
     MemoryCopy(currentEntry->key, key, keyLength);
     currentEntry->keyLength = keyLength;

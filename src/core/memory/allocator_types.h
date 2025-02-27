@@ -3,27 +3,6 @@
 #include "defines.h"
 
 
-typedef enum MemTag
-{
-	MEM_TAG_ALLOCATOR_STATE,
-	MEM_TAG_SUB_ARENA,
-	MEM_TAG_MEMORY_SUBSYS,
-	MEM_TAG_LOGGING_SUBSYS,
-	MEM_TAG_PLATFORM_SUBSYS,
-	MEM_TAG_EVENT_SUBSYS,
-	MEM_TAG_RENDERER_SUBSYS,
-	MEM_TAG_INPUT_SUBSYS,
-	MEM_TAG_GAME,
-	MEM_TAG_TEST,
-	MEM_TAG_DARRAY,
-	MEM_TAG_VERTEX_BUFFER,
-	MEM_TAG_INDEX_BUFFER,
-	MEM_TAG_TEXTURE,
-	MEM_TAG_HASHMAP,
-    MEM_TAG_MEMORY_DEBUG,
-	MAX_MEMORY_TAGS
-} MemTag;
-
 // Forward declaring allocator struct (see bottom of script for internals)
 typedef struct Allocator Allocator;
 
@@ -50,6 +29,7 @@ typedef struct Allocator
 	PFN_BackendRealloc BackendRealloc;			// Function that handles reallocation
 	PFN_BackendFree BackendFree;				// Function that handles freeing
 	void* backendState;							// Hidden state that may be specific to allocator types
-    Allocator* parentAllocator;					// The allocator that was used to allocate the memory for this allocator
+	Allocator* parentAllocator;					// The allocator that was used to allocate the memory for this allocator
 	u32 id; 									// Is only usefull in debug mode, is always zero in dist mode (Used by memory debug tools)
 } Allocator;
+

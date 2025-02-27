@@ -91,7 +91,7 @@ bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask)
 Texture TextureCreate(u32 width, u32 height, void* pixels, TextureStorageType textureStorageType)
 {
 	Texture out_texture = {};
-	out_texture.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanImage), MEM_TAG_TEXTURE);
+	out_texture.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanImage));
 	VulkanImage* image = (VulkanImage*)out_texture.internalState;
 
 	size_t size = width * height * TEXTURE_CHANNELS;
@@ -235,7 +235,7 @@ Texture TextureCreate(u32 width, u32 height, void* pixels, TextureStorageType te
 	// Creating the image memory barrier for the queue family acquire operation
 	// This is put in the requestedQueueAcquisitionOperations list and will be submitted as a command in the draw loop, 
 	// also synced with image upload semaphore, so ownership isn't acquired before it is released
-	VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkImageMemoryBarrier2), MEM_TAG_RENDERER_SUBSYS);
+	VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkImageMemoryBarrier2));
 	VkImageMemoryBarrier2* acquireImageInfo = (VkImageMemoryBarrier2*)(acquireDependencyInfo + 1);
 
 	acquireImageInfo->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;

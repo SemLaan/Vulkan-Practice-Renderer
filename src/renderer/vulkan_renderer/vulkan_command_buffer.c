@@ -122,7 +122,7 @@ bool EndSubmitAndFreeSingleUseCommandBuffer(CommandBuffer commandBuffer, u32 wai
 		return false;
 	}
 
-	CommandBuffer* destructionResource = Alloc(vk_state->poolAllocator32B, RENDER_POOL_BLOCK_SIZE_32, MEM_TAG_RENDERER_SUBSYS);
+	CommandBuffer* destructionResource = Alloc(vk_state->poolAllocator32B, RENDER_POOL_BLOCK_SIZE_32);
 	*destructionResource = commandBuffer;
 
 	ResourceDestructionInfo commandBufferDestructionInfo = {};

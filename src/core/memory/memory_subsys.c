@@ -32,7 +32,7 @@ bool InitializeMemory(size_t requiredMemory)
 	}
 
 	// Creating the memory state
-	state = Alloc(globalAllocator, sizeof(MemoryState), MEM_TAG_MEMORY_SUBSYS);
+	state = Alloc(globalAllocator, sizeof(MemoryState));
 	initialized = true;
 
 	state->globalAllocator = globalAllocator;

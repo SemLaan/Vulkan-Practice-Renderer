@@ -42,7 +42,7 @@ typedef struct HashmapU64
 // or the hashmap will have outdated pointers
 // backingArrayCapacity: amount of elements in the backing array
 // maxCollisions: determines the size of linkedEntryPool, also determines how many collisions can happen before the map runs out of space to store collisions
-HashmapU64* MapU64Create(Allocator* allocator, MemTag memtag, u32 backingArrayCapacity, u32 maxCollisions, HashFunctionU64 hashFunction);
+HashmapU64* MapU64Create(Allocator* allocator, u32 backingArrayCapacity, u32 maxCollisions, HashFunctionU64 hashFunction);
 
 // Destroys everything about the map, except the objects
 void MapU64Destroy(HashmapU64* hashmap);

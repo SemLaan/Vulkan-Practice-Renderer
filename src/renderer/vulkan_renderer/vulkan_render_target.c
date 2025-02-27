@@ -8,7 +8,7 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
 {
     // Allocating RenderTarget struct
     RenderTarget clientRenderTarget;
-    clientRenderTarget.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanRenderTarget), MEM_TAG_RENDERER_SUBSYS);
+    clientRenderTarget.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanRenderTarget));
     VulkanRenderTarget* renderTarget = clientRenderTarget.internalState;
     renderTarget->colorBufferUsage = colorBufferUsage;
     renderTarget->depthBufferUsage = depthBufferUsage;

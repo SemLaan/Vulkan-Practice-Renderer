@@ -221,7 +221,7 @@ bool InitializeDebugUI()
 
     GRASSERT_DEBUG(INTERACTABLE_TYPE_NONE_COUNT == INTERACTABLE_TYPE_COUNT);
 
-    state = Alloc(GetGlobalAllocator(), sizeof(*state), MEM_TAG_RENDERER_SUBSYS);
+    state = Alloc(GetGlobalAllocator(), sizeof(*state));
     MemoryZero(state, sizeof(*state));
 
     // Creating interactable internal data allocator
@@ -385,7 +385,7 @@ void UpdateDebugUI()
 DebugMenu* DebugUICreateMenu()
 {
     // Allocating the DebugMenu struct
-    DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu), MEM_TAG_RENDERER_SUBSYS);
+    DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu));
 
     menu->active = true;
 
@@ -395,7 +395,7 @@ DebugMenu* DebugUICreateMenu()
     menu->nextElementYOffset = MENU_ELEMENTS_OFFSET; // Making sure that the first element that gets added to the menu has the correct offset from the edge of the menu.
 
     // Creating an instanced vertex buffer for all the quads that will be rendered in the menu.
-    menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS, MEM_TAG_RENDERER_SUBSYS);
+    menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
     menu->maxQuads = MAX_DBG_MENU_QUADS;
     menu->quadCount = 0;
     menu->menuElementMaterial = MaterialCreate(ShaderGetRef("roundedQuad"));
@@ -414,7 +414,7 @@ DebugMenu* DebugUICreateMenu()
     GRASSERT_DEBUG(state->debugMenuDarray->size <= MAX_DBG_MENUS);
 
     // Creating an array for keeping track of all the interactable elements in the menu
-    menu->interactablesArray = Alloc(GetGlobalAllocator(), sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES, MEM_TAG_RENDERER_SUBSYS);
+    menu->interactablesArray = Alloc(GetGlobalAllocator(), sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES);
     MemoryZero(menu->interactablesArray, sizeof(*menu->interactablesArray) * MAX_DBG_MENU_INTERACTABLES);
     menu->interactablesCount = 0;
     menu->activeInteractableIndex = NO_INTERACTABLE_ACTIVE_VALUE;
@@ -492,7 +492,7 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
-    MenuHandlebarInteractableData* handlebarData = Alloc(state->interactableInternalDataAllocator, sizeof(*handlebarData), MEM_TAG_RENDERER_SUBSYS);
+    MenuHandlebarInteractableData* handlebarData = Alloc(state->interactableInternalDataAllocator, sizeof(*handlebarData));
     handlebarData->mouseStartWorldPosition = vec4_create(0, 0, 0, 0);
 
     menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1; // Minus one because this function added one quad that belongs to the handlebar.
@@ -509,7 +509,7 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool* pSignalBool)
 {
     // Allocating internal button data and saving the pointers to the state and signal bools
-    ButtonInteractableData* buttonData = Alloc(state->interactableInternalDataAllocator, sizeof(*buttonData), MEM_TAG_RENDERER_SUBSYS);
+    ButtonInteractableData* buttonData = Alloc(state->interactableInternalDataAllocator, sizeof(*buttonData));
     buttonData->pStateBool = pStateBool;
     buttonData->pSignalBool = pSignalBool;
 
@@ -542,7 +542,7 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
     GRASSERT_DEBUG(pStateBool);
 
     // Allocating internal button data and saving the pointers to the state bool
-    ToggleButtonInteractableData* buttonData = Alloc(state->interactableInternalDataAllocator, sizeof(*buttonData), MEM_TAG_RENDERER_SUBSYS);
+    ToggleButtonInteractableData* buttonData = Alloc(state->interactableInternalDataAllocator, sizeof(*buttonData));
     buttonData->pStateBool = pStateBool;
 
     menu->nextElementYOffset += BUTTON_SIZE.y;
@@ -575,7 +575,7 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
 void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 maxValue, f32* pSliderValue)
 {
     // Allocating internal slider data and saving the pointer to the slider value
-    SliderFloatInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
+    SliderFloatInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData));
     sliderData->pSliderValue = pSliderValue;
     sliderData->minValue = minValue;
     sliderData->maxValue = maxValue;
@@ -624,7 +624,7 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
 void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 maxValue, i64* pSliderValue)
 {
     // Allocating internal slider data and saving the pointer to the slider value
-    SliderIntInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
+    SliderIntInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData));
     sliderData->pSliderValue = pSliderValue;
     sliderData->minValue = minValue;
     sliderData->maxValue = maxValue;
@@ -673,7 +673,7 @@ void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 ma
 void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteValuesArray, u64 discreteValueCount, i64* pSliderValue)
 {
     // Allocating internal slider data and saving the pointer to the slider value
-    SliderDiscreteInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
+    SliderDiscreteInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData));
     sliderData->pSliderValue = pSliderValue;
     sliderData->pDiscreteSliderValues = discreteValuesArray;
     sliderData->maxIndex = discreteValueCount - 1;
@@ -732,7 +732,7 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
     f32 oneOverLogBase = 1.f / logf(base);
 
     // Allocating internal slider data and saving the pointer to the slider value
-    SliderLogInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData), MEM_TAG_RENDERER_SUBSYS);
+    SliderLogInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData));
     sliderData->pSliderValue = pSliderValue;
     sliderData->base = base;
     GRASSERT_DEBUG(base - nearbyintf(base) < 0.000001 || nearbyintf(base) - base < 0.000001);

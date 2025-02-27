@@ -16,7 +16,7 @@ bool InitializeEvent()
 {
 	GRASSERT_DEBUG(state == nullptr); // If this triggers init got called twice
 	_INFO("Initializing event subsystem...");
-	state = Alloc(GetGlobalAllocator(), sizeof(EventState), MEM_TAG_EVENT_SUBSYS);
+	state = Alloc(GetGlobalAllocator(), sizeof(EventState));
 	MemoryZero(state, sizeof(EventState));
 
 	return true;

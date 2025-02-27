@@ -62,7 +62,7 @@ void CreateFreelistAllocator(const char* name, Allocator* parentAllocator, size_
     size_t requiredMemory = arenaSize + stateSize;
 
     // Allocating memory for state and arena and zeroing state memory
-    void* arenaBlock = Alloc(parentAllocator, requiredMemory, MEM_TAG_SUB_ARENA);
+    void* arenaBlock = Alloc(parentAllocator, requiredMemory);
     MemoryZero(arenaBlock, stateSize);
 
     // Getting pointers to the internal components of the allocator
@@ -82,7 +82,7 @@ void CreateFreelistAllocator(const char* name, Allocator* parentAllocator, size_
     state->head->size = arenaSize;
     state->head->next = nullptr;
 
-    Allocator* allocator = Alloc(parentAllocator, sizeof(*allocator), MEM_TAG_ALLOCATOR_STATE);
+    Allocator* allocator = Alloc(parentAllocator, sizeof(*allocator));
 
     // Linking the allocator object to the freelist functions
     allocator->BackendAlloc = FreelistAlignedAlloc;
@@ -422,7 +422,7 @@ void CreateBumpAllocator(const char* name, Allocator* parentAllocator, size_t ar
     size_t requiredMemory = arenaSize + stateSize;
 
     // Allocating memory for state and arena and zeroing state memory
-    void* arenaBlock = Alloc(parentAllocator, requiredMemory, MEM_TAG_SUB_ARENA);
+    void* arenaBlock = Alloc(parentAllocator, requiredMemory);
     MemoryZero(arenaBlock, stateSize);
 
     // Getting pointers to the internal components of the allocator
@@ -435,7 +435,7 @@ void CreateBumpAllocator(const char* name, Allocator* parentAllocator, size_t ar
     state->bumpPointer = arenaStart;
     state->allocCount = 0;
 
-    Allocator* allocator = Alloc(parentAllocator, sizeof(*allocator), MEM_TAG_ALLOCATOR_STATE);
+    Allocator* allocator = Alloc(parentAllocator, sizeof(*allocator));
 
     // Linking the allocator object to the freelist functions
     allocator->BackendAlloc = BumpAlignedAlloc;
@@ -546,7 +546,7 @@ void CreatePoolAllocator(const char* name, Allocator* parentAllocator, u32 block
     u32 requiredMemory = arenaSize + stateSize + blockTrackerSize;
 
     // Allocating memory for state and arena and zeroing state memory
-    void* arenaBlock = Alloc(parentAllocator, requiredMemory, MEM_TAG_SUB_ARENA);
+    void* arenaBlock = Alloc(parentAllocator, requiredMemory);
     MemoryZero(arenaBlock, stateSize + blockTrackerSize);
 
     // Getting pointers to the internal components of the allocator
@@ -559,7 +559,7 @@ void CreatePoolAllocator(const char* name, Allocator* parentAllocator, u32 block
     state->poolSize = poolSize;
 	state->controlBlockCount = ceil((f32)poolSize / 32.f);
 
-    Allocator* allocator = Alloc(parentAllocator, sizeof(*allocator), MEM_TAG_ALLOCATOR_STATE);
+    Allocator* allocator = Alloc(parentAllocator, sizeof(*allocator));
 
     // Linking the allocator object to the freelist functions
     allocator->BackendAlloc = PoolAlignedAlloc;

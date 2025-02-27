@@ -35,7 +35,7 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
     fseek(file, 0L, SEEK_END);
 
     u64 fileSize = ftell(file);
-    char* text = AlignedAlloc(vk_state->rendererAllocator, fileSize, 64, MEM_TAG_RENDERER_SUBSYS);
+    char* text = AlignedAlloc(vk_state->rendererAllocator, fileSize, 64);
 
     rewind(file);
     fread(text, sizeof(*text), fileSize, file);
@@ -86,10 +86,10 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
                 uniformStartCopy++;
             }
 
-            ref_propertyData->propertyStringsMemory = Alloc(vk_state->rendererAllocator, PROPERTY_MAX_NAME_LENGTH * ref_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-            ref_propertyData->propertyNameArray = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertyNameArray) * ref_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-            ref_propertyData->propertyOffsets = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertyOffsets) * ref_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
-            ref_propertyData->propertySizes = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertySizes) * ref_propertyData->propertyCount, MEM_TAG_RENDERER_SUBSYS);
+            ref_propertyData->propertyStringsMemory = Alloc(vk_state->rendererAllocator, PROPERTY_MAX_NAME_LENGTH * ref_propertyData->propertyCount);
+            ref_propertyData->propertyNameArray = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertyNameArray) * ref_propertyData->propertyCount);
+            ref_propertyData->propertyOffsets = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertyOffsets) * ref_propertyData->propertyCount);
+            ref_propertyData->propertySizes = Alloc(vk_state->rendererAllocator, sizeof(*ref_propertyData->propertySizes) * ref_propertyData->propertyCount);
 
             for (int i = 0; i < ref_propertyData->propertyCount; i++)
             {
@@ -258,9 +258,9 @@ void GetUniformDataFromShader(const char* filename, UniformPropertiesData* ref_p
 
         if (ref_textureData->textureCount > 0)
         {
-            ref_textureData->bindingIndices = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * sizeof(*ref_textureData->bindingIndices), MEM_TAG_RENDERER_SUBSYS);
-            ref_textureData->textureStringsMemory = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH, MEM_TAG_RENDERER_SUBSYS);
-            ref_textureData->textureNameArray = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * sizeof(*ref_textureData->textureNameArray), MEM_TAG_RENDERER_SUBSYS);
+            ref_textureData->bindingIndices = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * sizeof(*ref_textureData->bindingIndices));
+            ref_textureData->textureStringsMemory = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH);
+            ref_textureData->textureNameArray = Alloc(vk_state->rendererAllocator, ref_textureData->textureCount * sizeof(*ref_textureData->textureNameArray));
 
             MemoryCopy(ref_textureData->bindingIndices, bindingIndices, ref_textureData->textureCount * sizeof(*ref_textureData->bindingIndices));
             MemoryCopy(ref_textureData->textureStringsMemory, nameStrings, ref_textureData->textureCount * PROPERTY_MAX_NAME_LENGTH);
@@ -293,7 +293,7 @@ void FreeUniformData(UniformPropertiesData* propertyData, UniformTexturesData* t
     }
 }
 
-bool ReadFile(const char* filename, MemTag tag, char** out_data, u64* out_fileSize)
+bool ReadFile(const char* filename, char** out_data, u64* out_fileSize)
 {
     FILE* file = fopen(filename, "rb");
 
@@ -306,7 +306,7 @@ bool ReadFile(const char* filename, MemTag tag, char** out_data, u64* out_fileSi
     fseek(file, 0L, SEEK_END);
 
     *out_fileSize = ftell(file);
-    *out_data = (char*)AlignedAlloc(vk_state->rendererAllocator, *out_fileSize, 64, tag);
+    *out_data = (char*)AlignedAlloc(vk_state->rendererAllocator, *out_fileSize, 64);
 
     rewind(file);
     fread(*out_data, 1, *out_fileSize, file);
@@ -319,7 +319,7 @@ bool CreateShaderModule(const char* filename, RendererState* state, VkShaderModu
 {
     char* fileData;
     u64 fileSize;
-    ReadFile(filename, MEM_TAG_RENDERER_SUBSYS, &fileData, &fileSize);
+    ReadFile(filename, &fileData, &fileSize);
 
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

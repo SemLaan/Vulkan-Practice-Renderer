@@ -14,7 +14,7 @@
 void ShaderCreate(const char* shaderName, ShaderCreateInfo* pCreateInfo)
 {
     Shader clientShader;
-    clientShader.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanShader), MEM_TAG_RENDERER_SUBSYS);
+    clientShader.internalState = Alloc(vk_state->rendererAllocator, sizeof(VulkanShader));
     VulkanShader* shader = (VulkanShader*)clientShader.internalState;
     MemoryZero(shader, sizeof(*shader));
 
@@ -23,7 +23,7 @@ void ShaderCreate(const char* shaderName, ShaderCreateInfo* pCreateInfo)
         pCreateInfo->fragmentShaderName = "no fragment shader";
 
     // Preparing filename strings
-    char* compiledVertFilename = Alloc(vk_state->rendererAllocator, 4 * MAX_FILEPATH_SIZE, MEM_TAG_RENDERER_SUBSYS);
+    char* compiledVertFilename = Alloc(vk_state->rendererAllocator, 4 * MAX_FILEPATH_SIZE);
     char* compiledFragFilename = compiledVertFilename + MAX_FILEPATH_SIZE;
     char* rawVertFilename = compiledFragFilename + MAX_FILEPATH_SIZE;
     char* rawFragFilename = rawVertFilename + MAX_FILEPATH_SIZE;

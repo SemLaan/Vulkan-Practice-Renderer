@@ -11,11 +11,11 @@ SwapchainSupportDetails QuerySwapchainSupport(VkPhysicalDevice device, VkSurface
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
 
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &details.formatCount, nullptr);
-	details.formats = Alloc(vk_state->rendererAllocator, sizeof(*details.formats) * details.formatCount, MEM_TAG_RENDERER_SUBSYS);
+	details.formats = Alloc(vk_state->rendererAllocator, sizeof(*details.formats) * details.formatCount);
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &details.formatCount, (VkSurfaceFormatKHR*)details.formats);
 
 	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &details.presentModeCount, nullptr);
-	details.presentModes = Alloc(vk_state->rendererAllocator, sizeof(*details.presentModes) * details.presentModeCount, MEM_TAG_RENDERER_SUBSYS);
+	details.presentModes = Alloc(vk_state->rendererAllocator, sizeof(*details.presentModes) * details.presentModeCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &details.presentModeCount, (VkPresentModeKHR*)details.presentModes);
 
 	return details;
@@ -115,10 +115,10 @@ bool CreateSwapchain(GrPresentMode requestedPresentMode)
 	vk_state->swapchainExtent = swapchainExtent;
 
 	vkGetSwapchainImagesKHR(vk_state->device, vk_state->swapchain, &vk_state->swapchainImageCount, 0);
-	vk_state->swapchainImages = Alloc(vk_state->rendererBumpAllocator, sizeof(*vk_state->swapchainImages) * vk_state->swapchainImageCount, MEM_TAG_RENDERER_SUBSYS);
+	vk_state->swapchainImages = Alloc(vk_state->rendererBumpAllocator, sizeof(*vk_state->swapchainImages) * vk_state->swapchainImageCount);
 	vkGetSwapchainImagesKHR(vk_state->device, vk_state->swapchain, &vk_state->swapchainImageCount, vk_state->swapchainImages);
 
-	vk_state->swapchainImageViews = Alloc(vk_state->rendererBumpAllocator, sizeof(*vk_state->swapchainImageViews) * vk_state->swapchainImageCount, MEM_TAG_RENDERER_SUBSYS);
+	vk_state->swapchainImageViews = Alloc(vk_state->rendererBumpAllocator, sizeof(*vk_state->swapchainImageViews) * vk_state->swapchainImageCount);
 
 	for (u32 i = 0; i < vk_state->swapchainImageCount; ++i)
 	{
