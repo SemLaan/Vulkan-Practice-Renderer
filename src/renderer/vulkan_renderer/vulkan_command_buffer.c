@@ -112,15 +112,9 @@ bool EndSubmitAndFreeSingleUseCommandBuffer(CommandBuffer commandBuffer, u32 wai
 	submitInfo.signalSemaphoreInfoCount = semaphoreInfosDarray->size;
 	submitInfo.pSignalSemaphoreInfos = semaphoreInfosDarray->data;
 
-	VkResult result = vkQueueSubmit2(commandBuffer.queueFamily->handle, 1, &submitInfo, VK_NULL_HANDLE);
+	VK_CHECK(vkQueueSubmit2(commandBuffer.queueFamily->handle, 1, &submitInfo, VK_NULL_HANDLE));
 
 	DarrayDestroy(semaphoreInfosDarray);
-
-	if (VK_SUCCESS != result)
-	{
-		_FATAL("Failed to submit single use buffer to queue");
-		return false;
-	}
 
 	CommandBuffer* destructionResource = Alloc(vk_state->poolAllocator32B, RENDER_POOL_BLOCK_SIZE_32);
 	*destructionResource = commandBuffer;

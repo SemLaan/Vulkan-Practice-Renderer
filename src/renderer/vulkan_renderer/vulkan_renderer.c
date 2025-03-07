@@ -20,6 +20,7 @@
 #include "vulkan_utils.h"
 #include "vulkan_shader.h"
 
+#define RENDERER_ALLOCATOR_SIZE (50 * MiB)
 #define RENDERER_POOL_ALLOCATOR_32b_SIZE 200
 #define RENDERER_RESOURCE_ACQUISITION_SIZE 200
 #define MAX_VERTEX_BUFFERS_PER_DRAW_CALL 2
@@ -39,7 +40,7 @@ bool InitializeRenderer(RendererInitSettings settings)
 
     vk_state = AlignedAlloc(GetGlobalAllocator(), sizeof(RendererState), 64 /*cache line*/);
     MemoryZero(vk_state, sizeof(*vk_state));
-    CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), MiB * 5, &vk_state->rendererAllocator, true);
+    CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), RENDERER_ALLOCATOR_SIZE, &vk_state->rendererAllocator, true);
     CreateBumpAllocator("renderer bump allocator", vk_state->rendererAllocator, KiB * 5, &vk_state->rendererBumpAllocator, true);
     CreatePoolAllocator("renderer resource destructor pool", vk_state->rendererAllocator, RENDER_POOL_BLOCK_SIZE_32, RENDERER_POOL_ALLOCATOR_32b_SIZE, &vk_state->poolAllocator32B, true);
     CreatePoolAllocator("Renderer resource acquisition pool", vk_state->rendererAllocator, QUEUE_ACQUISITION_POOL_BLOCK_SIZE, RENDERER_RESOURCE_ACQUISITION_SIZE, &vk_state->resourceAcquisitionPool, true);
@@ -50,6 +51,15 @@ bool InitializeRenderer(RendererInitSettings settings)
     vk_state->currentInFlightFrameIndex = 0;
     vk_state->shouldRecreateSwapchain = false;
 	vk_state->requestedPresentMode = settings.presentMode;
+	vk_state->previousFrameUploadSemaphoreValues[0] = 0;
+	vk_state->previousFrameUploadSemaphoreValues[1] = 0;
+	vk_state->previousFrameUploadSemaphoreValues[2] = 0;
+	GRASSERT_DEBUG(MAX_FRAMES_IN_FLIGHT > 1);
+	for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		vk_state->vulkanFrameArenas[i] = ArenaCreate(vk_state->rendererAllocator, VULKAN_FRAME_ARENA_BYTES);
+	}
+	vk_state->vkFrameArena = &vk_state->vulkanFrameArenas[MAX_FRAMES_IN_FLIGHT-1];
 
     RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
@@ -986,7 +996,7 @@ void RecreateSwapchain()
 }
 
 bool BeginRendering()
-{
+{	
     // Destroy temporary resources that the GPU has finished with (e.g. staging buffers, etc.)
     TryDestroyResourcesPendingDestruction();
 
@@ -997,16 +1007,24 @@ bool BeginRendering()
     // ================================= Waiting for rendering resources to become available ==============================================================
     // The GPU can work on multiple frames simultaneously (i.e. multiple frames can be "in flight"), but each frame has it's own resources
     // that the GPU needs while it's rendering a frame. So we need to wait for one of those sets of resources to become available again (command buffers and binary semaphores).
+	VkSemaphore waitSemaphores[4] = { vk_state->frameSemaphore.handle, vk_state->vertexUploadSemaphore.handle, vk_state->indexUploadSemaphore.handle, vk_state->imageUploadSemaphore.handle };
+	u64 waitValues[4] = { vk_state->frameSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1), vk_state->previousFrameUploadSemaphoreValues[0], vk_state->previousFrameUploadSemaphoreValues[1], vk_state->previousFrameUploadSemaphoreValues[2] };
+
     VkSemaphoreWaitInfo semaphoreWaitInfo = {};
     semaphoreWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
     semaphoreWaitInfo.pNext = nullptr;
     semaphoreWaitInfo.flags = 0;
-    semaphoreWaitInfo.semaphoreCount = 1;
-    semaphoreWaitInfo.pSemaphores = &vk_state->frameSemaphore.handle;
-    u64 waitForValue = vk_state->frameSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1);
-    semaphoreWaitInfo.pValues = &waitForValue;
+    semaphoreWaitInfo.semaphoreCount = 4;
+    semaphoreWaitInfo.pSemaphores = waitSemaphores;
+    semaphoreWaitInfo.pValues = waitValues;
 
-    vkWaitSemaphores(vk_state->device, &semaphoreWaitInfo, UINT64_MAX);
+    VK_CHECK(vkWaitSemaphores(vk_state->device, &semaphoreWaitInfo, UINT64_MAX));
+
+	TryDestroyResourcesPendingDestruction();
+
+	// Swap the vk frame allocator and reset it
+	vk_state->vkFrameArena = &vk_state->vulkanFrameArenas[vk_state->currentInFlightFrameIndex];
+	ArenaClear(vk_state->vkFrameArena);
 
     // Getting the next image from the swapchain (doesn't block the CPU and only blocks the GPU if there's no image available (which only happens in certain present modes with certain buffer counts))
     VkResult result = vkAcquireNextImageKHR(vk_state->device, vk_state->swapchain, UINT64_MAX, vk_state->imageAvailableSemaphores[vk_state->currentInFlightFrameIndex], VK_NULL_HANDLE, &vk_state->currentSwapchainImageIndex);
@@ -1189,6 +1207,10 @@ void EndRendering()
     waitSemaphores[3].value = vk_state->imageUploadSemaphore.submitValue;
     waitSemaphores[3].stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
     waitSemaphores[3].deviceIndex = 0;
+
+	vk_state->previousFrameUploadSemaphoreValues[0] = vk_state->vertexUploadSemaphore.submitValue;
+	vk_state->previousFrameUploadSemaphoreValues[1] = vk_state->indexUploadSemaphore.submitValue;
+	vk_state->previousFrameUploadSemaphoreValues[2] = vk_state->imageUploadSemaphore.submitValue;
 
 #define SIGNAL_SEMAPHORE_COUNT 2
     VkSemaphoreSubmitInfo signalSemaphores[SIGNAL_SEMAPHORE_COUNT] = {};

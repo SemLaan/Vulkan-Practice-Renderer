@@ -15,6 +15,7 @@ extern RendererState* vk_state;
 #define MAX_FRAMES_IN_FLIGHT 2
 #define RENDER_POOL_BLOCK_SIZE_32 32
 #define QUEUE_ACQUISITION_POOL_BLOCK_SIZE 160 // 160 bytes (2.5 cache lines) 32 byte aligned, enough to store VkDependencyInfo + (VkImageMemoryBarrier2 or VkBufferMemoryBarrier2)
+#define VULKAN_FRAME_ARENA_BYTES (MiB * 10)
 
 #define VK_CHECK(x)                                                 \
 	do                                                              \
@@ -22,24 +23,44 @@ extern RendererState* vk_state;
 		VkResult err = x;                                           \
 		if (err)                                                    \
 		{                                                           \
-			_ERROR("Detected vulkan error: %i", err);				\
+			_ERROR("Detected vulkan error: %s", err);				\
 			debugBreak();                                           \
 		}                                                           \
 	} while (0)
 
 
+typedef enum VulkanMemoryType
+{
+	MEMORY_TYPE_STATIC = 0,
+	MEMORY_TYPE_UPLOAD = 1,
+	MEMORY_TYPE_DYNAMIC = 2,
+} VulkanMemoryType;
+
+typedef struct VkMemoryTypeHolder
+{
+	VulkanMemoryType memoryType;
+} VkMemoryTypeHolder;
+
+static inline VkMemoryTypeHolder MemType(VulkanMemoryType type) { return (VkMemoryTypeHolder){type}; }
+
+typedef struct VulkanAllocation
+{
+	VkDeviceMemory deviceMemory;
+	void* mappedMemory;
+} VulkanAllocation;
+
 typedef struct VulkanVertexBuffer
 {
 	VkDeviceSize size;
 	VkBuffer handle;
-	VkDeviceMemory memory;
+	VulkanAllocation memory;
 } VulkanVertexBuffer;
 
 typedef struct VulkanIndexBuffer
 {
 	VkDeviceSize size;
 	VkBuffer handle;
-	VkDeviceMemory memory;
+	VulkanAllocation memory;
 	size_t indexCount;
 } VulkanIndexBuffer;
 
@@ -174,6 +195,8 @@ typedef struct RendererState
 	void** globalUniformBufferMappedArray;							// Global uniform mapped memory for updating global ubo data
 	VkDescriptorSet* globalDescriptorSetArray;						// Global descriptor set array, one per possible in flight frame
 	RenderTarget mainRenderTarget;									// Render target used for rendering the main scene
+	Arena* vkFrameArena;											// Per frame memory arena for the vulkan allocator, is double buffered and thus should be used instead of the frame allocator inside the vk renderer
+	u64 previousFrameUploadSemaphoreValues[3];						// Upload semaphore values from the previous frame, used to make the current frame wait untill uploads from the previous frame are finished
 
 	// Binary semaphores for synchronizing the swapchain with the screen and the GPU
 	VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image acquisition TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)
@@ -190,6 +213,7 @@ typedef struct RendererState
 	Allocator* rendererBumpAllocator;								// Bump allocator for the renderer subsys
 	Allocator* poolAllocator32B;									// Pool allocator of the renderer subsys
 	Allocator* resourceAcquisitionPool;								// Pool allocator for resource acquisition operation infos (memory barriers)
+	Arena vulkanFrameArenas[MAX_FRAMES_IN_FLIGHT];					// Double buffered arenas for frame arena, should be used through vkFrameArena
 
 	// Data that is not used every frame or possibly used every frame
 	QueueFamily graphicsQueue;										// Graphics family queue
