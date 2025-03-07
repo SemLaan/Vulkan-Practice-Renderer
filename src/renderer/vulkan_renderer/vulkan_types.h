@@ -68,8 +68,7 @@ typedef struct VulkanImage
 {
 	VkImage handle;
 	VkImageView view;
-	VkDeviceMemory memory;
-	VkFormat format;
+	VulkanAllocation memory;
 } VulkanImage;
 
 typedef struct VulkanRenderTarget
@@ -119,8 +118,7 @@ typedef struct VulkanMaterial
 {
 	VulkanShader* shader;								// Handle to the shader this material is an instance of
 	VkBuffer uniformBuffer;								// VkBuffer that backs this materials uniforms
-	VkDeviceMemory uniformBufferMemory;					// VkDeviceMemory that backs this materials uniforms
-	void* uniformBufferMapped;							// Pointer to where the uniform buffers are mapped
+	VulkanAllocation uniformBufferAllocation;			// Allocation that backs this materials uniforms
 	VkDescriptorSet* descriptorSetArray;				// Descriptor sets
 } VulkanMaterial;
 
@@ -175,6 +173,19 @@ typedef struct VulkanSamplers
 	VkSampler shadow;				// Sampler with comparisson state enabled for percentage closer filtering
 } VulkanSamplers;
 
+typedef struct VulkanGPUAllocator
+{
+	VkDeviceMemory gpuMemory;
+	u32 memoryTypeIndex;
+} VulkanGPUAllocator;
+
+typedef struct VulkanMemoryState
+{
+	VulkanGPUAllocator staticAllocator;
+	VulkanGPUAllocator dynamicAllocator;
+	VulkanGPUAllocator uploadAllocator;
+} VulkanMemoryState;
+
 DEFINE_DARRAY_TYPE_REF(VkDependencyInfo);
 
 typedef struct RendererState
@@ -192,7 +203,6 @@ typedef struct RendererState
 	bool shouldRecreateSwapchain;									// Checked at the start of each renderloop, is set to true upon window resize
 	VkExtent2D swapchainExtent;										// Extent of the swapchain, used for beginning renderpass
 	VulkanShader* boundShader;										// Currently bound shader (pipeline object)
-	void** globalUniformBufferMappedArray;							// Global uniform mapped memory for updating global ubo data
 	VkDescriptorSet* globalDescriptorSetArray;						// Global descriptor set array, one per possible in flight frame
 	RenderTarget mainRenderTarget;									// Render target used for rendering the main scene
 	Arena* vkFrameArena;											// Per frame memory arena for the vulkan allocator, is double buffered and thus should be used instead of the frame allocator inside the vk renderer
@@ -220,6 +230,7 @@ typedef struct RendererState
 	QueueFamily transferQueue;										// Transfer family queue
 	VkDependencyInfoRefDarray* requestedQueueAcquisitionOperationsDarray;	// For transfering queue ownership from transfer to graphics after a resource has been uploaded
 	VkAllocationCallbacks* vkAllocator;								// Vulkan API allocator, only for reading vulkan allocations not for taking over allocation from vulkan //TODO: this is currently just nullptr
+	VulkanMemoryState* vkMemory;									// State for the system that manages gpu memory
 	VkDescriptorPool descriptorPool;								// Pool used to allocate descriptor sets for all materials
 	Material defaultMaterial;										// Material based on default shader
 	VulkanSamplers* samplers;										// All the different texture samplers
@@ -239,7 +250,7 @@ typedef struct RendererState
 	Texture defaultTexture;											// Default texture
 	VkDescriptorSetLayout globalDescriptorSetLayout;				// Descriptor set layout of the global ubo
 	VkBuffer* globalUniformBufferArray;								// Global uniform buffer object
-	VkDeviceMemory* globalUniformMemoryArray;						// Global uniform memory
+	VulkanAllocation* globalUniformAllocationArray;					// Global uniform allocations
 	VkPhysicalDeviceProperties deviceProperties;					// Properties of the physical device
 	GrPresentMode requestedPresentMode;
 #ifndef GR_DIST

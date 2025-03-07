@@ -2,7 +2,7 @@
 
 #include "core/asserts.h"
 #include "core/meminc.h"
-#include "vulkan_buffer.h"
+#include "vulkan_memory.h"
 #include "vulkan_types.h"
 #include <string.h>
 
@@ -21,8 +21,7 @@ Material MaterialCreate(Shader clientShader)
     // ============================================================================================================================================================
     if (shader->totalUniformDataSize > 0)
     {
-        CreateBuffer(shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &material->uniformBuffer, &material->uniformBufferMemory);
-        vkMapMemory(vk_state->device, material->uniformBufferMemory, 0, shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, 0, &material->uniformBufferMapped);
+        BufferCreate(shader->totalUniformDataSize * MAX_FRAMES_IN_FLIGHT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemType(MEMORY_TYPE_DYNAMIC), &material->uniformBuffer, &material->uniformBufferAllocation);
     }
 
     // ============================================================================================================================================================
@@ -151,9 +150,7 @@ void MaterialDestroy(Material clientMaterial)
 
     if (shader->totalUniformDataSize > 0)
     {
-        vkUnmapMemory(vk_state->device, material->uniformBufferMemory);
-        vkDestroyBuffer(vk_state->device, material->uniformBuffer, vk_state->vkAllocator);
-        vkFreeMemory(vk_state->device, material->uniformBufferMemory, vk_state->vkAllocator);
+		BufferDestroy(&material->uniformBuffer, &material->uniformBufferAllocation);
     }
 
 	Free(vk_state->rendererAllocator, material->descriptorSetArray);
@@ -172,8 +169,7 @@ void MaterialUpdateProperty(Material clientMaterial, const char* name, void* val
         if (MemoryCompare(name, shader->vertUniformPropertiesData.propertyNameArray[i], nameLength))
         {
             // Taking the mapped buffer, then offsetting into the current frame, then offsetting into the current property
-            u8* uniformPropertyLocation = ((u8*)material->uniformBufferMapped) + vk_state->currentInFlightFrameIndex * shader->totalUniformDataSize + shader->vertUniformPropertiesData.propertyOffsets[i];
-            MemoryCopy(uniformPropertyLocation, value, shader->vertUniformPropertiesData.propertySizes[i]);
+			CopyDataToAllocation(&material->uniformBufferAllocation, value, vk_state->currentInFlightFrameIndex * shader->totalUniformDataSize + shader->vertUniformPropertiesData.propertyOffsets[i], shader->vertUniformPropertiesData.propertySizes[i]);
             return;
         }
     }
@@ -183,8 +179,7 @@ void MaterialUpdateProperty(Material clientMaterial, const char* name, void* val
         if (MemoryCompare(name, shader->fragUniformPropertiesData.propertyNameArray[i], nameLength))
         {
             // Taking the mapped buffer, then offsetting into the current frame, then offsetting into the current property
-            u8* uniformPropertyLocation = ((u8*)material->uniformBufferMapped) + vk_state->currentInFlightFrameIndex * shader->totalUniformDataSize + shader->fragUniformPropertiesData.propertyOffsets[i];
-            MemoryCopy(uniformPropertyLocation, value, shader->fragUniformPropertiesData.propertySizes[i]);
+			CopyDataToAllocation(&material->uniformBufferAllocation, value, vk_state->currentInFlightFrameIndex * shader->totalUniformDataSize + shader->fragUniformPropertiesData.propertyOffsets[i], shader->fragUniformPropertiesData.propertySizes[i]);
             return;
         }
     }

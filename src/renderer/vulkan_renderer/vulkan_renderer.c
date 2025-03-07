@@ -19,6 +19,7 @@
 #include "vulkan_types.h"
 #include "vulkan_utils.h"
 #include "vulkan_shader.h"
+#include "vulkan_memory.h"
 
 #define RENDERER_ALLOCATOR_SIZE (50 * MiB)
 #define RENDERER_POOL_ALLOCATOR_32b_SIZE 200
@@ -490,6 +491,11 @@ bool InitializeRenderer(RendererInitSettings settings)
         _TRACE("Vulkan sync objects created successfully");
     }
 
+	// ============================================================================================================================================================
+    // ======================== Initializing the vulkan memory system ============================================================================================================
+    // ============================================================================================================================================================
+	VulkanMemoryInit();
+
     // ============================================================================================================================================================
     // ======================== Finding render target formats ============================================================================================================
     // ============================================================================================================================================================
@@ -635,12 +641,10 @@ bool InitializeRenderer(RendererInitSettings settings)
     VkDeviceSize uniformBufferSize = sizeof(GlobalUniformObject);
 
     vk_state->globalUniformBufferArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformBufferArray));
-    vk_state->globalUniformMemoryArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformMemoryArray));
-    vk_state->globalUniformBufferMappedArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformBufferMappedArray));
+    vk_state->globalUniformAllocationArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalUniformAllocationArray));
     for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        CreateBuffer(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vk_state->globalUniformBufferArray[i], &vk_state->globalUniformMemoryArray[i]);
-        vkMapMemory(vk_state->device, vk_state->globalUniformMemoryArray[i], 0, uniformBufferSize, 0, &vk_state->globalUniformBufferMappedArray[i]);
+        BufferCreate(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemType(MEMORY_TYPE_DYNAMIC), &vk_state->globalUniformBufferArray[i], &vk_state->globalUniformAllocationArray[i]);
     }
 
     // Allocating descriptor sets
@@ -864,14 +868,11 @@ void ShutdownRenderer()
 
     for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        vkUnmapMemory(vk_state->device, vk_state->globalUniformMemoryArray[i]);
-        vkDestroyBuffer(vk_state->device, vk_state->globalUniformBufferArray[i], vk_state->vkAllocator);
-        vkFreeMemory(vk_state->device, vk_state->globalUniformMemoryArray[i], vk_state->vkAllocator);
+		BufferDestroy(&vk_state->globalUniformBufferArray[i], &vk_state->globalUniformAllocationArray[i]);
     }
 
-    Free(vk_state->rendererAllocator, vk_state->globalUniformBufferMappedArray);
     Free(vk_state->rendererAllocator, vk_state->globalUniformBufferArray);
-    Free(vk_state->rendererAllocator, vk_state->globalUniformMemoryArray);
+    Free(vk_state->rendererAllocator, vk_state->globalUniformAllocationArray);
 
     // ============================================================================================================================================================
     // ====================== Destroying samplers if they were created ==============================================================================================
@@ -897,6 +898,11 @@ void ShutdownRenderer()
     // ====================== Destroying swapchain if it was created ==============================================================================================
     // ============================================================================================================================================================
     DestroySwapchain(vk_state);
+
+	// ============================================================================================================================================================
+    // ================================ Shutdown vulkan memory system =================================================================================
+    // ============================================================================================================================================================
+	VulkanMemoryShutdown();
 
     // ============================================================================================================================================================
     // ================================ Destroy sync objects if they were created =================================================================================
@@ -1252,7 +1258,7 @@ void EndRendering()
 
 void UpdateGlobalUniform(GlobalUniformObject* properties)
 {
-    MemoryCopy(vk_state->globalUniformBufferMappedArray[vk_state->currentInFlightFrameIndex], properties, sizeof(*properties));
+	CopyDataToAllocation(&vk_state->globalUniformAllocationArray[vk_state->currentInFlightFrameIndex], properties, 0, sizeof(*properties));
 }
 
 void Draw(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer clientIndexBuffer, mat4* pushConstantValues, u32 instanceCount)

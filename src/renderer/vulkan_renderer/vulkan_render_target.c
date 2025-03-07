@@ -3,6 +3,7 @@
 #include "vulkan_command_buffer.h"
 #include "vulkan_image.h"
 #include "vulkan_types.h"
+#include "vulkan_memory.h"
 
 RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBufferUsage, RenderTargetUsage depthBufferUsage)
 {
@@ -28,10 +29,9 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
         createImageParameters.format = vk_state->renderTargetColorFormat;
         createImageParameters.tiling = VK_IMAGE_TILING_OPTIMAL;
         createImageParameters.usage = vulkanColorImageUsage;
-        createImageParameters.properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-        CreateImage(&createImageParameters, &renderTarget->colorImage);
-        CreateImageView(&renderTarget->colorImage, VK_IMAGE_ASPECT_COLOR_BIT);
+        ImageCreate(&createImageParameters, MemType(MEMORY_TYPE_STATIC), &renderTarget->colorImage.handle, &renderTarget->colorImage.memory);
+        CreateImageView(&renderTarget->colorImage, VK_IMAGE_ASPECT_COLOR_BIT, vk_state->renderTargetColorFormat);
 
         CommandBuffer oneTimeCommandBuffer = {};
         AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
@@ -80,10 +80,9 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
         createImageParameters.format = vk_state->renderTargetDepthFormat;
         createImageParameters.tiling = VK_IMAGE_TILING_OPTIMAL;
         createImageParameters.usage = vulkanDepthImageUsage;
-        createImageParameters.properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-        CreateImage(&createImageParameters, &renderTarget->depthImage);
-        CreateImageView(&renderTarget->depthImage, VK_IMAGE_ASPECT_DEPTH_BIT);
+        ImageCreate(&createImageParameters, MemType(MEMORY_TYPE_STATIC), &renderTarget->depthImage.handle, &renderTarget->depthImage.memory);
+        CreateImageView(&renderTarget->depthImage, VK_IMAGE_ASPECT_DEPTH_BIT, vk_state->renderTargetDepthFormat);
 
         CommandBuffer oneTimeCommandBuffer = {};
         AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
@@ -132,9 +131,7 @@ void RenderTargetDestroy(RenderTarget clientRenderTarget)
         if (renderTarget->depthImage.view)
             vkDestroyImageView(vk_state->device, renderTarget->depthImage.view, vk_state->vkAllocator);
         if (renderTarget->depthImage.handle)
-            vkDestroyImage(vk_state->device, renderTarget->depthImage.handle, vk_state->vkAllocator);
-        if (renderTarget->depthImage.memory)
-            vkFreeMemory(vk_state->device, renderTarget->depthImage.memory, vk_state->vkAllocator);
+			ImageDestroy(&renderTarget->depthImage.handle, &renderTarget->depthImage.memory);
     }
 
     if (renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_DISPLAY || renderTarget->colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
@@ -142,9 +139,7 @@ void RenderTargetDestroy(RenderTarget clientRenderTarget)
         if (renderTarget->colorImage.view)
             vkDestroyImageView(vk_state->device, renderTarget->colorImage.view, vk_state->vkAllocator);
         if (renderTarget->colorImage.handle)
-            vkDestroyImage(vk_state->device, renderTarget->colorImage.handle, vk_state->vkAllocator);
-        if (renderTarget->colorImage.memory)
-            vkFreeMemory(vk_state->device, renderTarget->colorImage.memory, vk_state->vkAllocator);
+		ImageDestroy(&renderTarget->colorImage.handle, &renderTarget->colorImage.memory);
     }
 
 	Free(vk_state->rendererAllocator, renderTarget);

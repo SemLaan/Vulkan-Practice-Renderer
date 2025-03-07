@@ -43,6 +43,12 @@
 		"random": "cpp",
 		"iterator": "cpp",
 		"string": "c",
-		"input.h": "c"
+		"input.h": "c",
+		"string_view": "c",
+		"initializer_list": "c",
+		"executor": "cpp",
+		"ratio": "cpp",
+		"vulkan_memory.h": "c",
+		"vk_enum_string_helper.h": "c"
 	}
 }

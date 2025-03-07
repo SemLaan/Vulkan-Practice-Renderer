@@ -5,62 +5,12 @@
 #include "vulkan_types.h"
 #include "vulkan_buffer.h"
 #include "vulkan_command_buffer.h"
+#include "vulkan_memory.h"
 #include "core/logger.h"
 #include "core/asserts.h"
 
 
-
-
-bool CreateImage(VulkanCreateImageParameters* pCreateParameters, VulkanImage* vulkanImage)
-{
-	vulkanImage->format = pCreateParameters->format;
-
-	VkImageCreateInfo imageCreateInfo = {};
-	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageCreateInfo.pNext = nullptr;
-	imageCreateInfo.flags = 0;
-	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageCreateInfo.format = pCreateParameters->format;
-	imageCreateInfo.extent.width = pCreateParameters->width;
-	imageCreateInfo.extent.height = pCreateParameters->height;
-	imageCreateInfo.extent.depth = 1;
-	imageCreateInfo.mipLevels = 1;
-	imageCreateInfo.arrayLayers = 1;
-	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageCreateInfo.tiling = pCreateParameters->tiling;
-	imageCreateInfo.usage = pCreateParameters->usage;
-	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imageCreateInfo.queueFamilyIndexCount = 0;
-	imageCreateInfo.pQueueFamilyIndices = nullptr;
-	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-	if (VK_SUCCESS != vkCreateImage(vk_state->device, &imageCreateInfo, vk_state->vkAllocator, &vulkanImage->handle))
-	{
-		_FATAL("Vulkan image (texture) creation failed");
-		return false;
-	}
-
-	VkMemoryRequirements memoryRequirements;
-	vkGetImageMemoryRequirements(vk_state->device, vulkanImage->handle, &memoryRequirements);
-
-	VkMemoryAllocateInfo allocateInfo = {};
-	allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocateInfo.pNext = nullptr;
-	allocateInfo.allocationSize = memoryRequirements.size;
-	allocateInfo.memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits, pCreateParameters->properties);
-
-	if (VK_SUCCESS != vkAllocateMemory(vk_state->device, &allocateInfo, vk_state->vkAllocator, &vulkanImage->memory))
-	{
-		_FATAL("Vulkan image (texture) memory allocation failed");
-		return false;
-	}
-
-	vkBindImageMemory(vk_state->device, vulkanImage->handle, vulkanImage->memory, 0);
-
-	return true;
-}
-
-bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask)
+bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkFormat format)
 {
 	VkImageViewCreateInfo viewCreateInfo = {};
 	viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -68,7 +18,7 @@ bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask)
 	viewCreateInfo.flags = 0;
 	viewCreateInfo.image = pImage->handle;
 	viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	viewCreateInfo.format = pImage->format;
+	viewCreateInfo.format = format;
 	viewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 	viewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	viewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -96,29 +46,27 @@ Texture TextureCreate(u32 width, u32 height, void* pixels, TextureStorageType te
 
 	size_t size = width * height * TEXTURE_CHANNELS;
 
+	VkFormat chosenFormat;
+	if (textureStorageType == TEXTURE_STORAGE_RGBA8SRGB)
+		chosenFormat = VK_FORMAT_R8G8B8A8_SRGB;
+	else 
+		chosenFormat = VK_FORMAT_R8G8B8A8_UNORM;
+
 	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
+	VulkanAllocation stagingAllocation;
 
-	CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &stagingBuffer, &stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(vk_state->device, stagingBufferMemory, 0, size, 0, &data);
-	MemoryCopy(data, pixels, size);
-	vkUnmapMemory(vk_state->device, stagingBufferMemory);
+	BufferCreate(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemType(MEMORY_TYPE_UPLOAD), &stagingBuffer, &stagingAllocation);
+	CopyDataToAllocation(&stagingAllocation, pixels, 0, size);
 
 	VulkanCreateImageParameters createImageParameters = {};
 	createImageParameters.width = width;
 	createImageParameters.height = height;
-	if (textureStorageType == TEXTURE_STORAGE_RGBA8SRGB)
-		createImageParameters.format = VK_FORMAT_R8G8B8A8_SRGB;
-	else 
-		createImageParameters.format = VK_FORMAT_R8G8B8A8_UNORM;
+	createImageParameters.format = chosenFormat;
 	createImageParameters.tiling = VK_IMAGE_TILING_OPTIMAL;
 	createImageParameters.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	createImageParameters.properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
 	// Creating the image resource
-	CreateImage(&createImageParameters, image);
+	ImageCreate(&createImageParameters, MemType(MEMORY_TYPE_STATIC), &image->handle, &image->memory);
 
 	// Transitioning the image for copying, copying the image to gpu, transitioning the image for shader reads, transfering image resource ownership to graphics queue
 	{
@@ -218,18 +166,16 @@ Texture TextureCreate(u32 width, u32 height, void* pixels, TextureStorageType te
 		EndSubmitAndFreeSingleUseCommandBuffer(commandBuffer, 0, nullptr, 1, &semaphoreSubmitInfo, &signaledValue);
 
 		// Making sure the staging buffer and memory get deleted when their corresponding command buffer is completed
-		ResourceDestructionInfo bufferDestructionInfo = {};
-		bufferDestructionInfo.resource = stagingBuffer;
-		bufferDestructionInfo.Destructor = VulkanBufferDestructor;
-		bufferDestructionInfo.signalValue = signaledValue;
+		BufferDestructionObject* stagingBufferDestructionObject = ArenaAlloc(vk_state->vkFrameArena, sizeof(*stagingBufferDestructionObject));
+		stagingBufferDestructionObject->allocation = ArenaAlloc(vk_state->vkFrameArena, sizeof(*stagingBufferDestructionObject->allocation));
+		stagingBufferDestructionObject->buffer = stagingBuffer;
+		*stagingBufferDestructionObject->allocation = stagingAllocation;
+        ResourceDestructionInfo bufferDestructionInfo = {};
+        bufferDestructionInfo.resource = stagingBufferDestructionObject;
+        bufferDestructionInfo.Destructor = VulkanBufferDestructor;
+        bufferDestructionInfo.signalValue = signaledValue;
 
-		ResourceDestructionInfo memoryDestructionInfo = {};
-		memoryDestructionInfo.resource = stagingBufferMemory;
-		memoryDestructionInfo.Destructor = VulkanMemoryDestructor;
-		memoryDestructionInfo.signalValue = signaledValue;
-
-		ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
-		ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &memoryDestructionInfo);
+        ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
 	}
 
 	// Creating the image memory barrier for the queue family acquire operation
@@ -266,7 +212,7 @@ Texture TextureCreate(u32 width, u32 height, void* pixels, TextureStorageType te
 	VkDependencyInfoRefDarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
 
 	// Creating the image view
-	if (!CreateImageView(image, VK_IMAGE_ASPECT_COLOR_BIT))
+	if (!CreateImageView(image, VK_IMAGE_ASPECT_COLOR_BIT, chosenFormat))
 		GRASSERT_MSG(false, "image view creation failed");
 
 	return out_texture;
@@ -277,8 +223,7 @@ static void ImageDestructor(void* resource)
 	VulkanImage* image = (VulkanImage*)resource;
 
 	vkDestroyImageView(vk_state->device, image->view, vk_state->vkAllocator);
-	vkDestroyImage(vk_state->device, image->handle, vk_state->vkAllocator);
-	vkFreeMemory(vk_state->device, image->memory, vk_state->vkAllocator);
+	ImageDestroy(&image->handle, &image->memory);
 
 	Free(vk_state->rendererAllocator, image);
 }
