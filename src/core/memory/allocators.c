@@ -27,7 +27,7 @@ typedef struct FreelistNode
 {
     void* address;              // Address of this free block
     size_t size;                // Size of this free block
-    struct FreelistNode* next;  // Pointer to the freelist node after this (i'm fairly certain the list is ordered based on address but not 100% sure)
+    struct FreelistNode* next;  // Pointer to the freelist node after this
 } FreelistNode;
 
 // End should be 4 byte aligned

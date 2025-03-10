@@ -45,8 +45,12 @@ static inline VkMemoryTypeHolder MemType(VulkanMemoryType type) { return (VkMemo
 
 typedef struct VulkanAllocation
 {
-	VkDeviceMemory deviceMemory;
-	void* mappedMemory;
+	VkDeviceMemory deviceMemory;			// The device memory this allocation is suballocated in
+	VkDeviceSize userAllocationSize;		// Size of the allocation from the user perspective
+	VkDeviceSize userAllocationOffset;		// Offset from the start of the allocation from the allocator perspective to the start of the allocation from the user perspective (this offset usually exists to have correct alignment)
+	VkDeviceAddress deviceAddress;			// Address of the allocation from the user perspective
+	void* mappedMemory;						// Mapped memory, this pointer points to the start of the allocation from the user perspective, nullptr if the allocation is not on HOST_VISIBLE memory
+	u32 memoryType;
 } VulkanAllocation;
 
 typedef struct VulkanVertexBuffer
@@ -173,17 +177,47 @@ typedef struct VulkanSamplers
 	VkSampler shadow;				// Sampler with comparisson state enabled for percentage closer filtering
 } VulkanSamplers;
 
-typedef struct VulkanGPUAllocator
+typedef struct HeapInfo
 {
-	VkDeviceMemory gpuMemory;
+	VkDeviceSize heapCapacity;		// Not the actual heap size, but the heap size times a factor less than one, depending on the type of heap. (to account for the fact that others might be using the gpu)
+	VkDeviceSize heapUsage;			// How much memory the application has allocated from this heap
+} HeapInfo;
+
+typedef struct VulkanFreelistNode
+{
+    VkDeviceAddress address;              // Address of this free block
+    VkDeviceSize size;                // Size of this free block
+    struct VulkanFreelistNode* next;  // Pointer to the freelist node after this 
+} VulkanFreelistNode;
+
+typedef struct VulkanAllocatorMemoryBlock
+{
+	VkDeviceMemory deviceMemory;
+	void* mappedMemory;				// Is nullptr if this block is not host visible
+	VkDeviceSize size;
+	VulkanFreelistNode* head;         // The first free node in the arena
+    VulkanFreelistNode* nodePool;     // Address of the array that is used for the freelist node pool
+    u32 nodeCount;              // Amount of free nodes the allocator can have
+} VulkanAllocatorMemoryBlock;
+
+typedef struct VulkanFreelistAllocator
+{
+	VulkanAllocatorMemoryBlock* memoryBlocks;
+	u32 heapIndex;
 	u32 memoryTypeIndex;
-} VulkanGPUAllocator;
+	u32 memoryBlockCount;
+} VulkanFreelistAllocator;
 
 typedef struct VulkanMemoryState
 {
-	VulkanGPUAllocator staticAllocator;
-	VulkanGPUAllocator dynamicAllocator;
-	VulkanGPUAllocator uploadAllocator;
+	VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
+	Allocator* vulkanAllocatorStateAllocator;			// Allocator that is used for allocating the state of VulkanFreelistAllocators and VulkanAllocatorMemoryBlocks
+	VulkanFreelistAllocator* smallBufferAllocators;
+	VulkanFreelistAllocator* largeBufferAllocators;
+	VulkanFreelistAllocator* imageAllocators;
+	HeapInfo* heapInfos;
+	u32 heapCount;
+	u32 memoryTypeCount;								// Also represents the amount of freelist allocators in the VulkanFreelistAllocator arrays
 } VulkanMemoryState;
 
 DEFINE_DARRAY_TYPE_REF(VkDependencyInfo);

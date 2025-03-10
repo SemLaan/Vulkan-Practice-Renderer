@@ -25,5 +25,7 @@ void CopyDataToAllocation(VulkanAllocation* allocation, void* data, u64 offset, 
 void ImageCreate(VulkanCreateImageParameters* pCreateParams, VkMemoryTypeHolder memoryType, VkImage* out_image, VulkanAllocation* out_allocation);
 void ImageDestroy(VkImage* image, VulkanAllocation* allocation);
 
-
+// TODO: make static inline
+void VulkanFreelistAllocate(VulkanFreelistAllocator* allocator, VkMemoryRequirements* memoryRequirements, VulkanAllocation* out_allocation);
+void VulkanFreelistFree(VulkanFreelistAllocator* allocator, VulkanAllocation* allocation);
 
