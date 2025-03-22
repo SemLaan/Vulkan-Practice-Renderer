@@ -43,6 +43,54 @@ static const char* GetMemoryScaleString(u64 bytes, u64* out_scale)
     }
 }
 
+static inline void CreateVulkanMemoryBlock(VulkanAllocatorMemoryBlock* out_allocatorBlock, u32 memoryType, u32 heapIndex, VkDeviceSize blockSize)
+{
+	VkMemoryAllocateInfo allocateInfo = {};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocateInfo.pNext = nullptr;
+    allocateInfo.allocationSize = blockSize;
+    allocateInfo.memoryTypeIndex = memoryType;
+
+	out_allocatorBlock->size = blockSize;
+	out_allocatorBlock->nodeCount = VULKAN_MEMORY_BLOCK_NODE_COUNT;
+	out_allocatorBlock->nodePool = Alloc(vk_state->vkMemory->vulkanAllocatorStateAllocator, sizeof(*out_allocatorBlock->nodePool) * out_allocatorBlock->nodeCount);
+	out_allocatorBlock->head = out_allocatorBlock->nodePool;
+	out_allocatorBlock->head->address = 0;
+	out_allocatorBlock->head->size = blockSize;
+	out_allocatorBlock->head->next = nullptr;
+	out_allocatorBlock->mappedMemory = nullptr; // will get set at the end of this function if this block is host visible
+
+	vk_state->vkMemory->heapInfos[heapIndex].heapUsage += blockSize;
+	GRASSERT(vk_state->vkMemory->heapInfos[heapIndex].heapUsage < vk_state->vkMemory->heapInfos[heapIndex].heapCapacity);
+
+	VK_CHECK(vkAllocateMemory(vk_state->device, &allocateInfo, vk_state->vkAllocator, &out_allocatorBlock->deviceMemory));
+
+	// check if the memory should be mapped, and map if so
+	if (vk_state->vkMemory->deviceMemoryProperties.memoryTypes[memoryType].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+	{
+		vkMapMemory(vk_state->device, out_allocatorBlock->deviceMemory, 0, blockSize, 0, &out_allocatorBlock->mappedMemory);
+	}
+}
+
+static inline void DestroyVulkanMemoryBlock(VulkanAllocatorMemoryBlock* allocatorBlock, u32 heapIndex)
+{
+	// remove block size from heap usage
+	vk_state->vkMemory->heapInfos[heapIndex].heapUsage -= allocatorBlock->size;
+
+	// Check if memory should be unmapped, and unmap if so
+	if (allocatorBlock->mappedMemory)
+		vkUnmapMemory(vk_state->device, allocatorBlock->deviceMemory);
+	
+	allocatorBlock->mappedMemory = nullptr;
+
+	// Free device memory
+	vkFreeMemory(vk_state->device, allocatorBlock->deviceMemory, vk_state->vkAllocator);
+
+	// Free node pool
+	Free(vk_state->vkMemory->vulkanAllocatorStateAllocator, allocatorBlock->nodePool);
+	allocatorBlock->nodePool = nullptr;
+}
+
 void VulkanMemoryInit()
 {
 	vk_state->vkMemory = AlignedAlloc(vk_state->rendererAllocator, sizeof(*vk_state->vkMemory), CACHE_ALIGN);
@@ -124,14 +172,41 @@ void VulkanMemoryInit()
 
 void VulkanMemoryShutdown()
 {
-	DestroyFreelistAllocator(vk_state->vkMemory->vulkanAllocatorStateAllocator);
+	VulkanMemoryState* vkMemory = vk_state->vkMemory;
 
-	Free(vk_state->rendererAllocator, vk_state->vkMemory->smallBufferAllocators);
-	Free(vk_state->rendererAllocator, vk_state->vkMemory->largeBufferAllocators);
-	Free(vk_state->rendererAllocator, vk_state->vkMemory->imageAllocators);
+	for (u32 i = 0; i < vkMemory->deviceMemoryProperties.memoryTypeCount; i++)
+	{
+		for (u32 j = 0; j < vkMemory->smallBufferAllocators[i].memoryBlockCount; j++)
+		{
+			DestroyVulkanMemoryBlock(&vkMemory->smallBufferAllocators[i].memoryBlocks[j], vkMemory->smallBufferAllocators[i].heapIndex);
+		}
+		
+		for (u32 j = 0; j < vkMemory->largeBufferAllocators[i].memoryBlockCount; j++)
+		{
+			DestroyVulkanMemoryBlock(&vkMemory->largeBufferAllocators[i].memoryBlocks[j], vkMemory->largeBufferAllocators[i].heapIndex);
+		}
 
-	Free(vk_state->rendererAllocator, vk_state->vkMemory->heapInfos);
-	Free(vk_state->rendererAllocator, vk_state->vkMemory);
+		for (u32 j = 0; j < vkMemory->imageAllocators[i].memoryBlockCount; j++)
+		{
+			DestroyVulkanMemoryBlock(&vkMemory->imageAllocators[i].memoryBlocks[j], vkMemory->imageAllocators[i].heapIndex);
+		}
+
+		if (vkMemory->smallBufferAllocators[i].memoryBlockCount > 0)
+			Free(vkMemory->vulkanAllocatorStateAllocator, vkMemory->smallBufferAllocators[i].memoryBlocks);
+		if (vkMemory->largeBufferAllocators[i].memoryBlockCount > 0)
+			Free(vkMemory->vulkanAllocatorStateAllocator, vkMemory->largeBufferAllocators[i].memoryBlocks);
+		if (vkMemory->imageAllocators[i].memoryBlockCount > 0)
+			Free(vkMemory->vulkanAllocatorStateAllocator, vkMemory->imageAllocators[i].memoryBlocks);
+	}
+
+	DestroyFreelistAllocator(vkMemory->vulkanAllocatorStateAllocator);
+
+	Free(vk_state->rendererAllocator, vkMemory->smallBufferAllocators);
+	Free(vk_state->rendererAllocator, vkMemory->largeBufferAllocators);
+	Free(vk_state->rendererAllocator, vkMemory->imageAllocators);
+
+	Free(vk_state->rendererAllocator, vkMemory->heapInfos);
+	Free(vk_state->rendererAllocator, vkMemory);
 }
 
 static u32 FindMemoryType(u32 typeFilter, VkMemoryPropertyFlags requiredFlags)
@@ -178,7 +253,7 @@ void BufferCreate(VkDeviceSize size, VkBufferUsageFlags bufferUsageFlags, VkMemo
 	else // If the allocation size is smaller than large allocation threshold, use the smallBufferAllocators
 	{
 		// Memory type index is the same as allocator index
-		VulkanFreelistAllocate(&vk_state->vkMemory->largeBufferAllocators[allocatorIndex], &memoryRequirements, out_allocation);
+		VulkanFreelistAllocate(&vk_state->vkMemory->smallBufferAllocators[allocatorIndex], &memoryRequirements, out_allocation);
 	}
 
     vkBindBufferMemory(vk_state->device, *out_buffer, out_allocation->deviceMemory, out_allocation->deviceAddress);
@@ -191,7 +266,7 @@ void BufferDestroy(VkBuffer* buffer, VulkanAllocation* allocation)
 	if (allocation->userAllocationSize > LARGE_BUFFER_ALLOCATION_THRESHOLD)
 		VulkanFreelistFree(&vk_state->vkMemory->largeBufferAllocators[allocation->memoryType], allocation);
 	else
-		VulkanFreelistFree(&vk_state->vkMemory->largeBufferAllocators[allocation->memoryType], allocation);
+		VulkanFreelistFree(&vk_state->vkMemory->smallBufferAllocators[allocation->memoryType], allocation);
 }
 
 void CopyDataToAllocation(VulkanAllocation* allocation, void* data, u64 offset, u64 size)
@@ -239,43 +314,6 @@ void ImageDestroy(VkImage* image, VulkanAllocation* allocation)
 {
 	vkDestroyImage(vk_state->device, *image, vk_state->vkAllocator);
 	VulkanFreelistFree(&vk_state->vkMemory->imageAllocators[allocation->memoryType], allocation);
-}
-
-static inline void CreateVulkanMemoryBlock(VulkanAllocatorMemoryBlock* out_allocatorBlock, u32 memoryType, u32 heapIndex, VkDeviceSize blockSize)
-{
-	VkMemoryAllocateInfo allocateInfo = {};
-    allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocateInfo.pNext = nullptr;
-    allocateInfo.allocationSize = blockSize;
-    allocateInfo.memoryTypeIndex = memoryType;
-
-	out_allocatorBlock->size = blockSize;
-	out_allocatorBlock->nodeCount = VULKAN_MEMORY_BLOCK_NODE_COUNT;
-	out_allocatorBlock->nodePool = Alloc(vk_state->vkMemory->vulkanAllocatorStateAllocator, sizeof(*out_allocatorBlock->nodePool) * out_allocatorBlock->nodeCount);
-	out_allocatorBlock->head = out_allocatorBlock->nodePool;
-	out_allocatorBlock->head->address = 0;
-	out_allocatorBlock->head->size = blockSize;
-	out_allocatorBlock->head->next = nullptr;
-	out_allocatorBlock->mappedMemory = nullptr; // will get set at the end of this function if this block is host visible
-
-	vk_state->vkMemory->heapInfos[heapIndex].heapUsage += blockSize;
-	GRASSERT(vk_state->vkMemory->heapInfos[heapIndex].heapUsage < vk_state->vkMemory->heapInfos[heapIndex].heapCapacity);
-
-	VK_CHECK(vkAllocateMemory(vk_state->device, &allocateInfo, vk_state->vkAllocator, &out_allocatorBlock->deviceMemory));
-
-	// check if the memory should be mapped, and map if so
-	if (vk_state->vkMemory->deviceMemoryProperties.memoryTypes[memoryType].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-	{
-		vkMapMemory(vk_state->device, out_allocatorBlock->deviceMemory, 0, blockSize, 0, &out_allocatorBlock->mappedMemory);
-	}
-}
-
-static inline void DestroyVulkanMemoryBlock(VulkanAllocatorMemoryBlock* allocatorBlock)
-{
-	// TODO: remove block size from heap usage
-	// TODO: Check if memory should be unmapped, and unmap if so
-	// TODO: Free device memory
-	// TODO: Free node pool
 }
 
 static inline bool VulkanAllocatorBlockAllocate(VulkanAllocatorMemoryBlock* allocatorBlock, VkMemoryRequirements* memoryRequirements, VulkanAllocation* out_allocation)
