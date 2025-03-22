@@ -32,40 +32,6 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
 
         ImageCreate(&createImageParameters, MemType(MEMORY_TYPE_STATIC), &renderTarget->colorImage.handle, &renderTarget->colorImage.memory);
         CreateImageView(&renderTarget->colorImage, VK_IMAGE_ASPECT_COLOR_BIT, vk_state->renderTargetColorFormat);
-
-        CommandBuffer oneTimeCommandBuffer = {};
-        AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
-
-        VkImageMemoryBarrier2 colorTransitionImageBarrierInfo = {};
-        colorTransitionImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        colorTransitionImageBarrierInfo.pNext = nullptr;
-        colorTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-        colorTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_NONE;
-        colorTransitionImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        colorTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        colorTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorTransitionImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        colorTransitionImageBarrierInfo.srcQueueFamilyIndex = 0;
-        colorTransitionImageBarrierInfo.dstQueueFamilyIndex = 0;
-        colorTransitionImageBarrierInfo.image = renderTarget->colorImage.handle;
-        colorTransitionImageBarrierInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        colorTransitionImageBarrierInfo.subresourceRange.baseMipLevel = 0;
-        colorTransitionImageBarrierInfo.subresourceRange.levelCount = 1;
-        colorTransitionImageBarrierInfo.subresourceRange.baseArrayLayer = 0;
-        colorTransitionImageBarrierInfo.subresourceRange.layerCount = 1;
-
-        VkDependencyInfo rendertargetTransitionDependencyInfo = {};
-        rendertargetTransitionDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        rendertargetTransitionDependencyInfo.pNext = nullptr;
-        rendertargetTransitionDependencyInfo.dependencyFlags = 0;
-        rendertargetTransitionDependencyInfo.memoryBarrierCount = 0;
-        rendertargetTransitionDependencyInfo.bufferMemoryBarrierCount = 0;
-        rendertargetTransitionDependencyInfo.imageMemoryBarrierCount = 1;
-        rendertargetTransitionDependencyInfo.pImageMemoryBarriers = &colorTransitionImageBarrierInfo;
-
-        vkCmdPipelineBarrier2(oneTimeCommandBuffer.handle, &rendertargetTransitionDependencyInfo);
-
-        EndSubmitAndFreeSingleUseCommandBuffer(oneTimeCommandBuffer, 0, nullptr, 0, nullptr, nullptr);
     }
 
     // Creating depth buffer
@@ -83,40 +49,6 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
 
         ImageCreate(&createImageParameters, MemType(MEMORY_TYPE_STATIC), &renderTarget->depthImage.handle, &renderTarget->depthImage.memory);
         CreateImageView(&renderTarget->depthImage, VK_IMAGE_ASPECT_DEPTH_BIT, vk_state->renderTargetDepthFormat);
-
-        CommandBuffer oneTimeCommandBuffer = {};
-        AllocateAndBeginSingleUseCommandBuffer(&vk_state->graphicsQueue, &oneTimeCommandBuffer);
-
-        VkImageMemoryBarrier2 depthStencilTransitionImageBarrierInfo = {};
-        depthStencilTransitionImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        depthStencilTransitionImageBarrierInfo.pNext = nullptr;
-        depthStencilTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-        depthStencilTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_NONE;
-        depthStencilTransitionImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        depthStencilTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        depthStencilTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depthStencilTransitionImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        depthStencilTransitionImageBarrierInfo.srcQueueFamilyIndex = 0;
-        depthStencilTransitionImageBarrierInfo.dstQueueFamilyIndex = 0;
-        depthStencilTransitionImageBarrierInfo.image = renderTarget->depthImage.handle;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.baseMipLevel = 0;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.levelCount = 1;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.baseArrayLayer = 0;
-        depthStencilTransitionImageBarrierInfo.subresourceRange.layerCount = 1;
-
-        VkDependencyInfo rendertargetTransitionDependencyInfo = {};
-        rendertargetTransitionDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        rendertargetTransitionDependencyInfo.pNext = nullptr;
-        rendertargetTransitionDependencyInfo.dependencyFlags = 0;
-        rendertargetTransitionDependencyInfo.memoryBarrierCount = 0;
-        rendertargetTransitionDependencyInfo.bufferMemoryBarrierCount = 0;
-        rendertargetTransitionDependencyInfo.imageMemoryBarrierCount = 1;
-        rendertargetTransitionDependencyInfo.pImageMemoryBarriers = &depthStencilTransitionImageBarrierInfo;
-
-        vkCmdPipelineBarrier2(oneTimeCommandBuffer.handle, &rendertargetTransitionDependencyInfo);
-
-        EndSubmitAndFreeSingleUseCommandBuffer(oneTimeCommandBuffer, 0, nullptr, 0, nullptr, nullptr);
     }
 
     return clientRenderTarget;

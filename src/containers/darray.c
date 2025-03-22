@@ -93,6 +93,16 @@ void DarraySetSize(void* darray, u32 size)
     state->size = size;
 }
 
+void DarraySetCapacity(void* darray, u32 newCapacity)
+{
+	Darray* state = (Darray*)darray;
+
+	GRASSERT(state->size <= newCapacity);
+
+	state->data = Realloc(state->allocator, state->data, newCapacity * state->stride);
+	state->capacity = newCapacity;
+}
+
 // Reallocs the data to make the capacity the same as size.
 void DarrayFitExact(void* darray)
 {

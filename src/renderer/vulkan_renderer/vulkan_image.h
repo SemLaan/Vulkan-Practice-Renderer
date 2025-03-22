@@ -4,6 +4,5 @@
 
 
 
-bool CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkFormat format);
+void CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkFormat format);
 
-///TODO: create image view helper function maybe? since swapchain also needs it

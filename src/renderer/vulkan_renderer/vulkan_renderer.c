@@ -20,6 +20,7 @@
 #include "vulkan_utils.h"
 #include "vulkan_shader.h"
 #include "vulkan_memory.h"
+#include "vulkan_transfer.h"
 
 #define RENDERER_ALLOCATOR_SIZE (50 * MiB)
 #define RENDERER_POOL_ALLOCATOR_32b_SIZE 200
@@ -371,10 +372,9 @@ bool InitializeRenderer(RendererInitSettings settings)
         /// TODO: get compute queue
         // Graphics, transfer and (in the future) compute queue
         vkGetDeviceQueue(vk_state->device, vk_state->graphicsQueue.index, 0, &vk_state->graphicsQueue.handle);
-        vk_state->graphicsQueue.resourcesPendingDestructionDarray = ResourceDestructionInfoDarrayCreate(20, vk_state->rendererAllocator);
-
         vkGetDeviceQueue(vk_state->device, vk_state->transferQueue.index, 0, &vk_state->transferQueue.handle);
-        vk_state->transferQueue.resourcesPendingDestructionDarray = ResourceDestructionInfoDarrayCreate(20, vk_state->rendererAllocator);
+
+		InitDeferredResourceDestructionState(&vk_state->deferredResourceDestruction, 200/*200 objects can be destroyed per frame without having to do dynamic allocation*/);
 
         // ==================== Creating command pools for each of the queue families =============================
         VkCommandPoolCreateInfo commandPoolCreateInfo = {};
@@ -383,48 +383,15 @@ bool InitializeRenderer(RendererInitSettings settings)
         commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         commandPoolCreateInfo.queueFamilyIndex = vk_state->graphicsQueue.index;
 
-        if (VK_SUCCESS != vkCreateCommandPool(vk_state->device, &commandPoolCreateInfo, vk_state->vkAllocator, &vk_state->graphicsQueue.commandPool))
-        {
-            _FATAL("Failed to create Vulkan graphics command pool");
-            return false;
-        }
+        VK_CHECK(vkCreateCommandPool(vk_state->device, &commandPoolCreateInfo, vk_state->vkAllocator, &vk_state->graphicsQueue.commandPool));
 
-        commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
         commandPoolCreateInfo.queueFamilyIndex = vk_state->transferQueue.index;
 
-        if (VK_SUCCESS != vkCreateCommandPool(vk_state->device, &commandPoolCreateInfo, vk_state->vkAllocator, &vk_state->transferQueue.commandPool))
-        {
-            _FATAL("Failed to create Vulkan transfer command pool");
-            return false;
-        }
+        VK_CHECK(vkCreateCommandPool(vk_state->device, &commandPoolCreateInfo, vk_state->vkAllocator, &vk_state->transferQueue.commandPool));
 
         /// TODO: create compute command pool
 
-        // Create semaphores
-        vk_state->graphicsQueue.semaphore.submitValue = 0;
-        vk_state->transferQueue.semaphore.submitValue = 0;
-
-        VkSemaphoreTypeCreateInfo semaphoreTypeInfo = {};
-        semaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-        semaphoreTypeInfo.pNext = nullptr;
-        semaphoreTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-        semaphoreTypeInfo.initialValue = 0;
-
-        VkSemaphoreCreateInfo timelineSemaphoreCreateInfo = {};
-        timelineSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        timelineSemaphoreCreateInfo.pNext = &semaphoreTypeInfo;
-        timelineSemaphoreCreateInfo.flags = 0;
-
-        if (VK_SUCCESS != vkCreateSemaphore(vk_state->device, &timelineSemaphoreCreateInfo, vk_state->vkAllocator, &vk_state->graphicsQueue.semaphore.handle) ||
-            VK_SUCCESS != vkCreateSemaphore(vk_state->device, &timelineSemaphoreCreateInfo, vk_state->vkAllocator, &vk_state->transferQueue.semaphore.handle))
-        {
-            _FATAL("Failed to create sync objects");
-            return false;
-        }
-
-        vk_state->requestedQueueAcquisitionOperationsDarray = VkDependencyInfoRefDarrayCreate(10, vk_state->rendererAllocator);
-
-        _TRACE("Successfully created vulkan queues");
+        _TRACE("Successfully retrieved vulkan queues and created command pools");
     }
 
     // ============================================================================================================================================================
@@ -432,8 +399,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     // ============================================================================================================================================================
     for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        if (!AllocateCommandBuffer(&vk_state->graphicsQueue, &vk_state->graphicsCommandBuffers[i]))
-            return false;
+        AllocateCommandBuffer(&vk_state->graphicsQueue, &vk_state->graphicsCommandBuffers[i]);
     }
 
     // ============================================================================================================================================================
@@ -445,17 +411,9 @@ bool InitializeRenderer(RendererInitSettings settings)
 
         for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
         {
-            if ((VK_SUCCESS != vkCreateSemaphore(vk_state->device, &semaphoreCreateInfo, vk_state->vkAllocator, &vk_state->imageAvailableSemaphores[i])) ||
-                (VK_SUCCESS != vkCreateSemaphore(vk_state->device, &semaphoreCreateInfo, vk_state->vkAllocator, &vk_state->renderFinishedSemaphores[i])))
-            {
-                _FATAL("Failed to create sync objects");
-                return false;
-            }
+			VK_CHECK(vkCreateSemaphore(vk_state->device, &semaphoreCreateInfo, vk_state->vkAllocator, &vk_state->imageAvailableSemaphores[i]));
+			VK_CHECK(vkCreateSemaphore(vk_state->device, &semaphoreCreateInfo, vk_state->vkAllocator, &vk_state->renderFinishedSemaphores[i]));
         }
-
-        vk_state->vertexUploadSemaphore.submitValue = 0;
-        vk_state->indexUploadSemaphore.submitValue = 0;
-        vk_state->imageUploadSemaphore.submitValue = 0;
 
         VkSemaphoreTypeCreateInfo semaphoreTypeInfo = {};
         semaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
@@ -468,25 +426,12 @@ bool InitializeRenderer(RendererInitSettings settings)
         timelineSemaphoreCreateInfo.pNext = &semaphoreTypeInfo;
         timelineSemaphoreCreateInfo.flags = 0;
 
-        if (VK_SUCCESS != vkCreateSemaphore(vk_state->device, &timelineSemaphoreCreateInfo, vk_state->vkAllocator, &vk_state->vertexUploadSemaphore.handle) ||
-            VK_SUCCESS != vkCreateSemaphore(vk_state->device, &timelineSemaphoreCreateInfo, vk_state->vkAllocator, &vk_state->indexUploadSemaphore.handle) ||
-            VK_SUCCESS != vkCreateSemaphore(vk_state->device, &timelineSemaphoreCreateInfo, vk_state->vkAllocator, &vk_state->imageUploadSemaphore.handle))
-        {
-            _FATAL("Failed to create sync objects");
-            return false;
-        }
-
         // max max frames in flight just needs to be higher than any sensible maxFramesInFlight value,
         // look at the wait for semaphores function at the start of the renderloop to understand why
-        const u64 maxMaxFramesInFlight = 10;
-        vk_state->frameSemaphore.submitValue = maxMaxFramesInFlight;
-        semaphoreTypeInfo.initialValue = maxMaxFramesInFlight;
+        vk_state->frameSemaphore.submitValue = MAX_FRAMES_IN_FLIGHT;
+        semaphoreTypeInfo.initialValue = MAX_FRAMES_IN_FLIGHT;
 
-        if (VK_SUCCESS != vkCreateSemaphore(vk_state->device, &timelineSemaphoreCreateInfo, vk_state->vkAllocator, &vk_state->frameSemaphore.handle))
-        {
-            _FATAL("Failed to create sync objects");
-            return false;
-        }
+        VK_CHECK(vkCreateSemaphore(vk_state->device, &timelineSemaphoreCreateInfo, vk_state->vkAllocator, &vk_state->frameSemaphore.handle));
 
         _TRACE("Vulkan sync objects created successfully");
     }
@@ -495,6 +440,11 @@ bool InitializeRenderer(RendererInitSettings settings)
     // ======================== Initializing the vulkan memory system ============================================================================================================
     // ============================================================================================================================================================
 	VulkanMemoryInit();
+
+	// ============================================================================================================================================================
+    // ======================== Initializing the vulkan transfer system ============================================================================================================
+    // ============================================================================================================================================================
+	VulkanTransferInit();
 
     // ============================================================================================================================================================
     // ======================== Finding render target formats ============================================================================================================
@@ -809,9 +759,6 @@ void ShutdownRenderer()
     if (vk_state->device)
         vkDeviceWaitIdle(vk_state->device);
 
-    if (vk_state->requestedQueueAcquisitionOperationsDarray)
-        DarrayDestroy(vk_state->requestedQueueAcquisitionOperationsDarray);
-
 	// ============================================================================================================================================================
     // ============================ Destroying basic meshes ======================================================================================================
     // ============================================================================================================================================================
@@ -850,8 +797,7 @@ void ShutdownRenderer()
     if (vk_state->defaultTexture.internalState)
         TextureDestroy(vk_state->defaultTexture);
 
-    if (vk_state->graphicsQueue.resourcesPendingDestructionDarray)
-        TryDestroyResourcesPendingDestruction();
+    TryDestroyResourcesPendingDestruction();
 
     // ============================================================================================================================================================
     // ============================ Destroying global ubo stuff (arrays, buffers, memory, descriptor set layout, descriptor sets) =================================
@@ -900,6 +846,11 @@ void ShutdownRenderer()
     DestroySwapchain(vk_state);
 
 	// ============================================================================================================================================================
+    // ======================== Shutdown vulkan transfer system ============================================================================================================
+    // ============================================================================================================================================================
+	VulkanTransferShutdown();
+
+	// ============================================================================================================================================================
     // ================================ Shutdown vulkan memory system =================================================================================
     // ============================================================================================================================================================
 	VulkanMemoryShutdown();
@@ -915,41 +866,23 @@ void ShutdownRenderer()
             vkDestroySemaphore(vk_state->device, vk_state->renderFinishedSemaphores[i], vk_state->vkAllocator);
     }
 
-    if (vk_state->vertexUploadSemaphore.handle)
-        vkDestroySemaphore(vk_state->device, vk_state->vertexUploadSemaphore.handle, vk_state->vkAllocator);
-    if (vk_state->indexUploadSemaphore.handle)
-        vkDestroySemaphore(vk_state->device, vk_state->indexUploadSemaphore.handle, vk_state->vkAllocator);
-    if (vk_state->imageUploadSemaphore.handle)
-        vkDestroySemaphore(vk_state->device, vk_state->imageUploadSemaphore.handle, vk_state->vkAllocator);
     if (vk_state->frameSemaphore.handle)
         vkDestroySemaphore(vk_state->device, vk_state->frameSemaphore.handle, vk_state->vkAllocator);
 
     // ============================================================================================================================================================
-    // =================================== Free command buffers ===================================================================================================
+    // ===================== destroys command pools ====================================================================================================
     // ============================================================================================================================================================
-    for (i32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-    {
-        FreeCommandBuffer(vk_state->graphicsCommandBuffers[i]);
-    }
-
-    // ============================================================================================================================================================
-    // ===================== destroys queues and command pools ====================================================================================================
-    // ============================================================================================================================================================
-    if (vk_state->graphicsQueue.semaphore.handle)
-        vkDestroySemaphore(vk_state->device, vk_state->graphicsQueue.semaphore.handle, vk_state->vkAllocator);
-    if (vk_state->transferQueue.semaphore.handle)
-        vkDestroySemaphore(vk_state->device, vk_state->transferQueue.semaphore.handle, vk_state->vkAllocator);
-
     if (vk_state->graphicsQueue.commandPool)
+	{
         vkDestroyCommandPool(vk_state->device, vk_state->graphicsQueue.commandPool, vk_state->vkAllocator);
+	}
 
     if (vk_state->transferQueue.commandPool)
+	{
         vkDestroyCommandPool(vk_state->device, vk_state->transferQueue.commandPool, vk_state->vkAllocator);
+	}
 
-    if (vk_state->graphicsQueue.resourcesPendingDestructionDarray)
-        DarrayDestroy(vk_state->graphicsQueue.resourcesPendingDestructionDarray);
-    if (vk_state->transferQueue.resourcesPendingDestructionDarray)
-        DarrayDestroy(vk_state->transferQueue.resourcesPendingDestructionDarray);
+	ShutdownDeferredResourceDestructionState(&vk_state->deferredResourceDestruction);
 
     // ============================================================================================================================================================
     // ===================== Destroying logical device if it was created ==========================================================================================
@@ -1002,7 +935,7 @@ void RecreateSwapchain()
 }
 
 bool BeginRendering()
-{	
+{
     // Destroy temporary resources that the GPU has finished with (e.g. staging buffers, etc.)
     TryDestroyResourcesPendingDestruction();
 
@@ -1013,20 +946,22 @@ bool BeginRendering()
     // ================================= Waiting for rendering resources to become available ==============================================================
     // The GPU can work on multiple frames simultaneously (i.e. multiple frames can be "in flight"), but each frame has it's own resources
     // that the GPU needs while it's rendering a frame. So we need to wait for one of those sets of resources to become available again (command buffers and binary semaphores).
-	VkSemaphore waitSemaphores[4] = { vk_state->frameSemaphore.handle, vk_state->vertexUploadSemaphore.handle, vk_state->indexUploadSemaphore.handle, vk_state->imageUploadSemaphore.handle };
-	u64 waitValues[4] = { vk_state->frameSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1), vk_state->previousFrameUploadSemaphoreValues[0], vk_state->previousFrameUploadSemaphoreValues[1], vk_state->previousFrameUploadSemaphoreValues[2] };
+	#define CPU_SIDE_WAIT_SEMAPHORE_COUNT 2
+	VkSemaphore waitSemaphores[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.handle, vk_state->transferState.uploadSemaphore.handle };
+	u64 waitValues[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1), vk_state->transferState.uploadSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1) };
 
     VkSemaphoreWaitInfo semaphoreWaitInfo = {};
     semaphoreWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
     semaphoreWaitInfo.pNext = nullptr;
     semaphoreWaitInfo.flags = 0;
-    semaphoreWaitInfo.semaphoreCount = 4;
+    semaphoreWaitInfo.semaphoreCount = CPU_SIDE_WAIT_SEMAPHORE_COUNT;
     semaphoreWaitInfo.pSemaphores = waitSemaphores;
     semaphoreWaitInfo.pValues = waitValues;
 
     VK_CHECK(vkWaitSemaphores(vk_state->device, &semaphoreWaitInfo, UINT64_MAX));
 
-	TryDestroyResourcesPendingDestruction();
+	// Transferring resources to the GPU
+	VulkanCommitTransfers();
 
 	// Swap the vk frame allocator and reset it
 	vk_state->vkFrameArena = &vk_state->vulkanFrameArenas[vk_state->currentInFlightFrameIndex];
@@ -1056,13 +991,8 @@ bool BeginRendering()
     VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
 
     // =============================== acquire ownership of all uploaded resources =======================================
-    for (u32 i = 0; i < vk_state->requestedQueueAcquisitionOperationsDarray->size; ++i)
-    {
-        vkCmdPipelineBarrier2(currentCommandBuffer, vk_state->requestedQueueAcquisitionOperationsDarray->data[i]);
-        Free(vk_state->resourceAcquisitionPool, vk_state->requestedQueueAcquisitionOperationsDarray->data[i]);
-    }
-
-    DarraySetSize(vk_state->requestedQueueAcquisitionOperationsDarray, 0);
+	vkCmdPipelineBarrier2(currentCommandBuffer, vk_state->transferState.uploadAcquireDependencyInfo);
+	vk_state->transferState.uploadAcquireDependencyInfo = nullptr;
 
     // Binding global ubo
     VulkanShader* defaultShader = SimpleMapLookup(vk_state->shaderMap, DEFAULT_SHADER_NAME);
@@ -1181,7 +1111,7 @@ void EndRendering()
 
     // =================================== Submitting command buffer ==============================================
     // With all the synchronization that that entails...
-#define WAIT_SEMAPHORE_COUNT 4 // 1 swapchain image acquisition, 3 resourse upload waits
+#define WAIT_SEMAPHORE_COUNT 2 // 1 swapchain image acquisition, 1 resourse upload waits
     VkSemaphoreSubmitInfo waitSemaphores[WAIT_SEMAPHORE_COUNT] = {};
 
     // Swapchain image acquisition semaphore
@@ -1195,28 +1125,10 @@ void EndRendering()
     // Resource upload semaphores
     waitSemaphores[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
     waitSemaphores[1].pNext = nullptr;
-    waitSemaphores[1].semaphore = vk_state->vertexUploadSemaphore.handle;
-    waitSemaphores[1].value = vk_state->vertexUploadSemaphore.submitValue;
-    waitSemaphores[1].stageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+    waitSemaphores[1].semaphore = vk_state->transferState.uploadSemaphore.handle;
+    waitSemaphores[1].value = vk_state->transferState.uploadSemaphore.submitValue;
+    waitSemaphores[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     waitSemaphores[1].deviceIndex = 0;
-
-    waitSemaphores[2].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    waitSemaphores[2].pNext = nullptr;
-    waitSemaphores[2].semaphore = vk_state->indexUploadSemaphore.handle;
-    waitSemaphores[2].value = vk_state->indexUploadSemaphore.submitValue;
-    waitSemaphores[2].stageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
-    waitSemaphores[2].deviceIndex = 0;
-
-    waitSemaphores[3].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    waitSemaphores[3].pNext = nullptr;
-    waitSemaphores[3].semaphore = vk_state->imageUploadSemaphore.handle;
-    waitSemaphores[3].value = vk_state->imageUploadSemaphore.submitValue;
-    waitSemaphores[3].stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    waitSemaphores[3].deviceIndex = 0;
-
-	vk_state->previousFrameUploadSemaphoreValues[0] = vk_state->vertexUploadSemaphore.submitValue;
-	vk_state->previousFrameUploadSemaphoreValues[1] = vk_state->indexUploadSemaphore.submitValue;
-	vk_state->previousFrameUploadSemaphoreValues[2] = vk_state->imageUploadSemaphore.submitValue;
 
 #define SIGNAL_SEMAPHORE_COUNT 2
     VkSemaphoreSubmitInfo signalSemaphores[SIGNAL_SEMAPHORE_COUNT] = {};

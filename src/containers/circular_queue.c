@@ -45,7 +45,8 @@ void CircularQueueDequeue(void* circularQueue)
 	CircularQueue* queue = circularQueue;
 	GRASSERT_DEBUG(queue->size > 0);
 	queue->rear++;
-	queue->rear %= queue->capacity;
+	queue->rear = queue->rear % queue->capacity;
+	queue->size--;
 }
 
 

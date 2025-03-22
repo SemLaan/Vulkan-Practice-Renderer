@@ -29,6 +29,8 @@ void DarrayPopRange(void* darray, u32 firstIndex, u32 count);
 
 // Sets the size value of the darray, increases capacity if necessary
 void DarraySetSize(void* darray, u32 size);
+// Sets the darray's capacity, used for lowering its capacity
+void DarraySetCapacity(void* darray, u32 newCapacity);
 // Reallocs the data to make the capacity the same as size.
 void DarrayFitExact(void* darray);
 

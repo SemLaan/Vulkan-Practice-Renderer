@@ -37,7 +37,6 @@ u32 stride; \
 } type ## CircularQueue; \
 \
 \
-inline static type ## CircularQueue* type ## CircularQueueCreate(type ## CircularQueue* out_circularQueue, u32 capacity, Allocator* allocator) { return CircularQueueCreate(out_circularQueue, capacity, sizeof(type), allocator); }\
+inline static void type ## CircularQueueCreate(type ## CircularQueue* out_circularQueue, u32 capacity, Allocator* allocator) { return CircularQueueCreate(out_circularQueue, capacity, sizeof(type), allocator); }\
 inline static void type ## CircularQueueEnqueue(type ## CircularQueue* queue, type* ptrToElement) { CircularQueueEnqueue(queue, ptrToElement); }\
-inline static bool type ## CircularQueueDequeue(type ## CircularQueue* queue) { return CircularQueueDequeue(queue); } \
 

@@ -6,17 +6,13 @@
 
 
 
-bool AllocateCommandBuffer(QueueFamily* queueFamily, CommandBuffer* ref_pCommandBuffer);
-void FreeCommandBuffer(CommandBuffer commandBuffer);
-
-bool AllocateAndBeginSingleUseCommandBuffer(QueueFamily* queueFamily, CommandBuffer* ref_pCommandBuffer);
-bool EndSubmitAndFreeSingleUseCommandBuffer(CommandBuffer commandBuffer, u32 waitSemaphoreCount, VkSemaphoreSubmitInfo* pWaitSemaphoreSubmitInfos, u32 signalSemaphoreCount, VkSemaphoreSubmitInfo* pSignalSemaphoreSubmitInfos, u64* ref_signaledValue);
+void AllocateCommandBuffer(QueueFamily* queueFamily, CommandBuffer* ref_pCommandBuffer);
 
 /// <summary>
 /// Resets the command buffer, only supported if the command buffer was allocated from a command pool with the VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT flag.
 /// </summary>
 /// <param name="commandBuffer"></param>
 void ResetCommandBuffer(CommandBuffer commandBuffer);
-bool ResetAndBeginCommandBuffer(CommandBuffer commandBuffer);
+void ResetAndBeginCommandBuffer(CommandBuffer commandBuffer);
 void EndCommandBuffer(CommandBuffer commandBuffer);
-bool SubmitCommandBuffers(u32 waitSemaphoreCount, VkSemaphoreSubmitInfo* pWaitSemaphoreInfos, u32 signalSemaphoreCount, VkSemaphoreSubmitInfo* pSignalSemaphoreInfos, u32 commandBufferCount, CommandBuffer* commandBuffers, VkFence fence);
+void SubmitCommandBuffers(u32 waitSemaphoreCount, VkSemaphoreSubmitInfo* pWaitSemaphoreInfos, u32 signalSemaphoreCount, VkSemaphoreSubmitInfo* pSignalSemaphoreInfos, u32 commandBufferCount, CommandBuffer* commandBuffers, VkFence fence);

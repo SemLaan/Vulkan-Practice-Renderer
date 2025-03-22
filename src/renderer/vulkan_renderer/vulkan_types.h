@@ -2,10 +2,12 @@
 #include <vulkan/vulkan.h>
 #include "defines.h"
 #include "containers/darray.h"
+#include "containers/circular_queue.h"
 #include "../buffer.h"
 #include "../render_target.h"
 #include "containers/simplemap.h"
 #include "../renderer.h"
+#include "core/asserts.h"
 
 typedef struct RendererState RendererState;
 extern RendererState* vk_state;
@@ -75,6 +77,21 @@ typedef struct VulkanImage
 	VulkanAllocation memory;
 } VulkanImage;
 
+typedef struct VulkanBufferCopyData
+{
+	VkBuffer dstBuffer;
+	VkBuffer srcBuffer;
+    VkBufferCopy copyRegion;
+} VulkanBufferCopyData;
+
+typedef struct VulkanBufferToImageUploadData
+{
+	VkBuffer srcBuffer;
+	VkImage dstImage;
+	u32 imageWidth;
+	u32 imageHeight;
+} VulkanBufferToImageUploadData;
+
 typedef struct VulkanRenderTarget
 {
 	VkExtent2D extent;
@@ -132,23 +149,34 @@ typedef struct VulkanSemaphore
 	u64 submitValue;
 } VulkanSemaphore;
 
-typedef void (*PFN_ResourceDestructor)(void* resource);
+typedef enum DestructionObjectType
+{
+	DESTRUCTION_OBJECT_TYPE_IMAGE,
+	DESTRUCTION_OBJECT_TYPE_BUFFER,
+} DestructionObjectType;
 
 typedef struct ResourceDestructionInfo
 {
-	void* resource;
-	PFN_ResourceDestructor	Destructor;
-	u64						signalValue;
+	void* resource0;
+	void* resource1;
+	u64 signalValue;
+	VulkanAllocation allocation;
+	DestructionObjectType destructionObjectType;
 } ResourceDestructionInfo;
 
 DEFINE_DARRAY_TYPE(ResourceDestructionInfo);
+DEFINE_CIRCULARQUEUE_TYPE(ResourceDestructionInfo);
+
+typedef struct DeferResourceDestructionState
+{
+	ResourceDestructionInfoCircularQueue destructionQueue;
+	ResourceDestructionInfoDarray* destructionOverflowDarray;
+} DeferResourceDestructionState;
 
 typedef struct QueueFamily
 {
 	VkQueue handle;
 	VkCommandPool commandPool;
-	ResourceDestructionInfoDarray* resourcesPendingDestructionDarray;
-	VulkanSemaphore semaphore;
 	u32 index;
 } QueueFamily;
 
@@ -157,7 +185,6 @@ typedef struct CommandBuffer
 	VkCommandBuffer handle;
 	QueueFamily* queueFamily;
 } CommandBuffer;
-
 
 typedef struct SwapchainSupportDetails
 {
@@ -220,7 +247,25 @@ typedef struct VulkanMemoryState
 	u32 memoryTypeCount;								// Also represents the amount of freelist allocators in the VulkanFreelistAllocator arrays
 } VulkanMemoryState;
 
-DEFINE_DARRAY_TYPE_REF(VkDependencyInfo);
+typedef enum TransferMethod
+{
+	TRANSFER_METHOD_UNSYNCHRONIZED,
+	TRANSFER_METHOD_SYNCHRONIZED_DOUBLE_BUFFERED,
+	TRANSFER_METHOD_SYNCHRONIZED_SINGLE_BUFFERED,
+} TransferMethod;
+
+DEFINE_DARRAY_TYPE(VulkanBufferCopyData);
+DEFINE_DARRAY_TYPE(VulkanBufferToImageUploadData);
+
+typedef struct TransferState
+{
+	VulkanBufferCopyDataDarray* bufferCopyOperations;
+	VulkanBufferToImageUploadDataDarray* bufferToImageCopyOperations;
+	CommandBuffer transferCommandBuffers[MAX_FRAMES_IN_FLIGHT];
+	VulkanSemaphore uploadSemaphore;
+	VkDependencyInfo* uploadAcquireDependencyInfo;
+	TransferMethod slowestTransferMethod;
+} TransferState;
 
 typedef struct RendererState
 {
@@ -241,15 +286,14 @@ typedef struct RendererState
 	RenderTarget mainRenderTarget;									// Render target used for rendering the main scene
 	Arena* vkFrameArena;											// Per frame memory arena for the vulkan allocator, is double buffered and thus should be used instead of the frame allocator inside the vk renderer
 	u64 previousFrameUploadSemaphoreValues[3];						// Upload semaphore values from the previous frame, used to make the current frame wait untill uploads from the previous frame are finished
+	TransferState transferState;
+	DeferResourceDestructionState deferredResourceDestruction;
 
 	// Binary semaphores for synchronizing the swapchain with the screen and the GPU
 	VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image acquisition TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)
 	VkSemaphore renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image presentation TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)
 
 	// Timeline semaphores for synchronizing uploads and 
-	VulkanSemaphore vertexUploadSemaphore;							// Timeline semaphore that synchronizes vertex upload with vertex input
-	VulkanSemaphore indexUploadSemaphore;							// Timeline semaphore that synchronizes index upload with index input
-	VulkanSemaphore imageUploadSemaphore;							// Timeline semaphore that synchronizes image upload with image usage
 	VulkanSemaphore frameSemaphore;									// Timeline semaphore that synchronizes rendering resources
 
 	// Allocators
@@ -262,7 +306,6 @@ typedef struct RendererState
 	// Data that is not used every frame or possibly used every frame
 	QueueFamily graphicsQueue;										// Graphics family queue
 	QueueFamily transferQueue;										// Transfer family queue
-	VkDependencyInfoRefDarray* requestedQueueAcquisitionOperationsDarray;	// For transfering queue ownership from transfer to graphics after a resource has been uploaded
 	VkAllocationCallbacks* vkAllocator;								// Vulkan API allocator, only for reading vulkan allocations not for taking over allocation from vulkan //TODO: this is currently just nullptr
 	VulkanMemoryState* vkMemory;									// State for the system that manages gpu memory
 	VkDescriptorPool descriptorPool;								// Pool used to allocate descriptor sets for all materials

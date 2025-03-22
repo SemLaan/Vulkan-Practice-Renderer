@@ -6,32 +6,10 @@
 #include "vulkan_command_buffer.h"
 #include "vulkan_memory.h"
 #include "vulkan_types.h"
+#include "vulkan_transfer.h"
+#include "vulkan_utils.h"
 
 
-
-static void CopyBufferAndTransitionQueue(VkBuffer dstBuffer, VkBuffer srcBuffer, u32 waitSemaphoreCount, VkSemaphoreSubmitInfo* pWaitSemaphoreInfos, u32 signalSemaphoreCount, VkSemaphoreSubmitInfo* pSignalSemaphoreInfos, VkDependencyInfo* pDependencyInfo, VkDeviceSize size, u64* out_signaledValue)
-{
-	CommandBuffer transferCommandBuffer;
-	AllocateAndBeginSingleUseCommandBuffer(&vk_state->transferQueue, &transferCommandBuffer);
-
-	VkBufferCopy copyRegion = {};
-	copyRegion.dstOffset = 0;
-	copyRegion.srcOffset = 0;
-	copyRegion.size = size;
-
-	vkCmdCopyBuffer(transferCommandBuffer.handle, srcBuffer, dstBuffer, 1, &copyRegion);
-
-	if (pDependencyInfo)
-		vkCmdPipelineBarrier2(transferCommandBuffer.handle, pDependencyInfo);
-
-	EndSubmitAndFreeSingleUseCommandBuffer(transferCommandBuffer, waitSemaphoreCount, pWaitSemaphoreInfos, signalSemaphoreCount, pSignalSemaphoreInfos, out_signaledValue);
-}
-
-void VulkanBufferDestructor(void* resource)
-{
-	BufferDestructionObject* bufferResource = resource;
-	BufferDestroy(&bufferResource->buffer, bufferResource->allocation);
-}
 
 VertexBuffer VertexBufferCreate(void* vertices, size_t size)
 {
@@ -55,95 +33,27 @@ VertexBuffer VertexBufferCreate(void* vertices, size_t size)
 		// ================= copying data into staging buffer ===============================
 		CopyDataToAllocation(&stagingAllocation, vertices, 0, buffer->size);
 
-		// Creating the buffer memory barrier for the queue family release operation
-		VkBufferMemoryBarrier2 releaseBufferInfo = {};
-		releaseBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-		releaseBufferInfo.pNext = nullptr;
-		releaseBufferInfo.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-		releaseBufferInfo.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-		releaseBufferInfo.dstStageMask = 0;  // IGNORED because it is a queue family release operation
-		releaseBufferInfo.dstAccessMask = 0; // IGNORED because it is a queue family release operation
-		releaseBufferInfo.srcQueueFamilyIndex = vk_state->transferQueue.index;
-		releaseBufferInfo.dstQueueFamilyIndex = vk_state->graphicsQueue.index;
-		releaseBufferInfo.buffer = buffer->handle;
-		releaseBufferInfo.offset = 0;
-		releaseBufferInfo.size = buffer->size;
+		// ================= copying data into GPU buffer ===============================
+		VulkanBufferCopyData bufferCopy = {};
+		bufferCopy.srcBuffer = stagingBuffer;
+		bufferCopy.dstBuffer = buffer->handle;
+		bufferCopy.copyRegion.srcOffset = 0;
+		bufferCopy.copyRegion.dstOffset = 0;
+		bufferCopy.copyRegion.size = size;
 
-		VkDependencyInfo releaseDependencyInfo = {};
-		releaseDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		releaseDependencyInfo.pNext = nullptr;
-		releaseDependencyInfo.dependencyFlags = 0;
-		releaseDependencyInfo.memoryBarrierCount = 0;
-		releaseDependencyInfo.pMemoryBarriers = nullptr;
-		releaseDependencyInfo.bufferMemoryBarrierCount = 1;
-		releaseDependencyInfo.pBufferMemoryBarriers = &releaseBufferInfo;
-		releaseDependencyInfo.imageMemoryBarrierCount = 0;
-		releaseDependencyInfo.pImageMemoryBarriers = nullptr;
+		RequestBufferUpload(&bufferCopy, TRANSFER_METHOD_UNSYNCHRONIZED);
 
-		// Submitting the semaphore that can let other queues know when this vertex buffer has been uploaded
-		vk_state->vertexUploadSemaphore.submitValue++;
-		VkSemaphoreSubmitInfo semaphoreSubmitInfo = {};
-		semaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-		semaphoreSubmitInfo.pNext = nullptr;
-		semaphoreSubmitInfo.semaphore = vk_state->vertexUploadSemaphore.handle;
-		semaphoreSubmitInfo.value = vk_state->vertexUploadSemaphore.submitValue;
-		semaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
-		semaphoreSubmitInfo.deviceIndex = 0;
-
-		// Copying the buffer to the GPU - this function returns before the buffer is actually copied
-		u64 signaledValue; // This value indicates at what point in time the command buffer that executes the copy is finished, used for deleting staging buffer and memory
-		CopyBufferAndTransitionQueue(buffer->handle, stagingBuffer, 0, nullptr, 1, &semaphoreSubmitInfo, &releaseDependencyInfo, buffer->size, &signaledValue);
-
-		// Creating the buffer memory barrier for the queue family acquire operation
-		// This is put in the requestedQueueAcquisitionOperations list and will be submitted as a command in the draw loop,
-		// also synced with vertex upload semaphore, so ownership isn't acquired before it is released
-		VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2));
-		VkBufferMemoryBarrier2* acquireBufferInfo = (VkBufferMemoryBarrier2*)(acquireDependencyInfo + 1);
-
-		acquireBufferInfo->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-		acquireBufferInfo->pNext = nullptr;
-		acquireBufferInfo->srcStageMask = 0;  // IGNORED because it is a queue family acquire operation
-		acquireBufferInfo->srcAccessMask = 0; // IGNORED because it is a queue family acquire operation
-		acquireBufferInfo->dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
-		acquireBufferInfo->dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
-		acquireBufferInfo->srcQueueFamilyIndex = vk_state->transferQueue.index;
-		acquireBufferInfo->dstQueueFamilyIndex = vk_state->graphicsQueue.index;
-		acquireBufferInfo->buffer = buffer->handle;
-		acquireBufferInfo->offset = 0;
-		acquireBufferInfo->size = buffer->size;
-
-		acquireDependencyInfo->sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		acquireDependencyInfo->pNext = nullptr;
-		acquireDependencyInfo->dependencyFlags = 0;
-		acquireDependencyInfo->memoryBarrierCount = 0;
-		acquireDependencyInfo->pMemoryBarriers = nullptr;
-		acquireDependencyInfo->bufferMemoryBarrierCount = 1;
-		acquireDependencyInfo->pBufferMemoryBarriers = acquireBufferInfo;
-		acquireDependencyInfo->imageMemoryBarrierCount = 0;
-		acquireDependencyInfo->pImageMemoryBarriers = nullptr;
-
-		VkDependencyInfoRefDarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
-
-		// Making sure the staging buffer and memory get deleted when their corresponding command buffer is completed
-		BufferDestructionObject* stagingBufferDestructionObject = ArenaAlloc(vk_state->vkFrameArena, sizeof(*stagingBufferDestructionObject));
-		stagingBufferDestructionObject->allocation = ArenaAlloc(vk_state->vkFrameArena, sizeof(*stagingBufferDestructionObject->allocation));
-		stagingBufferDestructionObject->buffer = stagingBuffer;
-		*stagingBufferDestructionObject->allocation = stagingAllocation;
-		ResourceDestructionInfo bufferDestructionInfo = {};
-		bufferDestructionInfo.resource = stagingBufferDestructionObject;
-		bufferDestructionInfo.Destructor = VulkanBufferDestructor;
-		bufferDestructionInfo.signalValue = signaledValue;
-
-		ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
+		// Making sure the staging buffer and memory get deleted
+		QueueDeferredBufferDestruction(stagingBuffer, &stagingAllocation, DESTRUCTION_TIME_NEXT_FRAME);
 	}
 
 	return clientBuffer;
 }
 
-// Updates the data in the vertex buffer, note that if size is less than the size of the buffer
+// Updates the data in the vertex buffer, note that size can't be larger than the size of the buffer
 void VertexBufferUpdate(VertexBuffer clientBuffer, void* vertices, u64 size)
 {
-	// TODO: this is a slow copy, an option should be added to vertex buffer create that creates 3 buffers and an upload buffer so data can be uploaded without halting the cpu and gpu
+	// TODO: this is a slow copy, an option should be added to vertex buffer create that creates 2 buffers and an upload buffer so data can be uploaded without halting the cpu and gpu
 	VulkanVertexBuffer* buffer = clientBuffer.internalState;
 	GRASSERT_MSG(size <= buffer->size, "Tried to update vertex buffer with more vertices than vertex buffer can hold");
 
@@ -156,116 +66,28 @@ void VertexBufferUpdate(VertexBuffer clientBuffer, void* vertices, u64 size)
 	// ================= copying data into staging buffer ===============================
 	CopyDataToAllocation(&stagingAllocation, vertices, 0, size);
 
-	// Creating the buffer memory barrier for the queue family release operation
-	VkBufferMemoryBarrier2 releaseBufferInfo = {};
-	releaseBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-	releaseBufferInfo.pNext = nullptr;
-	releaseBufferInfo.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-	releaseBufferInfo.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-	releaseBufferInfo.dstStageMask = 0;  // IGNORED because it is a queue family release operation
-	releaseBufferInfo.dstAccessMask = 0; // IGNORED because it is a queue family release operation
-	releaseBufferInfo.srcQueueFamilyIndex = vk_state->transferQueue.index;
-	releaseBufferInfo.dstQueueFamilyIndex = vk_state->graphicsQueue.index;
-	releaseBufferInfo.buffer = buffer->handle;
-	releaseBufferInfo.offset = 0;
-	releaseBufferInfo.size = buffer->size;
+	// ================= copying data into GPU buffer ===============================
+	VulkanBufferCopyData bufferCopy = {};
+	bufferCopy.srcBuffer = stagingBuffer;
+	bufferCopy.dstBuffer = buffer->handle;
+	bufferCopy.copyRegion.srcOffset = 0;
+	bufferCopy.copyRegion.dstOffset = 0;
+	bufferCopy.copyRegion.size = size;
 
-	VkDependencyInfo releaseDependencyInfo = {};
-	releaseDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-	releaseDependencyInfo.pNext = nullptr;
-	releaseDependencyInfo.dependencyFlags = 0;
-	releaseDependencyInfo.memoryBarrierCount = 0;
-	releaseDependencyInfo.pMemoryBarriers = nullptr;
-	releaseDependencyInfo.bufferMemoryBarrierCount = 1;
-	releaseDependencyInfo.pBufferMemoryBarriers = &releaseBufferInfo;
-	releaseDependencyInfo.imageMemoryBarrierCount = 0;
-	releaseDependencyInfo.pImageMemoryBarriers = nullptr;
+	RequestBufferUpload(&bufferCopy, TRANSFER_METHOD_SYNCHRONIZED_SINGLE_BUFFERED);
 
-	// Submitting the semaphore that can let other queues know when this vertex buffer has been uploaded
-	vk_state->vertexUploadSemaphore.submitValue++;
-	VkSemaphoreSubmitInfo signalSemaphoreSubmitInfo = {};
-	signalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-	signalSemaphoreSubmitInfo.pNext = nullptr;
-	signalSemaphoreSubmitInfo.semaphore = vk_state->vertexUploadSemaphore.handle;
-	signalSemaphoreSubmitInfo.value = vk_state->vertexUploadSemaphore.submitValue;
-	signalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
-	signalSemaphoreSubmitInfo.deviceIndex = 0;
-
-	// Submitting the semaphore that makes the upload wait until the buffer isn't being used for rendering anymore
-	VkSemaphoreSubmitInfo waitSemaphoreSubmitInfo = {};
-	waitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-	waitSemaphoreSubmitInfo.pNext = nullptr;
-	// TODO: Use a different semaphore that gets signaled when the gfx pipeline has consumed the vertex buffer, because now we have to wait for the entire pipeline to finish
-	// TODO: before we can upload which is unnecessary
-	waitSemaphoreSubmitInfo.semaphore = vk_state->frameSemaphore.handle; // When the vertex buffer has been consumed by the pipeline we can begin uploading
-	waitSemaphoreSubmitInfo.value = vk_state->frameSemaphore.submitValue;
-	waitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-	waitSemaphoreSubmitInfo.deviceIndex = 0;
-
-	// Copying the buffer to the GPU - this function returns before the buffer is actually copied
-	u64 signaledValue; // This value indicates at what point in time the command buffer that executes the copy is finished, used for deleting staging buffer and memory
-	CopyBufferAndTransitionQueue(buffer->handle, stagingBuffer, 1, &waitSemaphoreSubmitInfo, 1, &signalSemaphoreSubmitInfo, &releaseDependencyInfo, buffer->size, &signaledValue);
-
-	// Creating the buffer memory barrier for the queue family acquire operation
-	// This is put in the requestedQueueAcquisitionOperations list and will be submitted as a command in the draw loop,
-	// also synced with vertex upload semaphore, so ownership isn't acquired before it is released
-	VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2));
-	VkBufferMemoryBarrier2* acquireBufferInfo = (VkBufferMemoryBarrier2*)(acquireDependencyInfo + 1);
-
-	acquireBufferInfo->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-	acquireBufferInfo->pNext = nullptr;
-	acquireBufferInfo->srcStageMask = 0;  // IGNORED because it is a queue family acquire operation
-	acquireBufferInfo->srcAccessMask = 0; // IGNORED because it is a queue family acquire operation
-	acquireBufferInfo->dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
-	acquireBufferInfo->dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
-	acquireBufferInfo->srcQueueFamilyIndex = vk_state->transferQueue.index;
-	acquireBufferInfo->dstQueueFamilyIndex = vk_state->graphicsQueue.index;
-	acquireBufferInfo->buffer = buffer->handle;
-	acquireBufferInfo->offset = 0;
-	acquireBufferInfo->size = buffer->size;
-
-	acquireDependencyInfo->sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-	acquireDependencyInfo->pNext = nullptr;
-	acquireDependencyInfo->dependencyFlags = 0;
-	acquireDependencyInfo->memoryBarrierCount = 0;
-	acquireDependencyInfo->pMemoryBarriers = nullptr;
-	acquireDependencyInfo->bufferMemoryBarrierCount = 1;
-	acquireDependencyInfo->pBufferMemoryBarriers = acquireBufferInfo;
-	acquireDependencyInfo->imageMemoryBarrierCount = 0;
-	acquireDependencyInfo->pImageMemoryBarriers = nullptr;
-
-	VkDependencyInfoRefDarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
-
-	// Making sure the staging buffer and memory get deleted when their corresponding command buffer is completed
-	BufferDestructionObject* stagingBufferDestructionObject = ArenaAlloc(vk_state->vkFrameArena, sizeof(*stagingBufferDestructionObject));
-	stagingBufferDestructionObject->allocation = ArenaAlloc(vk_state->vkFrameArena, sizeof(*stagingBufferDestructionObject->allocation));
-	stagingBufferDestructionObject->buffer = stagingBuffer;
-	*stagingBufferDestructionObject->allocation = stagingAllocation;
-	ResourceDestructionInfo bufferDestructionInfo = {};
-	bufferDestructionInfo.resource = stagingBufferDestructionObject;
-	bufferDestructionInfo.Destructor = VulkanBufferDestructor;
-	bufferDestructionInfo.signalValue = signaledValue;
-
-	ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
-}
-
-static void VertexBufferDestructor(void* resource)
-{
-	VulkanVertexBuffer* buffer = (VulkanVertexBuffer*)resource;
-
-	BufferDestroy(&buffer->handle, &buffer->memory);
-
-	Free(vk_state->rendererAllocator, buffer);
+	// Making sure the staging buffer and memory get deleted
+	QueueDeferredBufferDestruction(stagingBuffer, &stagingAllocation, DESTRUCTION_TIME_NEXT_FRAME);
 }
 
 void VertexBufferDestroy(VertexBuffer clientBuffer)
 {
-	ResourceDestructionInfo vertexBufferDestructionInfo = {};
-	vertexBufferDestructionInfo.resource = clientBuffer.internalState;
-	vertexBufferDestructionInfo.Destructor = VertexBufferDestructor;
-	vertexBufferDestructionInfo.signalValue = vk_state->graphicsQueue.semaphore.submitValue;
+	VulkanVertexBuffer* buffer = (VulkanVertexBuffer*)clientBuffer.internalState;
 
-	ResourceDestructionInfoDarrayPushback(vk_state->graphicsQueue.resourcesPendingDestructionDarray, &vertexBufferDestructionInfo);
+	// Making sure the staging buffer and memory get deleted
+	QueueDeferredBufferDestruction(buffer->handle, &buffer->memory, DESTRUCTION_TIME_CURRENT_FRAME);
+
+	Free(vk_state->rendererAllocator, buffer);
 }
 
 IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount)
@@ -288,105 +110,28 @@ IndexBuffer IndexBufferCreate(u32* indices, size_t indexCount)
 	// ================= creating the actual buffer =========================
 	BufferCreate(buffer->size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, MemType(MEMORY_TYPE_STATIC), &buffer->handle, &buffer->memory);
 
-	// Creating the buffer memory barrier for the queue family release operation
-	VkBufferMemoryBarrier2 releaseBufferInfo = {};
-	releaseBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-	releaseBufferInfo.pNext = nullptr;
-	releaseBufferInfo.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-	releaseBufferInfo.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-	releaseBufferInfo.dstStageMask = 0;  // IGNORED because it is a queue family release operation
-	releaseBufferInfo.dstAccessMask = 0; // IGNORED because it is a queue family release operation
-	releaseBufferInfo.srcQueueFamilyIndex = vk_state->transferQueue.index;
-	releaseBufferInfo.dstQueueFamilyIndex = vk_state->graphicsQueue.index;
-	releaseBufferInfo.buffer = buffer->handle;
-	releaseBufferInfo.offset = 0;
-	releaseBufferInfo.size = buffer->size;
+	// ================= copying data into GPU buffer ===============================
+	VulkanBufferCopyData bufferCopy = {};
+	bufferCopy.srcBuffer = stagingBuffer;
+	bufferCopy.dstBuffer = buffer->handle;
+	bufferCopy.copyRegion.srcOffset = 0;
+	bufferCopy.copyRegion.dstOffset = 0;
+	bufferCopy.copyRegion.size = buffer->size;
 
-	VkDependencyInfo releaseDependencyInfo = {};
-	releaseDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-	releaseDependencyInfo.pNext = nullptr;
-	releaseDependencyInfo.dependencyFlags = 0;
-	releaseDependencyInfo.memoryBarrierCount = 0;
-	releaseDependencyInfo.pMemoryBarriers = nullptr;
-	releaseDependencyInfo.bufferMemoryBarrierCount = 1;
-	releaseDependencyInfo.pBufferMemoryBarriers = &releaseBufferInfo;
-	releaseDependencyInfo.imageMemoryBarrierCount = 0;
-	releaseDependencyInfo.pImageMemoryBarriers = nullptr;
+	RequestBufferUpload(&bufferCopy, TRANSFER_METHOD_UNSYNCHRONIZED);
 
-	// Submitting the semaphore that can let other queues know when this index buffer has been uploaded
-	vk_state->indexUploadSemaphore.submitValue++;
-	VkSemaphoreSubmitInfo semaphoreSubmitInfo = {};
-	semaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-	semaphoreSubmitInfo.pNext = nullptr;
-	semaphoreSubmitInfo.semaphore = vk_state->indexUploadSemaphore.handle;
-	semaphoreSubmitInfo.value = vk_state->indexUploadSemaphore.submitValue;
-	semaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
-	semaphoreSubmitInfo.deviceIndex = 0;
-
-	// Copying the buffer to the GPU - this function returns before the buffer is actually copied
-	u64 signaledValue; // This value indicates at what point in time the command buffer that executes the copy is finished, used for deleting staging buffer and memory
-	CopyBufferAndTransitionQueue(buffer->handle, stagingBuffer, 0, nullptr, 1, &semaphoreSubmitInfo, &releaseDependencyInfo, buffer->size, &signaledValue);
-
-	// Creating the buffer memory barrier for the queue family acquire operation
-	// This is put in the requestedQueueAcquisitionOperations list and will be submitted as a command in the draw loop,
-	// also synced with index upload semaphore, so ownership isn't acquired before it is released
-	VkDependencyInfo* acquireDependencyInfo = Alloc(vk_state->resourceAcquisitionPool, sizeof(VkDependencyInfo) + sizeof(VkBufferMemoryBarrier2));
-	VkBufferMemoryBarrier2* acquireBufferInfo = (VkBufferMemoryBarrier2*)(acquireDependencyInfo + 1);
-
-	acquireBufferInfo->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-	acquireBufferInfo->pNext = nullptr;
-	acquireBufferInfo->srcStageMask = 0;  // IGNORED because it is a queue family release operation
-	acquireBufferInfo->srcAccessMask = 0; // IGNORED because it is a queue family release operation
-	acquireBufferInfo->dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
-	acquireBufferInfo->dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
-	acquireBufferInfo->srcQueueFamilyIndex = vk_state->transferQueue.index;
-	acquireBufferInfo->dstQueueFamilyIndex = vk_state->graphicsQueue.index;
-	acquireBufferInfo->buffer = buffer->handle;
-	acquireBufferInfo->offset = 0;
-	acquireBufferInfo->size = buffer->size;
-
-	acquireDependencyInfo->sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-	acquireDependencyInfo->pNext = nullptr;
-	acquireDependencyInfo->dependencyFlags = 0;
-	acquireDependencyInfo->memoryBarrierCount = 0;
-	acquireDependencyInfo->pMemoryBarriers = nullptr;
-	acquireDependencyInfo->bufferMemoryBarrierCount = 1;
-	acquireDependencyInfo->pBufferMemoryBarriers = acquireBufferInfo;
-	acquireDependencyInfo->imageMemoryBarrierCount = 0;
-	acquireDependencyInfo->pImageMemoryBarriers = nullptr;
-
-	VkDependencyInfoRefDarrayPushback(vk_state->requestedQueueAcquisitionOperationsDarray, &acquireDependencyInfo);
-
-	// Making sure the staging buffer and memory get deleted when their corresponding command buffer is completed
-	BufferDestructionObject* stagingBufferDestructionObject = ArenaAlloc(vk_state->vkFrameArena, sizeof(*stagingBufferDestructionObject));
-	stagingBufferDestructionObject->allocation = ArenaAlloc(vk_state->vkFrameArena, sizeof(*stagingBufferDestructionObject->allocation));
-	stagingBufferDestructionObject->buffer = stagingBuffer;
-	*stagingBufferDestructionObject->allocation = stagingAllocation;
-	ResourceDestructionInfo bufferDestructionInfo = {};
-	bufferDestructionInfo.resource = stagingBufferDestructionObject;
-	bufferDestructionInfo.Destructor = VulkanBufferDestructor;
-	bufferDestructionInfo.signalValue = signaledValue;
-
-	ResourceDestructionInfoDarrayPushback(vk_state->transferQueue.resourcesPendingDestructionDarray, &bufferDestructionInfo);
+	// Making sure the staging buffer and memory get deleted
+	QueueDeferredBufferDestruction(stagingBuffer, &stagingAllocation, DESTRUCTION_TIME_NEXT_FRAME);
 
 	return clientBuffer;
 }
 
-static void IndexBufferDestructor(void* resource)
-{
-	VulkanIndexBuffer* buffer = (VulkanIndexBuffer*)resource;
-
-	BufferDestroy(&buffer->handle, &buffer->memory);
-
-	Free(vk_state->rendererAllocator, buffer);
-}
-
 void IndexBufferDestroy(IndexBuffer clientBuffer)
 {
-	ResourceDestructionInfo indexBufferDestructionInfo = {};
-	indexBufferDestructionInfo.resource = clientBuffer.internalState;
-	indexBufferDestructionInfo.Destructor = IndexBufferDestructor;
-	indexBufferDestructionInfo.signalValue = vk_state->graphicsQueue.semaphore.submitValue;
+	VulkanIndexBuffer* buffer = (VulkanIndexBuffer*)clientBuffer.internalState;
 
-	ResourceDestructionInfoDarrayPushback(vk_state->graphicsQueue.resourcesPendingDestructionDarray, &indexBufferDestructionInfo);
+	// Making sure the staging buffer and memory get deleted
+	QueueDeferredBufferDestruction(buffer->handle, &buffer->memory, DESTRUCTION_TIME_CURRENT_FRAME);
+
+	Free(vk_state->rendererAllocator, buffer);
 }

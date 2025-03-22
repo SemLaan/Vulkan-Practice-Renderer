@@ -1,8 +1,10 @@
 #include "vulkan_utils.h"
 
+#include "vulkan_memory.h"
 // TODO: make a custom string thing with strncmp replacement so string.h doesn't have to be included
 #include <string.h>
 
+#define RESOURCE_DESTRUCTION_OVERFLOW_DARRAY_STANDARD_CAPACITY 10
 
 bool CheckRequiredExtensions(u32 requiredExtensionCount, const char** requiredExtensions, u32 availableExtensionCount, VkExtensionProperties* availableExtensions)
 {
@@ -38,27 +40,107 @@ bool CheckRequiredLayers(u32 requiredLayerCount, const char** requiredLayers, u3
     return availableRequiredLayers == requiredLayerCount;
 }
 
-static void TryDestroyResourcesPendingDestructionInQueue(QueueFamily* queue)
-{
-	if (queue->resourcesPendingDestructionDarray->size != 0)
-	{
-		u64 semaphoreValue;
-		vkGetSemaphoreCounterValue(vk_state->device, queue->semaphore.handle, &semaphoreValue);
 
-		// Looping from the end of the list to the beginning so we can remove elements without ruining the loop
-		for (i32 i = (i32)queue->resourcesPendingDestructionDarray->size - 1; i >= 0; --i)
-		{
-			if (queue->resourcesPendingDestructionDarray->data[i].signalValue <= semaphoreValue)
-			{
-				queue->resourcesPendingDestructionDarray->data[i].Destructor(queue->resourcesPendingDestructionDarray->data[i].resource);
-				DarrayPopAt(queue->resourcesPendingDestructionDarray, i);
-			}
-		}
+void InitDeferredResourceDestructionState(DeferResourceDestructionState* state, u32 circularQueueSize)
+{
+	ResourceDestructionInfoCircularQueueCreate(&state->destructionQueue, circularQueueSize, vk_state->rendererAllocator);
+	state->destructionOverflowDarray = ResourceDestructionInfoDarrayCreate(RESOURCE_DESTRUCTION_OVERFLOW_DARRAY_STANDARD_CAPACITY, vk_state->rendererAllocator);
+}
+
+void ShutdownDeferredResourceDestructionState(DeferResourceDestructionState* state)
+{
+	CircularQueueDestroy(&state->destructionQueue);
+	DarrayDestroy(state->destructionOverflowDarray);
+}
+
+void QueueDeferredBufferDestruction(VkBuffer buffer, VulkanAllocation* pAllocation, DestructionTime destructionTime)
+{
+	DeferResourceDestructionState* state = &vk_state->deferredResourceDestruction;
+	ResourceDestructionInfo destructionInfo = {};
+	destructionInfo.resource0 = buffer;
+	destructionInfo.allocation = *pAllocation;
+	destructionInfo.signalValue = vk_state->frameSemaphore.submitValue + destructionTime;
+	destructionInfo.destructionObjectType = DESTRUCTION_OBJECT_TYPE_BUFFER;
+	if (state->destructionQueue.size < state->destructionQueue.capacity)
+	{
+		ResourceDestructionInfoCircularQueueEnqueue(&state->destructionQueue, &destructionInfo);
+	}
+	else
+	{
+		ResourceDestructionInfoDarrayPushback(state->destructionOverflowDarray, &destructionInfo);
+	}
+}
+
+void QueueDeferredImageDestruction(VkImage image, VkImageView imageView, VulkanAllocation* pAllocation, DestructionTime destructionTime)
+{
+	DeferResourceDestructionState* state = &vk_state->deferredResourceDestruction;
+	ResourceDestructionInfo destructionInfo = {};
+	destructionInfo.resource0 = image;
+	destructionInfo.resource1 = imageView;
+	destructionInfo.allocation = *pAllocation;
+	destructionInfo.signalValue = vk_state->frameSemaphore.submitValue + destructionTime;
+	destructionInfo.destructionObjectType = DESTRUCTION_OBJECT_TYPE_IMAGE;
+	if (state->destructionQueue.size < state->destructionQueue.capacity)
+	{
+		ResourceDestructionInfoCircularQueueEnqueue(&state->destructionQueue, &destructionInfo);
+	}
+	else
+	{
+		ResourceDestructionInfoDarrayPushback(state->destructionOverflowDarray, &destructionInfo);
 	}
 }
 
 void TryDestroyResourcesPendingDestruction()
 {
-	TryDestroyResourcesPendingDestructionInQueue(&vk_state->graphicsQueue);
-	TryDestroyResourcesPendingDestructionInQueue(&vk_state->transferQueue);
+	DeferResourceDestructionState* state = &vk_state->deferredResourceDestruction;
+
+	u64 semaphoreValue;
+	vkGetSemaphoreCounterValue(vk_state->device, vk_state->frameSemaphore.handle, &semaphoreValue);
+
+	// While the destruction queue is not empty and the semaphore value of the next item at the back of the queue has been signaled: destroy the resource in that position and dequeue it
+	while (state->destructionQueue.size > 0 && state->destructionQueue.data[state->destructionQueue.rear].signalValue <= semaphoreValue)
+	{
+		// destroy resource
+		ResourceDestructionInfo* resource = &state->destructionQueue.data[state->destructionQueue.rear];
+
+		if (resource->destructionObjectType == DESTRUCTION_OBJECT_TYPE_BUFFER)
+		{
+			VkBuffer buffer = resource->resource0;
+			BufferDestroy(&buffer, &resource->allocation);
+		}
+		else if (resource->destructionObjectType == DESTRUCTION_OBJECT_TYPE_IMAGE)
+		{
+			vkDestroyImageView(vk_state->device, (VkImageView)resource->resource1, vk_state->vkAllocator);
+			VkImage image = resource->resource0;
+			ImageDestroy(&image, &resource->allocation);
+		}
+
+		CircularQueueDequeue(&state->destructionQueue);
+	}
+
+	// Loop from the back to the front so we can pop elements from the array in the loop
+	for (u32 i = state->destructionOverflowDarray->size; i < state->destructionOverflowDarray->size; i++)
+	{
+		if (state->destructionOverflowDarray->data[i].signalValue > semaphoreValue)
+			return;
+		
+		// destroy resource
+		ResourceDestructionInfo* resource = &state->destructionOverflowDarray->data[i];
+
+		if (resource->destructionObjectType == DESTRUCTION_OBJECT_TYPE_BUFFER)
+		{
+			VkBuffer buffer = resource->resource0;
+			BufferDestroy(&buffer, &resource->allocation);
+		}
+		else if (resource->destructionObjectType == DESTRUCTION_OBJECT_TYPE_IMAGE)
+		{
+			vkDestroyImageView(vk_state->device, (VkImageView)resource->resource1, vk_state->vkAllocator);
+			VkImage image = resource->resource0;
+			ImageDestroy(&image, &resource->allocation);
+		}
+
+		DarrayPopAt(state->destructionOverflowDarray, i);
+		if (state->destructionOverflowDarray->size == 0)
+			DarraySetCapacity(state->destructionOverflowDarray, RESOURCE_DESTRUCTION_OVERFLOW_DARRAY_STANDARD_CAPACITY);
+	}
 }
