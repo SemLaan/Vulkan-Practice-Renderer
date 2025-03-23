@@ -4,6 +4,9 @@
 #include "math/lin_alg.h"
 #include "core/event.h"
 #include "core/platform.h"
+#include "core/engine.h"
+#include <stdio.h>
+#include <string.h>
 
 #define FRAME_STATS_BACKGROUND_SHADER_NAME "flat_color_shader"
 #define PROFILING_UI_FONT_NAME "profiling_font"
@@ -15,6 +18,7 @@ typedef struct ProfilingUIState
 	TextBatch* frameStatsTextBatch;
 	MeshData* quadMesh;
 	mat4 projection;
+	u64 textId;
 } ProfilingUIState;
 
 static ProfilingUIState* state = nullptr;
@@ -51,6 +55,13 @@ void InitializeProfilingUI()
 	state->flatWhiteMaterial = MaterialCreate(ShaderGetRef(FRAME_STATS_BACKGROUND_SHADER_NAME));
 	state->flatBlackMaterial = MaterialCreate(ShaderGetRef(FRAME_STATS_BACKGROUND_SHADER_NAME));
 
+	const f32 orthoHeigh = 10;
+	const f32 blockHeight = 0.15f;
+	const f32 whiteBorderThickness = 0.01f;
+	const f32 blackYPos = orthoHeigh - (blockHeight + whiteBorderThickness);
+
+	state->textId = TextBatchAddText(state->frameStatsTextBatch, "FPS: 0000", vec2_create(whiteBorderThickness * 2, blackYPos + 0.03), blockHeight * 0.9f, true);
+
 	vec2i windowSize = GetPlatformWindowSize();
     f32 windowAspectRatio = windowSize.x / (f32)windowSize.y;
     state->projection = mat4_orthographic(0, 10 * windowAspectRatio, 0, 10, -1, 1);
@@ -76,12 +87,29 @@ void UpdateProfilingUI()
 	vec4 black = vec4_create(0, 0, 0, 1);
     MaterialUpdateProperty(state->flatWhiteMaterial, "color", &white);
     MaterialUpdateProperty(state->flatBlackMaterial, "color", &black);
+
+	u32 fps = 0;
+	if (grGlobals->deltaTime != 0)
+		fps = 1.0 / grGlobals->deltaTime;
+	
+	if (fps > 9999)
+		fps = 9999;
+	
+	char* fpsString = ArenaAlloc(grGlobals->frameArena, sizeof("FPS: 0000"));
+	MemoryCopy(fpsString, "FPS: 0000", sizeof("FPS: 0000"));
+
+	char fpsShortString[5] = {};
+	sprintf(fpsShortString, "%u", fps);
+	u32 length = strlen(fpsShortString);
+	strcpy(fpsString + 5 + (4 - length), fpsShortString);
+
+	TextBatchUpdateTextString(state->frameStatsTextBatch, state->textId, fpsString);
 }
 
 void DrawFrameStats()
 {
 	const f32 orthoHeigh = 10;
-	const f32 blockHeight = 0.2f;
+	const f32 blockHeight = 0.15f;
 	const f32 blockWidth = 3.f;
 	const f32 whiteBorderThickness = 0.01f;
 	const f32 blackYPos = orthoHeigh - (blockHeight + whiteBorderThickness);
@@ -94,7 +122,7 @@ void DrawFrameStats()
 	MaterialBind(state->flatBlackMaterial);
 	Draw(1, &state->quadMesh->vertexBuffer, state->quadMesh->indexBuffer, &modelBlack, 1);
 
-	//TextBatchRender(state->frameStatsTextBatch, );
+	TextBatchRender(state->frameStatsTextBatch, state->projection);
 }
 
 

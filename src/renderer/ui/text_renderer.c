@@ -92,7 +92,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
     // Loading glyph data
     GlyphData* glyphData = LoadFont(fontFileString);
 
-    const char* renderableCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ<>,./\\?|_-=+1234567890!@#$&*()~`";
+    const char* renderableCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ<>,./\\?|_-=+1234567890!@#$&*()~`:";
     u32 charCount = strlen(renderableCharacters);
 
     // Creating font struct
@@ -238,7 +238,7 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
     MemoryCopy(textData.string, text, sizeof(*text) * stringLengthPlusNullTerminator);
     textData.firstGlyphInstanceIndex = textBatch->glyphInstanceData->size;
     textData.position = position;
-    textData.fontSize = variableText ? fontSize : -1.f;
+    textData.fontSize = variableText ? fontSize : -1.f;	// If the text is not variable we don't need to store the font size, meaning we can set the font size to a value that indicates that the font size isn't variable
 
     // Looping through every char in the text and constructing the instance data for all the chars (position, scale, texture coords)
     vec2 nextGlyphPosition = position;
