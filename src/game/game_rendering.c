@@ -7,6 +7,7 @@
 #include "renderer/render_target.h"
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
+#include "renderer/ui/profiling_ui.h"
 #include "terrain_density_functions.h"
 
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
@@ -333,6 +334,8 @@ void GameRenderingRender()
 	mat4 quadModelMatrix = mat4_mul_mat4(mat4_2Dtranslate(vec2_create(4, 4)), mat4_2Dscale(vec2_create(3, 3)));
 	MaterialBind(renderingState->uiTextureMaterial);
 	Draw(1, &quadMesh->vertexBuffer, quadMesh->indexBuffer, &quadModelMatrix, 1);
+
+	DrawFrameStats();
 
     RenderTargetStopRendering(GetMainRenderTarget());
 

@@ -198,7 +198,7 @@ void HandleSliderLogInteractionEnd(DebugMenu* menu, InteractableData* interactab
 static bool OnWindowResize(EventCode type, EventData data)
 {
     vec2i windowSize = GetPlatformWindowSize();
-    float windowAspectRatio = windowSize.x / (float)windowSize.y;
+    f32 windowAspectRatio = windowSize.x / (f32)windowSize.y;
     state->uiProjView = mat4_orthographic(0, MENU_ORTHO_PROJECTION_HEIGHT * windowAspectRatio, 0, MENU_ORTHO_PROJECTION_HEIGHT, -1, 1);
     state->inverseProjView = mat4_inverse(state->uiProjView);
 
@@ -249,7 +249,7 @@ bool InitializeDebugUI()
     state->quadMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);
 
     vec2i windowSize = GetPlatformWindowSize();
-    float windowAspectRatio = windowSize.x / (float)windowSize.y;
+    f32 windowAspectRatio = windowSize.x / (f32)windowSize.y;
     mat4 projection = mat4_orthographic(0, MENU_ORTHO_PROJECTION_HEIGHT * windowAspectRatio, 0, MENU_ORTHO_PROJECTION_HEIGHT, -1, 1);
     mat4 view = mat4_3Dtranslate(vec3_create(0, 0, 0));
     state->uiProjView = mat4_mul_mat4(projection, view);

@@ -9,6 +9,7 @@
 #include "renderer/renderer.h"
 #include "renderer/ui/debug_ui.h"
 #include "renderer/ui/text_renderer.h"
+#include "renderer/ui/profiling_ui.h"
 #include <stdio.h>
 #include "engine.h"
 
@@ -47,6 +48,7 @@ void EngineInit(EngineInitSettings settings)
 	InitializeRenderer(rendererInitSettings);
 	InitializeTextRenderer();
 	InitializeDebugUI();
+	InitializeProfilingUI();
 
 	grGlobals->appRunning = true;
 	grGlobals->appSuspended = false;
@@ -84,6 +86,7 @@ bool EngineUpdate()
 	if (GetKeyDown(KEY_F11) && !GetKeyDownPrevious(KEY_F11))
 		ToggleFullscreen();
 
+	UpdateProfilingUI();
 	UpdateDebugUI();
 
 	if (GetKeyDown(KEY_ESCAPE))
@@ -103,6 +106,7 @@ void EngineShutdown()
 	UnregisterEventListener(EVCODE_QUIT, OnQuit);
 	UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
 
+	ShutdownProfilingUI();
 	ShutdownDebugUI();
 	ShutdownTextRenderer();
 	ShutdownRenderer();

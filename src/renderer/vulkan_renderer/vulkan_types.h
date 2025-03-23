@@ -50,7 +50,7 @@ typedef struct VulkanAllocation
 	VkDeviceMemory deviceMemory;			// The device memory this allocation is suballocated in
 	VkDeviceSize userAllocationSize;		// Size of the allocation from the user perspective
 	VkDeviceSize userAllocationOffset;		// Offset from the start of the allocation from the allocator perspective to the start of the allocation from the user perspective (this offset usually exists to have correct alignment)
-	VkDeviceAddress deviceAddress;			// Address of the allocation from the user perspective
+	VkDeviceSize address;					// Address of the allocation from the user perspective
 	void* mappedMemory;						// Mapped memory, this pointer points to the start of the allocation from the user perspective, nullptr if the allocation is not on HOST_VISIBLE memory
 	u32 memoryType;
 } VulkanAllocation;
@@ -212,7 +212,7 @@ typedef struct HeapInfo
 
 typedef struct VulkanFreelistNode
 {
-    VkDeviceAddress address;              // Address of this free block
+    VkDeviceSize address;              // Address of this free block
     VkDeviceSize size;                // Size of this free block
     struct VulkanFreelistNode* next;  // Pointer to the freelist node after this 
 } VulkanFreelistNode;

@@ -256,7 +256,7 @@ void BufferCreate(VkDeviceSize size, VkBufferUsageFlags bufferUsageFlags, VkMemo
 		VulkanFreelistAllocate(&vk_state->vkMemory->smallBufferAllocators[allocatorIndex], &memoryRequirements, out_allocation);
 	}
 
-    vkBindBufferMemory(vk_state->device, *out_buffer, out_allocation->deviceMemory, out_allocation->deviceAddress);
+    vkBindBufferMemory(vk_state->device, *out_buffer, out_allocation->deviceMemory, out_allocation->address);
 }
 
 void BufferDestroy(VkBuffer* buffer, VulkanAllocation* allocation)
@@ -307,7 +307,7 @@ void ImageCreate(VulkanCreateImageParameters* pCreateParams, VkMemoryTypeHolder 
 	u32 allocatorIndex = FindMemoryType(memoryRequirements.memoryTypeBits, memoryTypeLUT[memoryType.memoryType]);
 	VulkanFreelistAllocate(&vk_state->vkMemory->imageAllocators[allocatorIndex], &memoryRequirements, out_allocation);
 
-	vkBindImageMemory(vk_state->device, *out_image, out_allocation->deviceMemory, out_allocation->deviceAddress);
+	vkBindImageMemory(vk_state->device, *out_image, out_allocation->deviceMemory, out_allocation->address);
 }
 
 void ImageDestroy(VkImage* image, VulkanAllocation* allocation)
@@ -327,12 +327,12 @@ static inline bool VulkanAllocatorBlockAllocate(VulkanAllocatorMemoryBlock* allo
 		{
 			// Setting the allocation data
 			out_allocation->deviceMemory = allocatorBlock->deviceMemory;
-			out_allocation->deviceAddress = (node->address + memoryRequirements->alignment - 1) & ~((u64)memoryRequirements->alignment - 1);
-			out_allocation->userAllocationOffset = out_allocation->deviceAddress - node->address;
+			out_allocation->address = (node->address + memoryRequirements->alignment - 1) & ~((u64)memoryRequirements->alignment - 1);
+			out_allocation->userAllocationOffset = out_allocation->address - node->address;
 			out_allocation->userAllocationSize = memoryRequirements->size;
 			out_allocation->mappedMemory = nullptr;
 			if (allocatorBlock->mappedMemory)
-				out_allocation->mappedMemory = (void*)((u8*)allocatorBlock->mappedMemory + out_allocation->deviceAddress);
+				out_allocation->mappedMemory = (void*)((u8*)allocatorBlock->mappedMemory + out_allocation->address);
 
 			// Updating the freelist node
 			node->size -= out_allocation->userAllocationSize + out_allocation->userAllocationOffset;
@@ -383,7 +383,7 @@ static inline void ReturnNodeToPool(VulkanFreelistNode* node)
 
 static inline void VulkanAllocatorBlockFree(VulkanAllocatorMemoryBlock* allocatorBlock, VulkanAllocation* allocation)
 {
-	VkDeviceAddress blockAddress = allocation->deviceAddress - allocation->userAllocationOffset;
+	VkDeviceAddress blockAddress = allocation->address - allocation->userAllocationOffset;
 	VkDeviceSize blockSize = allocation->userAllocationSize + allocation->userAllocationOffset;
 
 	if (!allocatorBlock->head)
