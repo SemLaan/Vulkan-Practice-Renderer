@@ -4,6 +4,7 @@
 #include "core/engine.h"
 
 #define COPY_OPERATIONS_DARRAY_START_CAPACITY 20
+#define MAX_COPY_REGIONS 40
 
 void VulkanTransferInit()
 {
@@ -39,6 +40,12 @@ void VulkanTransferShutdown()
 	DarrayDestroy(vk_state->transferState.bufferToImageCopyOperations);
 }
 
+static inline bool CheckDstBufferOverlap(VkBufferCopy* a, VkBufferCopy* b)
+{
+	return (b->dstOffset + b->size > a->dstOffset &&
+			b->dstOffset < a->dstOffset + a->size);
+}
+
 void VulkanCommitTransfers()
 {
 	ResetAndBeginCommandBuffer(vk_state->transferState.transferCommandBuffers[vk_state->currentInFlightFrameIndex]);
@@ -47,9 +54,64 @@ void VulkanCommitTransfers()
 	// ================================================== Copying buffers
 	VulkanBufferCopyDataDarray* bufferCopyOperations = vk_state->transferState.bufferCopyOperations;
 
-	for (u32 i = 0; i < bufferCopyOperations->size; i++)
+	// Doing all the copy operations in reverse order and cutting out copy regions that get overwritten by copies that were submitted after them
+	// This prevents WAW hazards and saves copies at the cost of some CPU time, but the alternative would be memory barriers and duplicate copies
+	for (i32 i = bufferCopyOperations->size - 1; i >= 0; i--)
 	{
-		vkCmdCopyBuffer(currentCommandBuffer, bufferCopyOperations->data[i].srcBuffer, bufferCopyOperations->data[i].dstBuffer, 1, &bufferCopyOperations->data[i].copyRegion);
+		VkBufferCopy copyRegions[MAX_COPY_REGIONS] = {};
+		copyRegions[0] = bufferCopyOperations->data[i].copyRegion;
+		u32 copyRegionCount = 1;
+
+		// Looping over the copy operations that were submitted after this one to check whether a part of it gets overwritten, so that we can cancel that part of the copy
+		for (i32 j = bufferCopyOperations->size - 1; j > i; j--)
+		{
+			// Looping over all the copy regions of the current copy, this starts as one, but since the copy region can be split by other copies that were checked before we now need to check each split region
+			for (u32 k = 0; k < copyRegionCount; k++)
+			{
+				// If the copy regions and dst buffers overlap
+				if (bufferCopyOperations->data[i].dstBuffer == bufferCopyOperations->data[j].dstBuffer && CheckDstBufferOverlap(&copyRegions[k], &bufferCopyOperations->data[j].copyRegion))
+				{
+					VkDeviceSize kEndOffset = copyRegions[k].dstOffset + copyRegions[k].size;
+					VkDeviceSize jEndOffset = bufferCopyOperations->data[j].copyRegion.dstOffset + bufferCopyOperations->data[j].copyRegion.size;
+					// Checking every type of overlap and adjusting the copy region accordingly
+					if (copyRegions[k].dstOffset >= bufferCopyOperations->data[j].copyRegion.dstOffset && kEndOffset <= jEndOffset) // if the regions are equal or if the new copy region is completely within the already copied one, remove the new region
+					{
+						if (copyRegionCount - k - 1 > 0)
+							MemoryCopy(copyRegions + k, copyRegions + k + 1, sizeof(*copyRegions) * copyRegionCount - k - 1);
+						copyRegionCount--;
+					}
+					else if (copyRegions[k].dstOffset < bufferCopyOperations->data[j].copyRegion.dstOffset && kEndOffset > jEndOffset) // if the region completely envelops the already copied one, split the new region
+					{
+						// New split region on the right side of the old region
+						VkBufferCopy newSplitRegion = {};
+						newSplitRegion.dstOffset = jEndOffset;
+						newSplitRegion.srcOffset = copyRegions[k].srcOffset + (jEndOffset - copyRegions[k].dstOffset);
+						newSplitRegion.size = kEndOffset - jEndOffset;
+
+						// New split region on the left side of the old region
+						copyRegions[k].size = bufferCopyOperations->data[j].copyRegion.dstOffset - copyRegions[k].dstOffset;
+
+						// Copying the new split region on the right into the array
+						GRASSERT_DEBUG(copyRegionCount < MAX_COPY_REGIONS);
+						copyRegions[copyRegionCount] = newSplitRegion;
+						copyRegionCount++;
+					}
+					else if (copyRegions[k].dstOffset < bufferCopyOperations->data[j].copyRegion.dstOffset) // if the right side of the new region overlaps the old region, cut the right side of the new region off
+					{
+						copyRegions[k].size = bufferCopyOperations->data[j].copyRegion.dstOffset - copyRegions[k].dstOffset;
+					}
+					else // if the left side of the new region overlaps the old region, cut the left side of the new region off
+					{
+						copyRegions[k].srcOffset = copyRegions[k].srcOffset + (jEndOffset - copyRegions[k].dstOffset);
+						copyRegions[k].dstOffset = jEndOffset;
+						copyRegions[k].size = kEndOffset - jEndOffset;
+					}
+				}
+			}
+		}
+
+		if (copyRegionCount > 0)
+			vkCmdCopyBuffer(currentCommandBuffer, bufferCopyOperations->data[i].srcBuffer, bufferCopyOperations->data[i].dstBuffer, copyRegionCount, copyRegions);
 	}
 
 	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
