@@ -119,7 +119,7 @@ void TryDestroyResourcesPendingDestruction()
 	}
 
 	// Loop from the back to the front so we can pop elements from the array in the loop
-	for (u32 i = state->destructionOverflowDarray->size - 1; i >= 0; i--)
+	for (i32 i = state->destructionOverflowDarray->size - 1; i >= 0; i--)
 	{
 		if (state->destructionOverflowDarray->data[i].signalValue > semaphoreValue)
 			return;
