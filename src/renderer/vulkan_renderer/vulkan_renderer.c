@@ -43,9 +43,6 @@ bool InitializeRenderer(RendererInitSettings settings)
     vk_state = AlignedAlloc(GetGlobalAllocator(), sizeof(RendererState), 64 /*cache line*/);
     MemoryZero(vk_state, sizeof(*vk_state));
     CreateFreelistAllocator("renderer allocator", GetGlobalAllocator(), RENDERER_ALLOCATOR_SIZE, &vk_state->rendererAllocator, true);
-    CreateBumpAllocator("renderer bump allocator", vk_state->rendererAllocator, KiB * 5, &vk_state->rendererBumpAllocator, true);
-    CreatePoolAllocator("renderer resource destructor pool", vk_state->rendererAllocator, RENDER_POOL_BLOCK_SIZE_32, RENDERER_POOL_ALLOCATOR_32b_SIZE, &vk_state->poolAllocator32B, true);
-    CreatePoolAllocator("Renderer resource acquisition pool", vk_state->rendererAllocator, QUEUE_ACQUISITION_POOL_BLOCK_SIZE, RENDERER_RESOURCE_ACQUISITION_SIZE, &vk_state->resourceAcquisitionPool, true);
 
     vk_state->vkAllocator = nullptr; // TODO: add something that tracks vulkan API allocations in debug mode
 
@@ -53,15 +50,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     vk_state->currentInFlightFrameIndex = 0;
     vk_state->shouldRecreateSwapchain = false;
 	vk_state->requestedPresentMode = settings.presentMode;
-	vk_state->previousFrameUploadSemaphoreValues[0] = 0;
-	vk_state->previousFrameUploadSemaphoreValues[1] = 0;
-	vk_state->previousFrameUploadSemaphoreValues[2] = 0;
 	GRASSERT_DEBUG(MAX_FRAMES_IN_FLIGHT > 1);
-	for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		vk_state->vulkanFrameArenas[i] = ArenaCreate(vk_state->rendererAllocator, VULKAN_FRAME_ARENA_BYTES);
-	}
-	vk_state->vkFrameArena = &vk_state->vulkanFrameArenas[MAX_FRAMES_IN_FLIGHT-1];
 
     RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
@@ -192,7 +181,7 @@ bool InitializeRenderer(RendererInitSettings settings)
         vk_state->physicalDevice = VK_NULL_HANDLE;
 
         u32 deviceCount = 0;
-        vkEnumeratePhysicalDevices(vk_state->instance, &deviceCount, nullptr);
+        VK_CHECK(vkEnumeratePhysicalDevices(vk_state->instance, &deviceCount, nullptr));
         if (deviceCount == 0)
         {
             _FATAL("No Vulkan devices found");
@@ -200,7 +189,7 @@ bool InitializeRenderer(RendererInitSettings settings)
         }
 
         VkPhysicalDevice* availableDevices = Alloc(vk_state->rendererAllocator, sizeof(*availableDevices) * deviceCount);
-        vkEnumeratePhysicalDevices(vk_state->instance, &deviceCount, availableDevices);
+        VK_CHECK(vkEnumeratePhysicalDevices(vk_state->instance, &deviceCount, availableDevices));
 
         /// TODO: better device selection
         for (u32 i = 0; i < deviceCount; ++i)
@@ -212,9 +201,9 @@ bool InitializeRenderer(RendererInitSettings settings)
 
             { // Checking if the device has the required extensions
                 u32 availableExtensionCount = 0;
-                vkEnumerateDeviceExtensionProperties(availableDevices[i], nullptr, &availableExtensionCount, nullptr);
+                VK_CHECK(vkEnumerateDeviceExtensionProperties(availableDevices[i], nullptr, &availableExtensionCount, nullptr));
                 VkExtensionPropertiesDarray* availableExtensionsDarray = VkExtensionPropertiesDarrayCreateWithSize(availableExtensionCount, GetGlobalAllocator()); // TODO: change from darray to just array
-                vkEnumerateDeviceExtensionProperties(availableDevices[i], nullptr, &availableExtensionCount, availableExtensionsDarray->data);
+                VK_CHECK(vkEnumerateDeviceExtensionProperties(availableDevices[i], nullptr, &availableExtensionCount, availableExtensionsDarray->data));
 
                 extensionsAvailable = CheckRequiredExtensions(requiredDeviceExtensionCount, requiredDeviceExtensions, availableExtensionCount, availableExtensionsDarray->data);
 
@@ -262,7 +251,7 @@ bool InitializeRenderer(RendererInitSettings settings)
         for (u32 i = 0; i < queueFamilyCount; ++i)
         {
             VkBool32 presentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(vk_state->physicalDevice, i, vk_state->surface, &presentSupport);
+            VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(vk_state->physicalDevice, i, vk_state->surface, &presentSupport));
             bool graphicsSupport = availableQueueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT;
             bool transferSupport = availableQueueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT;
             if (graphicsSupport)
@@ -348,15 +337,9 @@ bool InitializeRenderer(RendererInitSettings settings)
         createInfo.ppEnabledExtensionNames = requiredDeviceExtensions;
         createInfo.pEnabledFeatures = nullptr;
 
-        u32 result = vkCreateDevice(vk_state->physicalDevice, &createInfo, vk_state->vkAllocator, &vk_state->device);
+        VK_CHECK(vkCreateDevice(vk_state->physicalDevice, &createInfo, vk_state->vkAllocator, &vk_state->device));
 
         Free(vk_state->rendererAllocator, queueCreateInfos);
-
-        if (result != VK_SUCCESS)
-        {
-            _FATAL("Failed to create Vulkan logical device");
-            return false;
-        }
 
         _TRACE("Successfully created vulkan logical device");
     }
@@ -483,8 +466,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     // ============================================================================================================================================================
     // ======================== Creating the swapchain ============================================================================================================
     // ============================================================================================================================================================
-    if (!CreateSwapchain(settings.presentMode))
-        return false;
+    CreateSwapchain(settings.presentMode);
 
     // ============================================================================================================================================================
     // ======================== Creating the descriptor pool ============================================================================================================
@@ -503,11 +485,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     descriptorPoolCreateInfo.poolSizeCount = 2;
     descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes;
 
-    if (VK_SUCCESS != vkCreateDescriptorPool(vk_state->device, &descriptorPoolCreateInfo, vk_state->vkAllocator, &vk_state->descriptorPool))
-    {
-        _FATAL("Vulkan descriptor pool creation failed");
-        return false;
-    }
+    VK_CHECK(vkCreateDescriptorPool(vk_state->device, &descriptorPoolCreateInfo, vk_state->vkAllocator, &vk_state->descriptorPool));
 
     // ============================================================================================================================================================
     // ======================== Creating samplers ============================================================================================================
@@ -582,10 +560,7 @@ bool InitializeRenderer(RendererInitSettings settings)
     descriptorSetLayoutCreateInfo.bindingCount = 1;
     descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings;
 
-    if (VK_SUCCESS != vkCreateDescriptorSetLayout(vk_state->device, &descriptorSetLayoutCreateInfo, vk_state->vkAllocator, &vk_state->globalDescriptorSetLayout))
-    {
-        GRASSERT_MSG(false, "Vulkan descriptor set layout creation failed");
-    }
+    VK_CHECK(vkCreateDescriptorSetLayout(vk_state->device, &descriptorSetLayoutCreateInfo, vk_state->vkAllocator, &vk_state->globalDescriptorSetLayout));
 
     // Creating backing buffer and memory and mapping the memory
     VkDeviceSize uniformBufferSize = sizeof(GlobalUniformObject);
@@ -613,10 +588,7 @@ bool InitializeRenderer(RendererInitSettings settings)
 
     vk_state->globalDescriptorSetArray = Alloc(vk_state->rendererAllocator, MAX_FRAMES_IN_FLIGHT * sizeof(*vk_state->globalDescriptorSetArray));
 
-    if (VK_SUCCESS != vkAllocateDescriptorSets(vk_state->device, &descriptorSetAllocInfo, vk_state->globalDescriptorSetArray))
-    {
-        GRASSERT_MSG(false, "Vulkan descriptor set allocation failed");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(vk_state->device, &descriptorSetAllocInfo, vk_state->globalDescriptorSetArray));
 
     // Updating descriptor sets to link them to the backing buffer
     for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
@@ -757,7 +729,7 @@ void ShutdownRenderer()
 
     // Idling before destroying resources
     if (vk_state->device)
-        vkDeviceWaitIdle(vk_state->device);
+		VK_CHECK(vkDeviceWaitIdle(vk_state->device));
 
 	// ============================================================================================================================================================
     // ============================ Destroying basic meshes ======================================================================================================
@@ -911,9 +883,6 @@ void ShutdownRenderer()
     if (vk_state->instance)
         vkDestroyInstance(vk_state->instance, vk_state->vkAllocator);
 
-    DestroyPoolAllocator(vk_state->resourceAcquisitionPool);
-    DestroyPoolAllocator(vk_state->poolAllocator32B);
-    DestroyBumpAllocator(vk_state->rendererBumpAllocator);
     DestroyFreelistAllocator(vk_state->rendererAllocator);
     Free(GetGlobalAllocator(), vk_state);
     vk_state = nullptr;
@@ -921,7 +890,7 @@ void ShutdownRenderer()
 
 void RecreateSwapchain()
 {
-    vkDeviceWaitIdle(vk_state->device);
+    VK_CHECK(vkDeviceWaitIdle(vk_state->device));
 
     DestroySwapchain(vk_state);
 
@@ -962,10 +931,6 @@ bool BeginRendering()
 
 	// Transferring resources to the GPU
 	VulkanCommitTransfers();
-
-	// Swap the vk frame allocator and reset it
-	vk_state->vkFrameArena = &vk_state->vulkanFrameArenas[vk_state->currentInFlightFrameIndex];
-	ArenaClear(vk_state->vkFrameArena);
 
     // Getting the next image from the swapchain (doesn't block the CPU and only blocks the GPU if there's no image available (which only happens in certain present modes with certain buffer counts))
     VkResult result = vkAcquireNextImageKHR(vk_state->device, vk_state->swapchain, UINT64_MAX, vk_state->imageAvailableSemaphores[vk_state->currentInFlightFrameIndex], VK_NULL_HANDLE, &vk_state->currentSwapchainImageIndex);
@@ -1162,7 +1127,7 @@ void EndRendering()
     presentInfo.pResults = nullptr;
 
     // When using mailbox present mode, vulkan will take care of skipping the presentation of this frame if another one is already finished
-    vkQueuePresentKHR(vk_state->presentQueue, &presentInfo);
+    VK_CHECK(vkQueuePresentKHR(vk_state->presentQueue, &presentInfo));
 
     vk_state->currentFrameIndex += 1;
     vk_state->currentInFlightFrameIndex = (vk_state->currentInFlightFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;

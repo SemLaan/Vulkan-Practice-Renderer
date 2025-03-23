@@ -95,7 +95,7 @@ void TryDestroyResourcesPendingDestruction()
 	DeferResourceDestructionState* state = &vk_state->deferredResourceDestruction;
 
 	u64 semaphoreValue;
-	vkGetSemaphoreCounterValue(vk_state->device, vk_state->frameSemaphore.handle, &semaphoreValue);
+	VK_CHECK(vkGetSemaphoreCounterValue(vk_state->device, vk_state->frameSemaphore.handle, &semaphoreValue));
 
 	// While the destruction queue is not empty and the semaphore value of the next item at the back of the queue has been signaled: destroy the resource in that position and dequeue it
 	while (state->destructionQueue.size > 0 && state->destructionQueue.data[state->destructionQueue.rear].signalValue <= semaphoreValue)

@@ -284,8 +284,6 @@ typedef struct RendererState
 	VulkanShader* boundShader;										// Currently bound shader (pipeline object)
 	VkDescriptorSet* globalDescriptorSetArray;						// Global descriptor set array, one per possible in flight frame
 	RenderTarget mainRenderTarget;									// Render target used for rendering the main scene
-	Arena* vkFrameArena;											// Per frame memory arena for the vulkan allocator, is double buffered and thus should be used instead of the frame allocator inside the vk renderer
-	u64 previousFrameUploadSemaphoreValues[3];						// Upload semaphore values from the previous frame, used to make the current frame wait untill uploads from the previous frame are finished
 	TransferState transferState;
 	DeferResourceDestructionState deferredResourceDestruction;
 
@@ -298,10 +296,6 @@ typedef struct RendererState
 
 	// Allocators
 	Allocator* rendererAllocator;									// Global allocator of the renderer subsys
-	Allocator* rendererBumpAllocator;								// Bump allocator for the renderer subsys
-	Allocator* poolAllocator32B;									// Pool allocator of the renderer subsys
-	Allocator* resourceAcquisitionPool;								// Pool allocator for resource acquisition operation infos (memory barriers)
-	Arena vulkanFrameArenas[MAX_FRAMES_IN_FLIGHT];					// Double buffered arenas for frame arena, should be used through vkFrameArena
 
 	// Data that is not used every frame or possibly used every frame
 	QueueFamily graphicsQueue;										// Graphics family queue

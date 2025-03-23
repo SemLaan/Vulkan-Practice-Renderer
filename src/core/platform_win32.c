@@ -354,6 +354,7 @@ bool PlatformCreateSurface(VkInstance instance, VkAllocationCallbacks* allocator
 
 	if (VK_SUCCESS != vkCreateWin32SurfaceKHR(instance, &createInfo, allocator, out_surface))
 	{
+		GRASSERT_MSG(false, "Vulkan Surface creation failed");
 		memset(out_surface, 0, sizeof(VkSurfaceKHR));
 		return false;
 	}

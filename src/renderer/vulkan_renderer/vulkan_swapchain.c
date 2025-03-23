@@ -8,20 +8,20 @@ SwapchainSupportDetails QuerySwapchainSupport(VkPhysicalDevice device, VkSurface
 {
 	SwapchainSupportDetails details;
 
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+	VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities));
 
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &details.formatCount, nullptr);
+	VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &details.formatCount, nullptr));
 	details.formats = Alloc(vk_state->rendererAllocator, sizeof(*details.formats) * details.formatCount);
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &details.formatCount, (VkSurfaceFormatKHR*)details.formats);
+	VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &details.formatCount, (VkSurfaceFormatKHR*)details.formats));
 
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &details.presentModeCount, nullptr);
+	VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &details.presentModeCount, nullptr));
 	details.presentModes = Alloc(vk_state->rendererAllocator, sizeof(*details.presentModes) * details.presentModeCount);
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &details.presentModeCount, (VkPresentModeKHR*)details.presentModes);
+	VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &details.presentModeCount, (VkPresentModeKHR*)details.presentModes));
 
 	return details;
 }
 
-bool CreateSwapchain(GrPresentMode requestedPresentMode)
+void CreateSwapchain(GrPresentMode requestedPresentMode)
 {
 	// Getting a swapchain format
 	VkSurfaceFormatKHR format = vk_state->swapchainSupport.formats[0];
@@ -105,20 +105,16 @@ bool CreateSwapchain(GrPresentMode requestedPresentMode)
 	createInfo.clipped = VK_TRUE;
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-	if (VK_SUCCESS != vkCreateSwapchainKHR(vk_state->device, &createInfo, vk_state->vkAllocator, &vk_state->swapchain))
-	{
-		_FATAL("Vulkan Swapchain creation failed");
-		return false;
-	}
+	VK_CHECK(vkCreateSwapchainKHR(vk_state->device, &createInfo, vk_state->vkAllocator, &vk_state->swapchain));
 
 	vk_state->swapchainFormat = format.format;
 	vk_state->swapchainExtent = swapchainExtent;
 
-	vkGetSwapchainImagesKHR(vk_state->device, vk_state->swapchain, &vk_state->swapchainImageCount, 0);
-	vk_state->swapchainImages = Alloc(vk_state->rendererBumpAllocator, sizeof(*vk_state->swapchainImages) * vk_state->swapchainImageCount);
-	vkGetSwapchainImagesKHR(vk_state->device, vk_state->swapchain, &vk_state->swapchainImageCount, vk_state->swapchainImages);
+	VK_CHECK(vkGetSwapchainImagesKHR(vk_state->device, vk_state->swapchain, &vk_state->swapchainImageCount, 0));
+	vk_state->swapchainImages = Alloc(vk_state->rendererAllocator, sizeof(*vk_state->swapchainImages) * vk_state->swapchainImageCount);
+	VK_CHECK(vkGetSwapchainImagesKHR(vk_state->device, vk_state->swapchain, &vk_state->swapchainImageCount, vk_state->swapchainImages));
 
-	vk_state->swapchainImageViews = Alloc(vk_state->rendererBumpAllocator, sizeof(*vk_state->swapchainImageViews) * vk_state->swapchainImageCount);
+	vk_state->swapchainImageViews = Alloc(vk_state->rendererAllocator, sizeof(*vk_state->swapchainImageViews) * vk_state->swapchainImageCount);
 
 	for (u32 i = 0; i < vk_state->swapchainImageCount; ++i)
 	{
@@ -139,21 +135,13 @@ bool CreateSwapchain(GrPresentMode requestedPresentMode)
 		viewCreateInfo.subresourceRange.baseMipLevel = 0;
 		viewCreateInfo.subresourceRange.levelCount = 1;
 
-		if (VK_SUCCESS != vkCreateImageView(vk_state->device, &viewCreateInfo, vk_state->vkAllocator, &vk_state->swapchainImageViews[i]))
-		{
-			_FATAL("Swapchain image view creation failed");
-			return false;
-		}
+		VK_CHECK(vkCreateImageView(vk_state->device, &viewCreateInfo, vk_state->vkAllocator, &vk_state->swapchainImageViews[i]));
 	}
 
 	_TRACE("Vulkan swapchain created");
 
 	// ========================================== Main render target ======================================================
-	{
-		vk_state->mainRenderTarget = RenderTargetCreate(swapchainExtent.width, swapchainExtent.height, RENDER_TARGET_USAGE_DISPLAY, RENDER_TARGET_USAGE_DEPTH);
-	}
-
-	return true;
+	vk_state->mainRenderTarget = RenderTargetCreate(swapchainExtent.width, swapchainExtent.height, RENDER_TARGET_USAGE_DISPLAY, RENDER_TARGET_USAGE_DEPTH);
 }
 
 void DestroySwapchain()
@@ -173,7 +161,7 @@ void DestroySwapchain()
 		vkDestroySwapchainKHR(vk_state->device, vk_state->swapchain, vk_state->vkAllocator);
 
 	if (vk_state->swapchainImages)
-		Free(vk_state->rendererBumpAllocator, vk_state->swapchainImages);
+		Free(vk_state->rendererAllocator, vk_state->swapchainImages);
 	if (vk_state->swapchainImageViews)
-		Free(vk_state->rendererBumpAllocator, vk_state->swapchainImageViews);
+		Free(vk_state->rendererAllocator, vk_state->swapchainImageViews);
 }
