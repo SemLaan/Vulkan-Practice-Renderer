@@ -36,5 +36,5 @@ void main() {
 	//if (max(d.x, d.y) > 0)
 	//	signedDistance = 0;
 
-    outColor = vec4(finalColor, 1);
+    outColor = vec4(finalColor, signedDistance);
 }
