@@ -472,6 +472,12 @@ void DebugUIRenderMenu(DebugMenu* menu)
     Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
 }
 
+void DebugUISetMaterialValues(DebugMenu* menu, vec4 color, vec4 other)
+{
+	MaterialUpdateProperty(menu->menuElementMaterial, "color", &color);
+    MaterialUpdateProperty(menu->menuElementMaterial, "other", &other);
+}
+
 void DebugUIMenuSetActive(DebugMenu* menu, bool active)
 {
     menu->active = active;

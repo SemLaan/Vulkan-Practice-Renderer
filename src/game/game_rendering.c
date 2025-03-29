@@ -31,6 +31,8 @@ typedef struct ShaderParameters
 {
     f32 normalEdgeThreshold;
     bool renderMarchingCubesMesh;
+	vec4 uiColor;
+	vec4 uiOther;
 } ShaderParameters;
 
 typedef struct WorldGenParameters
@@ -238,6 +240,12 @@ void GameRenderingInit()
     RegisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
     DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
+	DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "r", 0.001f, 1, &renderingState->shaderParameters.uiColor.x);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "g", 0.001f, 1, &renderingState->shaderParameters.uiColor.y);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "b", 0.001f, 1, &renderingState->shaderParameters.uiColor.z);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge thickness", 0.001f, 1, &renderingState->shaderParameters.uiOther.x);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "roundedness", 0.001f, 1, &renderingState->shaderParameters.uiOther.y);
+	renderingState->shaderParameters.uiColor.w = 1;
 
 	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT] = POSSIBLE_BLUR_KERNEL_SIZES;
 	MemoryCopy(renderingState->worldGenParams.blurKernelSizeOptions, blurKernelSizeOptions, sizeof(blurKernelSizeOptions));
@@ -273,6 +281,7 @@ void GameRenderingRender()
     f32 roughness = 0;
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "roughness", &roughness);
+	DebugUISetMaterialValues(renderingState->shaderParamDebugMenu, renderingState->shaderParameters.uiColor, renderingState->shaderParameters.uiOther);
     f32 nearPlane = DEFAULT_NEAR_PLANE;
     f32 farPlane = DEFAULT_FAR_PLANE;
     vec2i windowSize = GetPlatformWindowSize();

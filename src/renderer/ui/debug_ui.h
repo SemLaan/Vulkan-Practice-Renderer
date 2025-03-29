@@ -1,6 +1,6 @@
 #pragma once
 #include "defines.h"
-
+#include "math/math_types.h"
 
 /// @brief The root debug UI node.
 typedef struct DebugMenu DebugMenu;
@@ -28,6 +28,8 @@ void DebugUIDestroyMenu(DebugMenu* menu);
 /// @brief Renders the given Debug UI menu instance.
 /// @param menu Pointer to the menu.
 void DebugUIRenderMenu(DebugMenu* menu);
+
+void DebugUISetMaterialValues(DebugMenu* menu, vec4 color, vec4 other);
 
 void DebugUIMenuSetActive(DebugMenu* menu, bool active);
 
