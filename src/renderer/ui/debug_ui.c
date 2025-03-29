@@ -30,18 +30,18 @@
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
 #define MENU_START_POSITION vec2_create(0.3f, 0.3f)
 #define MENU_START_SIZE vec2_create(2.5f, 9.4f)
-#define MENU_BACKGROUND_COLOR vec4_create(1, 1, 1, 1)
+#define MENU_BACKGROUND_COLOR vec4_create(44.f/255.f, 62.f/255.f, 80.f/255.f, 1)
 #define HANDLEBAR_VERTICAL_SIZE 0.5f
-#define HANDLEBAR_COLOR vec4_create(0.2f, 0.2f, 0.8f, 1)
-#define HANDLEBAR_PRESSED_COLOR vec4_create(0.1f, 0.1f, 0.7f, 1.0f)
+#define HANDLEBAR_COLOR vec4_create(52.f/255.f, 73.f/255.f, 94.f/255.f, 1)
+#define HANDLEBAR_PRESSED_COLOR vec4_create(44.f/255.f, 62.f/255.f, 80.f/255.f, 1)
 #define MENU_ELEMENTS_OFFSET 0.3f
 #define BUTTON_SIZE vec2_create(1, 1)
-#define BUTTON_BASIC_COLOR vec4_create(1, 0, 0, 1)
-#define BUTTON_PRESSED_COLOR vec4_create(0.0f, 0.0f, 1.0f, 1.0f)
+#define BUTTON_BASIC_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
+#define BUTTON_PRESSED_COLOR vec4_create(142.f/255.f, 68.f/255.f, 173.f/255.f, 1.0f)
 #define SLIDER_BAR_SIZE vec2_create(2, 0.2f)
 #define SLIDER_DOT_SIZE vec2_create(0.4f, 0.4f)
-#define SLIDER_BAR_COLOR vec4_create(0.3f, 0.3f, 0.3f, 1)
-#define SLIDER_DOT_COLOR vec4_create(1, 0, 0, 1)
+#define SLIDER_BAR_COLOR vec4_create(52.f/255.f, 152.f/255.f, 219.f/255.f, 1)
+#define SLIDER_DOT_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
 #define GREY_OUT_FACTOR 0.8f
 
 typedef struct QuadInstanceData

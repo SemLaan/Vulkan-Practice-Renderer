@@ -36,5 +36,7 @@ void main() {
 	//if (max(d.x, d.y) > 0)
 	//	signedDistance = 0;
 
-    outColor = vec4(finalColor, signedDistance);
+    //outColor = vec4(vec3(44.0/255.0, 62.0/255.0, 80.0/255.0), 1);
+
+    outColor = ToLinearRGB(vec4(finalColor, signedDistance));
 }
