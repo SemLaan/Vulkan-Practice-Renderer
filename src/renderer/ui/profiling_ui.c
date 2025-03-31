@@ -7,9 +7,9 @@
 #include "core/engine.h"
 #include <stdio.h>
 #include <string.h>
+#include "debug_ui.h"
 
 #define FRAME_STATS_BACKGROUND_SHADER_NAME "flat_color_shader"
-#define PROFILING_UI_FONT_NAME "profiling_font"
 
 typedef struct ProfilingUIState
 {
@@ -50,8 +50,7 @@ void InitializeProfilingUI()
     ShaderCreate(FRAME_STATS_BACKGROUND_SHADER_NAME, &shaderCreateInfo);
 
 	state->quadMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);
-	TextLoadFont(PROFILING_UI_FONT_NAME, "Roboto-Black.ttf");
-	state->frameStatsTextBatch = TextBatchCreate(PROFILING_UI_FONT_NAME);
+	state->frameStatsTextBatch = TextBatchCreate(DEBUG_UI_FONT_NAME);
 	state->flatWhiteMaterial = MaterialCreate(ShaderGetRef(FRAME_STATS_BACKGROUND_SHADER_NAME));
 	state->flatBlackMaterial = MaterialCreate(ShaderGetRef(FRAME_STATS_BACKGROUND_SHADER_NAME));
 
@@ -76,7 +75,6 @@ void ShutdownProfilingUI()
 	MaterialDestroy(state->flatBlackMaterial);
 	MaterialDestroy(state->flatWhiteMaterial);
 	TextBatchDestroy(state->frameStatsTextBatch);
-	TextUnloadFont(PROFILING_UI_FONT_NAME);
 
 	Free(GetGlobalAllocator(), state);
 }

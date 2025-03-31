@@ -43,6 +43,9 @@
 #define SLIDER_BAR_COLOR vec4_create(52.f/255.f, 152.f/255.f, 219.f/255.f, 1)
 #define SLIDER_DOT_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
 #define GREY_OUT_FACTOR 0.8f
+#define ELEMENT_TITLE_TEXT_SIZE .05f
+#define MENU_TITLE_TEXT_SIZE .1f
+
 
 typedef struct QuadInstanceData
 {
@@ -136,17 +139,18 @@ typedef struct InteractableData
 
 typedef struct DebugMenu
 {
-    vec2 position;                        // Position, anchor is bottom left of the menu.
-    vec2 size;                            // Vec 2 with the menu size, x is width y is height.
-    InteractableData* interactablesArray; // Array of interactables (buttons, sliders, text, etc.).
-    QuadInstanceData* quadsInstanceData;  // Instance data of the quads to render on the CPU.
-    VertexBuffer quadsInstancedVB;        // Vertex buffer with model matrices for quads.
-    Material menuElementMaterial;         // Material to render quads with.
-    i32 activeInteractableIndex;          // Index into interactables array, is -1 if no interactable is being interacted with. (If a button is being pressed or a slider is being dragged, this will indicate that.)
-    u32 maxQuads;                         // Max amount of quads
-    u32 quadCount;                        // Current amount of quads
-    u32 interactablesCount;               // Amount of buttons, sliders or other elements in the menu.
-    f32 nextElementYOffset;               // Y offset that the next element needs to have to not overlap with everything else in the menu.
+    vec2 position;                        	// Position, anchor is bottom left of the menu.
+    vec2 size;                            	// Vec 2 with the menu size, x is width y is height.
+    InteractableData* interactablesArray; 	// Array of interactables (buttons, sliders, text, etc.).
+    QuadInstanceData* quadsInstanceData;  	// Instance data of the quads to render on the CPU.
+    VertexBuffer quadsInstancedVB;        	// Vertex buffer with model matrices for quads.
+    Material menuElementMaterial;         	// Material to render quads with.
+	TextBatch* elementTextBatch;			// Text batch for rendering the names of elements
+    i32 activeInteractableIndex;          	// Index into interactables array, is -1 if no interactable is being interacted with. (If a button is being pressed or a slider is being dragged, this will indicate that.)
+    u32 maxQuads;                         	// Max amount of quads
+    u32 quadCount;                        	// Current amount of quads
+    u32 interactablesCount;               	// Amount of buttons, sliders or other elements in the menu.
+    f32 nextElementYOffset;               	// Y offset that the next element needs to have to not overlap with everything else in the menu.
     bool active;
 } DebugMenu;
 
@@ -218,8 +222,9 @@ static bool PointInRect(vec2 position, vec2 size, vec2 point)
 bool InitializeDebugUI()
 {
     GRASSERT_DEBUG(state == nullptr); // If this triggers, the debug ui was initialized twice.
-
     GRASSERT_DEBUG(INTERACTABLE_TYPE_NONE_COUNT == INTERACTABLE_TYPE_COUNT);
+	
+	TextLoadFont(DEBUG_UI_FONT_NAME, "Roboto-Black.ttf");
 
     state = Alloc(GetGlobalAllocator(), sizeof(*state));
     MemoryZero(state, sizeof(*state));
@@ -267,6 +272,8 @@ void ShutdownDebugUI()
     DestroyFreelistAllocator(state->interactableInternalDataAllocator);
     DarrayDestroy(state->debugMenuDarray);
     Free(GetGlobalAllocator(), state);
+
+	TextUnloadFont(DEBUG_UI_FONT_NAME);
 }
 
 void UpdateDebugUI()
@@ -394,6 +401,9 @@ DebugMenu* DebugUICreateMenu()
     menu->size = MENU_START_SIZE;
     menu->nextElementYOffset = MENU_ELEMENTS_OFFSET; // Making sure that the first element that gets added to the menu has the correct offset from the edge of the menu.
 
+	// Initiating the menu's text batches
+	menu->elementTextBatch = TextBatchCreate(DEBUG_UI_FONT_NAME);
+
     // Creating an instanced vertex buffer for all the quads that will be rendered in the menu.
     menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
     menu->maxQuads = MAX_DBG_MENU_QUADS;
@@ -427,6 +437,9 @@ DebugMenu* DebugUICreateMenu()
 
 void DebugUIDestroyMenu(DebugMenu* menu)
 {
+	// Destroying text batches
+	TextBatchDestroy(menu->elementTextBatch);
+
     // Destroying graphics resources
     VertexBufferDestroy(menu->quadsInstancedVB);
     MaterialDestroy(menu->menuElementMaterial);
@@ -470,6 +483,8 @@ void DebugUIRenderMenu(DebugMenu* menu)
     VertexBuffer vertexBuffers[2] = {state->quadMesh->vertexBuffer, menu->quadsInstancedVB};
 
     Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
+
+	TextBatchRender(menu->elementTextBatch, menuElementsView);
 }
 
 void DebugUISetMaterialValues(DebugMenu* menu, vec4 color, vec4 other)
@@ -491,6 +506,10 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
     menu->quadsInstanceData[menu->quadCount].transform = handlebarTransform;
     menu->quadsInstanceData[menu->quadCount].color = HANDLEBAR_COLOR;
     menu->quadCount++;
+
+	vec2 menuTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET, handlebarPosition.y + (HANDLEBAR_VERTICAL_SIZE / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f));
+
+	TextBatchAddText(menu->elementTextBatch, text, menuTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
     menu->nextElementYOffset += HANDLEBAR_VERTICAL_SIZE;
 

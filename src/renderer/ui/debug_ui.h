@@ -2,6 +2,9 @@
 #include "defines.h"
 #include "math/math_types.h"
 
+#define DEBUG_UI_FONT_NAME "debug_font"
+
+
 /// @brief The root debug UI node.
 typedef struct DebugMenu DebugMenu;
 
