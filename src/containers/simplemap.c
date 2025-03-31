@@ -5,8 +5,9 @@
 
 #define SIMPLEMAP_MAX_KEY_LEN 32
 
-// http://www.cse.yorku.ca/~oz/hash.html
-u32 HashString_djb2(const char* str, u32 moduloValue)
+
+// The hash function used is djb2 by Dan Bernstein: http://www.cse.yorku.ca/~oz/hash.html
+static inline u32 HashString_djb2(const char* str, u32 moduloValue)
 {
     u32 hash = 5381;
     i32 c;
@@ -17,15 +18,6 @@ u32 HashString_djb2(const char* str, u32 moduloValue)
 
     return hash % moduloValue;
 }
-
-typedef struct SimpleMap
-{
-    Allocator* allocator;		// Allocator used to allocate this map.
-    Allocator* keyPool;			// Pool for allocating memory to store key strings.
-    char** keys;				// Array of pointers to key strings, the strings are owned by the key pool.
-    void** values;				// Array of pointers to values, this struct does not own the pointers to values in this array.
-    u32 backingArraySize;		// Size of the backing arrays and the key pool.
-} SimpleMap;
 
 SimpleMap* SimpleMapCreate(Allocator* allocator, u32 maxEntries)
 {
@@ -62,15 +54,14 @@ void SimpleMapInsert(SimpleMap* map, const char* key, void* value)
 
 	u32 hash = HashString_djb2(key, map->backingArraySize);
 
-	// Making sure that there are no collisions
-	if (map->values[hash] != nullptr)
+	// Finding the first empty spot in the array from the hash position
+	u32 i = 0;
+	while (map->values[hash] != nullptr)
 	{
-		if (0 == strncmp(key, map->keys[hash], SIMPLEMAP_MAX_KEY_LEN))
-			_ERROR("Key with name: \"%s\" already exists.", key);
-		else
-			_ERROR("Key with name: \"%s\" collides with key: \"%s\", simple map can't have collisions so change one of their names.", key, map->keys[hash]);
-
-		GRASSERT(false);
+		GRASSERT_MSG(i <= map->backingArraySize, "Simple map backing array ran out of space or key not found");
+		GRASSERT_MSG(0 != strncmp(key, map->keys[hash], SIMPLEMAP_MAX_KEY_LEN), "Key with name: check it in the debugger, already exists.");
+		hash = (hash + 1) % map->backingArraySize;
+		i++;
 	}
 
 	u32 keyStringLength = strlen(key);
@@ -91,6 +82,15 @@ void* SimpleMapLookup(SimpleMap* map, const char* key)
 
 	u32 hash = HashString_djb2(key, map->backingArraySize);
 
+	u32 i = 0;
+	while (map->keys[hash] && 0 != strncmp(key, map->keys[hash], SIMPLEMAP_MAX_KEY_LEN))
+	{
+		hash = (hash + 1) % map->backingArraySize;
+		if (i > map->backingArraySize) // If the entire array was checked and the element wasn't found return nullptr
+			return nullptr;
+		i++;
+	}
+
 	// If the item doesn't exists nullptr should be stored in it's place already so we can 
 	// just return the value because the function is supposed to return nullptr if the item doesn't exist.
 	return map->values[hash];
@@ -102,8 +102,17 @@ void* SimpleMapDelete(SimpleMap* map, const char* key)
 
 	u32 hash = HashString_djb2(key, map->backingArraySize);
 
+	// Find the item
+	u32 i = 0;
+	while (map->values[hash] != nullptr && 0 != strncmp(key, map->keys[hash], SIMPLEMAP_MAX_KEY_LEN))
+	{
+		GRASSERT_MSG(i <= map->backingArraySize, "Key not found");
+		hash = (hash + 1) % map->backingArraySize;
+		i++;
+	}
+
 	// Making sure the key exists in the map.
-	GRASSERT(map->values[hash] && 0 == strncmp(key, map->keys[hash], SIMPLEMAP_MAX_KEY_LEN));
+	GRASSERT(map->values[hash]);
 
 	void* temp = map->values[hash];
 

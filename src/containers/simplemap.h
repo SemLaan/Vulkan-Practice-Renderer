@@ -2,13 +2,18 @@
 #include "defines.h"
 #include "core/meminc.h"
 
-/// @brief Opaque struct with all the data the simple map holds.
-typedef struct SimpleMap SimpleMap;
 
-/// @brief Creates a SimpleMap which is a map that uses strings as keys and pointers as values, it uses a simple
-/// backing array with no collision handling strategy. This makes it fast because it doesn't have to worry about
-/// collisions but also means it should only be used for systems that know there aren't any collisions at compile time as
-/// collisions at runtime result in a crash. The client has ownership over the items. The hash function used is djb2 by Dan Bernstein: http://www.cse.yorku.ca/~oz/hash.html.
+/// @brief Struct with all the data the simple map holds. The collision strategy this hashmap uses is storing it in the first free element of the backing array from the hash index.
+typedef struct SimpleMap
+{
+    Allocator* allocator;		// Allocator used to allocate this map.
+    Allocator* keyPool;			// Pool for allocating memory to store key strings.
+    char** keys;				// Array of pointers to key strings, the strings are owned by the key pool.
+    void** values;				// Array of pointers to values, this struct does not own the pointers to values in this array.
+    u32 backingArraySize;		// Size of the backing arrays and the key pool.
+} SimpleMap;
+
+/// @brief Creates a SimpleMap which is a map that uses strings as keys and pointers as values.
 /// @param allocator Allocator used to create the map and backing arrays.
 /// @param maxEntries Entries in the backing array, while it is called max entries this is a map and so filling all the entries is unlikely and shouldn't be expected.
 /// @return A handle to the map. (SimpleMap*)
@@ -24,10 +29,10 @@ void SimpleMapDestroy(SimpleMap* map);
 /// @param value The pointer to the item.
 void SimpleMapInsert(SimpleMap* map, const char* key, void* value);
 
-/// @brief Looks up the item corresponding to the given key in the given map. Returns nullptr if the key doesn't exist.
+/// @brief Looks up the item corresponding to the given key in the given map. Returns nullptr if the element doesn't exist.
 /// @param map Pointer to a SimpleMap to search.
 /// @param key Key in the form of a string.
-/// @return Pointer to the item corresponding to the given key. Nullpointer if the item with the given key doesn't exist.
+/// @return Pointer to the item corresponding to the given key. Or nullptr if the element doesn't exist
 void* SimpleMapLookup(SimpleMap* map, const char* key);
 
 /// @brief Removes the item corresponding to the given key from the given map, DOES NOT delete the actual item. Expects that the item existed in the first place.
