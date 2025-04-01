@@ -353,6 +353,8 @@ void ShaderCreate(const char* shaderName, ShaderCreateInfo* pCreateInfo)
     rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;
     rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizerCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	if (pCreateInfo->cullMode == CULL_FRONT)
+		rasterizerCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
     rasterizerCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizerCreateInfo.depthBiasEnable = VK_FALSE;
     rasterizerCreateInfo.depthBiasConstantFactor = 0.0f;
