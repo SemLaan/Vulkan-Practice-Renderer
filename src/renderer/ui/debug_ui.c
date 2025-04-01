@@ -237,7 +237,7 @@ bool InitializeDebugUI()
     // Creating the quad shader and material
     ShaderCreateInfo shaderCreateInfo = {};
     shaderCreateInfo.renderTargetStencil = false;
-    shaderCreateInfo.renderTargetDepth = true;
+    shaderCreateInfo.renderTargetDepth = false;
     shaderCreateInfo.renderTargetColor = true;
     shaderCreateInfo.vertexShaderName = "roundedQuad";
     shaderCreateInfo.fragmentShaderName = "roundedQuad";
