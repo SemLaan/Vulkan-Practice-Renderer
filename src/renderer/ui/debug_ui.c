@@ -43,6 +43,8 @@
 #define SLIDER_BAR_COLOR vec4_create(52.f/255.f, 152.f/255.f, 219.f/255.f, 1)
 #define SLIDER_DOT_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
 #define GREY_OUT_FACTOR 0.8f
+#define MENU_ELEMENT_OUTLINE_COLOR vec4_create(26.f/255.f, 188.f/255.f, 156.f/255.f, 1)
+#define MENU_ELEMENT_OUTLINE_DATA vec4_create(0.03f, 0.03f, 0, 0)
 #define ELEMENT_TITLE_TEXT_SIZE .05f
 #define MENU_TITLE_TEXT_SIZE .1f
 
@@ -477,7 +479,11 @@ void DebugUIRenderMenu(DebugMenu* menu)
 
     // Z for the view translation is 0.5f so that menu elements are rendered above the menu itself
     mat4 menuElementsView = mat4_mul_mat4(state->uiProjView, mat4_3Dtranslate(vec3_create(menu->position.x, menu->position.y, 0.5f)));
+	vec4 outlineColor = MENU_ELEMENT_OUTLINE_COLOR;
+	vec4 outlineData = MENU_ELEMENT_OUTLINE_DATA;
     MaterialUpdateProperty(menu->menuElementMaterial, "menuView", &menuElementsView);
+	MaterialUpdateProperty(menu->menuElementMaterial, "color", &outlineColor);
+    MaterialUpdateProperty(menu->menuElementMaterial, "other", &outlineData);
     MaterialBind(menu->menuElementMaterial);
 
     VertexBuffer vertexBuffers[2] = {state->quadMesh->vertexBuffer, menu->quadsInstancedVB};
