@@ -29,12 +29,12 @@
 // ====================== Debug menu visual constant values =====================================
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
 #define MENU_START_POSITION vec2_create(0.3f, MENU_ORTHO_PROJECTION_HEIGHT - 0.3f)
-#define MENU_START_SIZE vec2_create(2.5f, 9.4f)
+#define MENU_START_SIZE vec2_create(2.5f, 0.0f)
 #define MENU_BACKGROUND_COLOR vec4_create(44.f/255.f, 62.f/255.f, 80.f/255.f, 1)
 #define HANDLEBAR_VERTICAL_SIZE 0.5f
 #define HANDLEBAR_COLOR vec4_create(52.f/255.f, 73.f/255.f, 94.f/255.f, 1)
 #define HANDLEBAR_PRESSED_COLOR vec4_create(44.f/255.f, 62.f/255.f, 80.f/255.f, 1)
-#define MENU_ELEMENTS_OFFSET 0.3f
+#define MENU_ELEMENTS_OFFSET 0.1f
 #define BUTTON_SIZE vec2_create(1, 1)
 #define BUTTON_BASIC_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
 #define BUTTON_PRESSED_COLOR vec4_create(142.f/255.f, 68.f/255.f, 173.f/255.f, 1.0f)
@@ -391,6 +391,12 @@ void UpdateDebugUI()
     }
 }
 
+static inline void RecalculateMenuBackgroundSize(DebugMenu* menu)
+{
+	menu->size.y = -menu->nextElementYOffset;
+	menu->quadsInstanceData[0].transform = mat4_mul_mat4(mat4_2Dtranslate(vec2_create(0, -menu->size.y)), mat4_2Dscale(menu->size));
+}
+
 DebugMenu* DebugUICreateMenu()
 {
     // Allocating the DebugMenu struct
@@ -518,6 +524,7 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 
 	TextBatchAddText(menu->elementTextBatch, text, menuTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
+	RecalculateMenuBackgroundSize(menu);
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -552,6 +559,8 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
     menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
+
+	RecalculateMenuBackgroundSize(menu);
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -588,6 +597,8 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
+	RecalculateMenuBackgroundSize(menu);
+
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
@@ -621,21 +632,23 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset);
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
     vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
+    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET + SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
     vec2 sliderBarSize = SLIDER_BAR_SIZE;
     mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
+
+	RecalculateMenuBackgroundSize(menu);
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -670,21 +683,23 @@ void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 ma
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset);
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
     vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
+    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET + SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
     vec2 sliderBarSize = SLIDER_BAR_SIZE;
     mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
+
+	RecalculateMenuBackgroundSize(menu);
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -727,21 +742,23 @@ void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteVa
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset);
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
     vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
+    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET + SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
     vec2 sliderBarSize = SLIDER_BAR_SIZE;
     mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
+
+	RecalculateMenuBackgroundSize(menu);
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -784,21 +801,23 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset);
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
     vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
+    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET + SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
     vec2 sliderBarSize = SLIDER_BAR_SIZE;
     mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET - SLIDER_DOT_SIZE.x / 2) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_DOT_COLOR;
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
+
+	RecalculateMenuBackgroundSize(menu);
 
     GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
@@ -930,13 +949,13 @@ void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* intera
     SliderFloatInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -952,13 +971,13 @@ void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* inter
     SliderFloatInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -974,13 +993,13 @@ void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interact
     SliderFloatInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -997,7 +1016,7 @@ void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interact
     SliderIntInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
@@ -1008,7 +1027,7 @@ void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interact
     mouseSliderPosition = nearbyintf(mouseSliderPosition);                                               // Rounding mouseSliderPosition to the nearest float representable integer
     f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->valueRange); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -1023,7 +1042,7 @@ void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interac
     SliderIntInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
@@ -1034,7 +1053,7 @@ void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interac
     mouseSliderPosition = nearbyintf(mouseSliderPosition);                                               // Rounding mouseSliderPosition to the nearest float representable integer
     f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->valueRange); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -1049,7 +1068,7 @@ void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactab
     SliderIntInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
@@ -1060,7 +1079,7 @@ void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactab
     mouseSliderPosition = nearbyintf(mouseSliderPosition);                                               // Rounding mouseSliderPosition to the nearest float representable integer
     f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->valueRange); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -1076,7 +1095,7 @@ void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* int
     SliderDiscreteInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
@@ -1087,7 +1106,7 @@ void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* int
     mouseSliderPosition = nearbyintf(mouseSliderPosition);                                             // Rounding mouseSliderPosition to the nearest float representable integer
     f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->maxIndex); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -1102,7 +1121,7 @@ void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* in
     SliderDiscreteInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
@@ -1113,7 +1132,7 @@ void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* in
     mouseSliderPosition = nearbyintf(mouseSliderPosition);                                             // Rounding mouseSliderPosition to the nearest float representable integer
     f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->maxIndex); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -1128,7 +1147,7 @@ void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* inter
     SliderDiscreteInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
@@ -1139,7 +1158,7 @@ void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* inter
     mouseSliderPosition = nearbyintf(mouseSliderPosition);                                             // Rounding mouseSliderPosition to the nearest float representable integer
     f32 roundedSliderPosition = SLIDER_BAR_SIZE.x * (mouseSliderPosition / (f32)sliderData->maxIndex); // Mapping the range back to 0-1 and then to 0-slider_bar_size_x
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + roundedSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -1155,13 +1174,13 @@ void HandleSliderLogInteractionStart(DebugMenu* menu, InteractableData* interact
     SliderLogInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -1177,13 +1196,13 @@ void HandleSliderLogInteractionUpdate(DebugMenu* menu, InteractableData* interac
     SliderLogInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
@@ -1199,13 +1218,13 @@ void HandleSliderLogInteractionEnd(DebugMenu* menu, InteractableData* interactab
     SliderLogInteractableData* sliderData = interactableData->internalData;
 
     // Calculating the percentage of slider completion based on the mouse position. It doesn't have to be mapped from 0-1 because it is already in the world position range.
-    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET /*this represents the start of the slider*/);
+    f32 mouseSliderPosition = mouseWorldPosition.x - (menu->position.x + MENU_ELEMENTS_OFFSET +  SLIDER_DOT_SIZE.x / 2.f/*this represents the start of the slider*/);
     if (mouseSliderPosition > SLIDER_BAR_SIZE.x /*this represents the length of the slider*/)
         mouseSliderPosition = SLIDER_BAR_SIZE.x;
     if (mouseSliderPosition < 0)
         mouseSliderPosition = 0;
 
-    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET - (SLIDER_DOT_SIZE.x / 2)) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
+    vec3 sliderDotPosition = vec3_create((MENU_ELEMENTS_OFFSET) + mouseSliderPosition, interactableData->position.y, 0.1f); // Slider dot gets a z position to position it in front of the slider bar.
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
