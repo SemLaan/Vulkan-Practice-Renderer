@@ -35,10 +35,12 @@
 #define HANDLEBAR_COLOR vec4_create(52.f/255.f, 73.f/255.f, 94.f/255.f, 1)
 #define HANDLEBAR_PRESSED_COLOR vec4_create(44.f/255.f, 62.f/255.f, 80.f/255.f, 1)
 #define MENU_ELEMENTS_OFFSET 0.1f
-#define BUTTON_SIZE vec2_create(1, 1)
+#define TEXT_TO_ELEMENT_SEPARATION 0.05f
+#define ELEMENT_POST_TEXT_OFFSET 1.f
+#define BUTTON_SIZE vec2_create(MENU_START_SIZE.x - MENU_ELEMENTS_OFFSET * 2, .3f)
 #define BUTTON_BASIC_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
 #define BUTTON_PRESSED_COLOR vec4_create(142.f/255.f, 68.f/255.f, 173.f/255.f, 1.0f)
-#define SLIDER_BAR_SIZE vec2_create(2, 0.2f)
+#define SLIDER_BAR_SIZE vec2_create(MENU_START_SIZE.x - MENU_ELEMENTS_OFFSET * 2 - TEXT_TO_ELEMENT_SEPARATION - ELEMENT_POST_TEXT_OFFSET, 0.2f)
 #define SLIDER_DOT_SIZE vec2_create(0.4f, 0.4f)
 #define SLIDER_BAR_COLOR vec4_create(52.f/255.f, 152.f/255.f, 219.f/255.f, 1)
 #define SLIDER_DOT_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
@@ -553,12 +555,15 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
 
     menu->nextElementYOffset -= BUTTON_SIZE.y;
     vec2 buttonPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
+	vec2 elementTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET + (BUTTON_SIZE.y / 2.f) - (ELEMENT_TITLE_TEXT_SIZE / 2.f), menu->nextElementYOffset + (BUTTON_SIZE.y / 2.f) - (ELEMENT_TITLE_TEXT_SIZE / 2.f));
     vec2 buttonSize = BUTTON_SIZE;
     mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
     menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
+
+	TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -587,6 +592,7 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
 
     menu->nextElementYOffset -= BUTTON_SIZE.y;
     vec2 buttonPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
+	vec2 elementTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET + (BUTTON_SIZE.y / 2.f) - (ELEMENT_TITLE_TEXT_SIZE / 2.f), menu->nextElementYOffset + (BUTTON_SIZE.y / 2.f) - (ELEMENT_TITLE_TEXT_SIZE / 2.f));
     vec2 buttonSize = BUTTON_SIZE;
     mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
@@ -596,6 +602,8 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
         menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
+
+	TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -632,15 +640,14 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
-    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET + SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
-    vec2 sliderBarSize = SLIDER_BAR_SIZE;
-    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET + TEXT_TO_ELEMENT_SEPARATION + ELEMENT_POST_TEXT_OFFSET, menu->nextElementYOffset);
+    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x, SLIDER_DOT_SIZE.y);
+    
+    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderTotalPosition), mat4_2Dscale(sliderTotalSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderTotalSize.x, menu->nextElementYOffset);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
@@ -683,15 +690,14 @@ void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 ma
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
-    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET + SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
-    vec2 sliderBarSize = SLIDER_BAR_SIZE;
-    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET + TEXT_TO_ELEMENT_SEPARATION + ELEMENT_POST_TEXT_OFFSET, menu->nextElementYOffset);
+    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x, SLIDER_DOT_SIZE.y);
+    
+    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderTotalPosition), mat4_2Dscale(sliderTotalSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderTotalSize.x, menu->nextElementYOffset);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
@@ -742,15 +748,14 @@ void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteVa
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
-    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET + SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
-    vec2 sliderBarSize = SLIDER_BAR_SIZE;
-    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET + TEXT_TO_ELEMENT_SEPARATION + ELEMENT_POST_TEXT_OFFSET, menu->nextElementYOffset);
+    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x, SLIDER_DOT_SIZE.y);
+    
+    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderTotalPosition), mat4_2Dscale(sliderTotalSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderTotalSize.x, menu->nextElementYOffset);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
@@ -801,15 +806,14 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
-    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x + SLIDER_DOT_SIZE.x, SLIDER_DOT_SIZE.y);
-    vec2 sliderBarPosition = vec2_create(MENU_ELEMENTS_OFFSET + SLIDER_DOT_SIZE.x / 2, menu->nextElementYOffset + (SLIDER_DOT_SIZE.y / 4)); // Y position is slightly different than that of the dot because the origin of the quad is the bottom left corner.
-    vec2 sliderBarSize = SLIDER_BAR_SIZE;
-    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderBarPosition), mat4_2Dscale(sliderBarSize));
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET + TEXT_TO_ELEMENT_SEPARATION + ELEMENT_POST_TEXT_OFFSET, menu->nextElementYOffset);
+    vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x, SLIDER_DOT_SIZE.y);
+    
+    mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderTotalPosition), mat4_2Dscale(sliderTotalSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderBarSize.x, menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create((MENU_ELEMENTS_OFFSET) + sliderProgress * sliderTotalSize.x, menu->nextElementYOffset);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
