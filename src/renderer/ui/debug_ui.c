@@ -555,7 +555,7 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
 
     menu->nextElementYOffset -= BUTTON_SIZE.y;
     vec2 buttonPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
-	vec2 elementTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET + (BUTTON_SIZE.y / 2.f) - (ELEMENT_TITLE_TEXT_SIZE / 2.f), menu->nextElementYOffset + (BUTTON_SIZE.y / 2.f) - (ELEMENT_TITLE_TEXT_SIZE / 2.f));
+	vec2 elementTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET + (BUTTON_SIZE.y / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f), menu->nextElementYOffset + (BUTTON_SIZE.y / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f));
     vec2 buttonSize = BUTTON_SIZE;
     mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
@@ -592,7 +592,7 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
 
     menu->nextElementYOffset -= BUTTON_SIZE.y;
     vec2 buttonPosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset);
-	vec2 elementTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET + (BUTTON_SIZE.y / 2.f) - (ELEMENT_TITLE_TEXT_SIZE / 2.f), menu->nextElementYOffset + (BUTTON_SIZE.y / 2.f) - (ELEMENT_TITLE_TEXT_SIZE / 2.f));
+	vec2 elementTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET + (BUTTON_SIZE.y / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f), menu->nextElementYOffset + (BUTTON_SIZE.y / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f));
     vec2 buttonSize = BUTTON_SIZE;
     mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
     menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
@@ -640,14 +640,33 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
 
     // Adding a quad for the slider bar and a quad for the slider dot.
     menu->nextElementYOffset -= SLIDER_DOT_SIZE.y;
-    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET + TEXT_TO_ELEMENT_SEPARATION + ELEMENT_POST_TEXT_OFFSET, menu->nextElementYOffset);
+	vec2 elementTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset + (SLIDER_BAR_SIZE.y / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f));
+
+	f32 finalTextVerticalSize;
+	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
+
+	f32 halfDelta = 0; 
+	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
+	{
+		f32 delta = finalTextVerticalSize - SLIDER_BAR_SIZE.y;
+		halfDelta = delta / 2.f;
+		menu->nextElementYOffset -= delta;
+	}
+
+	if (finalTextVerticalSize > MENU_TITLE_TEXT_SIZE)
+	{
+		elementTitlePosition.y = menu->nextElementYOffset + halfDelta + (SLIDER_BAR_SIZE.y / 2.f) + (finalTextVerticalSize / 2.f) - MENU_TITLE_TEXT_SIZE;
+		TextBatchUpdateTextPosition(menu->elementTextBatch, textID, elementTitlePosition);
+	}
+
+    vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET + TEXT_TO_ELEMENT_SEPARATION + ELEMENT_POST_TEXT_OFFSET, menu->nextElementYOffset + halfDelta);
     vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x, SLIDER_DOT_SIZE.y);
-    
+
     mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderTotalPosition), mat4_2Dscale(sliderTotalSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
     menu->quadCount++;
-    vec2 sliderDotPosition = vec2_create(sliderTotalPosition.x + sliderProgress * (sliderTotalSize.x - SLIDER_DOT_SIZE.x), menu->nextElementYOffset);
+    vec2 sliderDotPosition = vec2_create(sliderTotalPosition.x + sliderProgress * (sliderTotalSize.x - SLIDER_DOT_SIZE.x), sliderTotalPosition.y);
     vec2 sliderDotSize = SLIDER_DOT_SIZE;
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderDotTransform;
