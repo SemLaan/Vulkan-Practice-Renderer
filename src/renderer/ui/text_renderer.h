@@ -90,6 +90,8 @@ void TextBatchDestroy(TextBatch* textBatch);
 /// @return ID of the text added, used for removing specific texts from a text batch
 u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize, bool variableText);
 
+u64 TextBatchAddTextMaxWidth(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize, f32 maxLineWidth, f32* out_height);
+
 void TextBatchRemoveText(TextBatch* textBatch, u64 textId);
 
 void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosition);
