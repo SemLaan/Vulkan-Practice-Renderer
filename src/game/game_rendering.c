@@ -81,9 +81,6 @@ typedef struct GameRenderingState
     // Data controlled by debug menu's
     ShaderParameters shaderParameters;
 	WorldGenParameters worldGenParams;
-
-    // Text,  TODO: THIS IS TEMPORARY, this needs to be changed once the text system is finished
-    TextBatch* textBatchTest;
 } GameRenderingState;
 
 static GameRenderingState* renderingState = nullptr;
@@ -135,17 +132,6 @@ void GameRenderingInit()
     TextLoadFont(FONT_NAME_NICOLAST, "Nicolast.ttf");
 
 	tempFontRef = TextGetFont(FONT_NAME_ROBOTO);
-
-    // Creating test text
-    // TODO: this will be replaced once the text rendering system is finished
-    const char* testString = "Beefy text te\tsting!?.";
-	renderingState->textBatchTest = TextBatchCreate(FONT_NAME_ROBOTO);
-	u64 id = TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 5), 0.5f, true);
-	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 7), 1.5f, true);
-	TextBatchAddText(renderingState->textBatchTest, testString, vec2_create(7, 3), 1.0f, false);
-
-	const char* testString2 = "baefy t xt te         ";
-	TextBatchUpdateTextString(renderingState->textBatchTest, id, testString2);
 
     // Creating render targets
     {
@@ -329,20 +315,17 @@ void GameRenderingRender()
     MeshData* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
     Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
 
-    // Rendering text as a demo of the text system
-	TextBatchRender(renderingState->textBatchTest, renderingState->uiCamera.projection);
-	//TextBatchRender(renderingState->textBatchTest, renderingState->sceneCamera.viewProjection);
-
     // Rendering the debug menu's
     for (u32 i = 0; i < renderingState->debugMenuDarray->size; i++)
     {
         DebugUIRenderMenu(renderingState->debugMenuDarray->data[i]);
     }
 
-	MeshData* quadMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);
-	mat4 quadModelMatrix = mat4_mul_mat4(mat4_2Dtranslate(vec2_create(4, 4)), mat4_2Dscale(vec2_create(3, 3)));
-	MaterialBind(renderingState->uiTextureMaterial);
-	Draw(1, &quadMesh->vertexBuffer, quadMesh->indexBuffer, &quadModelMatrix, 1);
+	// TODO: this renders the glyph texture atlas, once texture rendering has been added to the debug ui this needs to be removed and rendered with the debug ui
+	//MeshData* quadMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);
+	//mat4 quadModelMatrix = mat4_mul_mat4(mat4_2Dtranslate(vec2_create(4, 4)), mat4_2Dscale(vec2_create(3, 3)));
+	//MaterialBind(renderingState->uiTextureMaterial);
+	//Draw(1, &quadMesh->vertexBuffer, quadMesh->indexBuffer, &quadModelMatrix, 1);
 
 	DrawFrameStats();
 
@@ -355,9 +338,6 @@ void GameRenderingRender()
 void GameRenderingShutdown()
 {
     UnregisterEventListener(EVCODE_SWAPCHAIN_RESIZED, OnWindowResize);
-
-	// Destroying text test // TODO: remove
-	TextBatchDestroy(renderingState->textBatchTest);
 
 	TextUnloadFont(FONT_NAME_ROBOTO);
     TextUnloadFont(FONT_NAME_ADORABLE_HANDMADE);
