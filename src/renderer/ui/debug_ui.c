@@ -133,12 +133,13 @@ typedef struct SliderLogInteractableData
 
 typedef struct InteractableData
 {
+	u64 textID;
     vec2 position;
     vec2 size;
     u32 firstQuad;
     u32 quadCount;
-    InteractableType interactableType;
     void* internalData;
+    InteractableType interactableType;
 } InteractableData;
 
 typedef struct DebugMenu
@@ -524,7 +525,7 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 
 	vec2 menuTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET, handlebarPosition.y + (HANDLEBAR_VERTICAL_SIZE / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f));
 
-	TextBatchAddText(menu->elementTextBatch, text, menuTitlePosition, MENU_TITLE_TEXT_SIZE, false);
+	menu->interactablesArray[menu->interactablesCount].textID = TextBatchAddText(menu->elementTextBatch, text, menuTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -563,7 +564,7 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
-	TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
+	menu->interactablesArray[menu->interactablesCount].textID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -603,7 +604,7 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
-	TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
+	menu->interactablesArray[menu->interactablesCount].textID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -644,6 +645,7 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
 
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
+	menu->interactablesArray[menu->interactablesCount].textID = textID;
 
 	f32 halfDelta = 0; 
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -713,6 +715,7 @@ void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 ma
 
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
+	menu->interactablesArray[menu->interactablesCount].textID = textID;
 
 	f32 halfDelta = 0; 
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -790,6 +793,7 @@ void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteVa
 
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
+	menu->interactablesArray[menu->interactablesCount].textID = textID;
 
 	f32 halfDelta = 0; 
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -867,6 +871,7 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
+	menu->interactablesArray[menu->interactablesCount].textID = textID;
 
 	f32 halfDelta = 0; 
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
