@@ -731,6 +731,14 @@ void ShutdownRenderer()
     if (vk_state->device)
 		VK_CHECK(vkDeviceWaitIdle(vk_state->device));
 
+	VkSemaphoreSignalInfo signalInfo;
+	signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+	signalInfo.pNext = NULL;
+	signalInfo.semaphore = vk_state->frameSemaphore.handle;
+	signalInfo.value = vk_state->frameSemaphore.submitValue + 1;
+
+	vkSignalSemaphore(vk_state->device, &signalInfo);
+
 	// ============================================================================================================================================================
     // ============================ Destroying basic meshes ======================================================================================================
     // ============================================================================================================================================================
@@ -915,9 +923,9 @@ bool BeginRendering()
     // ================================= Waiting for rendering resources to become available ==============================================================
     // The GPU can work on multiple frames simultaneously (i.e. multiple frames can be "in flight"), but each frame has it's own resources
     // that the GPU needs while it's rendering a frame. So we need to wait for one of those sets of resources to become available again (command buffers and binary semaphores).
-	#define CPU_SIDE_WAIT_SEMAPHORE_COUNT 2
-	VkSemaphore waitSemaphores[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.handle, vk_state->transferState.uploadSemaphore.handle };
-	u64 waitValues[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1), vk_state->transferState.uploadSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1) };
+	#define CPU_SIDE_WAIT_SEMAPHORE_COUNT 1
+	VkSemaphore waitSemaphores[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.handle };
+	u64 waitValues[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1) };
 
     VkSemaphoreWaitInfo semaphoreWaitInfo = {};
     semaphoreWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
