@@ -33,6 +33,10 @@ void _DestroyDebugMessenger();
 #define CreateDebugMessenger() _CreateDebugMessenger()
 #define DestroyDebugMessenger() _DestroyDebugMessenger()
 
+void _InsertDebugMemoryBarier(VkCommandBuffer commandBuffer);
+
+#define INSERT_DEBUG_MEMORY_BARRIER(commandBuffer) _InsertDebugMemoryBarier(commandBuffer)
+
 #else
 
 #define ADD_DEBUG_INSTANCE_EXTENSIONS(extensions, extensionCount)
@@ -42,5 +46,7 @@ void _DestroyDebugMessenger();
 
 #define CreateDebugMessenger()
 #define DestroyDebugMessenger()
+
+#define INSERT_DEBUG_MEMORY_BARRIER(commandBuffer) GRASSERT_MSG(false, "remove debug memory barrier")
 
 #endif // !GR_DIST

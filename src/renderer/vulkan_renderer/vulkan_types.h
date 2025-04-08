@@ -272,8 +272,8 @@ typedef struct RendererState
 	// Frequently used data (every frame)
 	VkDevice device;												// Logical device
 	VkSwapchainKHR swapchain;										// Swapchain handle
-	VkQueue presentQueue;											// Present queue handle
 	CommandBuffer graphicsCommandBuffers[MAX_FRAMES_IN_FLIGHT]; 	// Command buffers for recording entire frames to the graphics queue
+	CommandBuffer presentCommandBuffers[MAX_FRAMES_IN_FLIGHT]; 		// Command buffers for transferring ownership of present images to the present queue
 	u64 currentFrameIndex;											// Current frame
 	u32 currentInFlightFrameIndex;									// Current frame % MAX_FRAMES_IN_FLIGHT
 	u32 currentSwapchainImageIndex;									// Current swapchain image index (current frame % swapchain image count)
@@ -286,20 +286,22 @@ typedef struct RendererState
 	RenderTarget mainRenderTarget;									// Render target used for rendering the main scene
 	TransferState transferState;
 	DeferResourceDestructionState deferredResourceDestruction;
+	QueueFamily graphicsQueue;										// Graphics family queue
+	QueueFamily transferQueue;										// Transfer family queue
+	QueueFamily presentQueue;										// Present family queue
 
 	// Binary semaphores for synchronizing the swapchain with the screen and the GPU
-	VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image acquisition TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)
-	VkSemaphore renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image presentation TODO: change to timeline semaphore once vulkan allows it (hopefully 1.4)
+	VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];		// Binary semaphores that synchronize swapchain image acquisition TODO: change to timeline semaphore once vulkan allows it (hopefully 1.5)
+	VkSemaphore prePresentCompleteSemaphores[MAX_FRAMES_IN_FLIGHT];	// Binary semaphores that synchronize swapchain image presentation TODO: change to timeline semaphore once vulkan allows it (hopefully 1.5)
 
 	// Timeline semaphores for synchronizing uploads and 
 	VulkanSemaphore frameSemaphore;									// Timeline semaphore that synchronizes rendering resources
+	VulkanSemaphore duplicatePrePresentCompleteSemaphore;			// Timeline semaphore that could replace prePresentCompleteSemaphores if surfaces allowed it TODO:
 
 	// Allocators
 	Allocator* rendererAllocator;									// Global allocator of the renderer subsys
 
 	// Data that is not used every frame or possibly used every frame
-	QueueFamily graphicsQueue;										// Graphics family queue
-	QueueFamily transferQueue;										// Transfer family queue
 	VkAllocationCallbacks* vkAllocator;								// Vulkan API allocator, only for reading vulkan allocations not for taking over allocation from vulkan //TODO: this is currently just nullptr
 	VulkanMemoryState* vkMemory;									// State for the system that manages gpu memory
 	VkDescriptorPool descriptorPool;								// Pool used to allocate descriptor sets for all materials
@@ -314,7 +316,6 @@ typedef struct RendererState
 	VkInstance instance;											// Vulkan instance handle
 	VkPhysicalDevice physicalDevice;								// Physical device handle
 	SwapchainSupportDetails swapchainSupport;						// Data about swapchain capabilities
-	u32 presentQueueFamilyIndex;									// What it says on the tin
 	VkSurfaceKHR surface;											// Vulkan surface handle
 	VkFormat swapchainFormat;										// Format of the swapchain
 	u32 swapchainImageCount;										// Amount of images in the swapchain

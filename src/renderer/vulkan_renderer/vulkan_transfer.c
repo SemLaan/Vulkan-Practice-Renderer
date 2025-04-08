@@ -2,6 +2,7 @@
 
 #include "vulkan_command_buffer.h"
 #include "core/engine.h"
+#include "vulkan_debug_tools.h"
 
 #define COPY_OPERATIONS_DARRAY_START_CAPACITY 20
 #define MAX_COPY_REGIONS 40
@@ -250,8 +251,8 @@ void VulkanCommitTransfers()
 		imageReleaseInfos[i].pNext = nullptr;
 		imageReleaseInfos[i].srcStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
 		imageReleaseInfos[i].srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-		imageReleaseInfos[i].dstStageMask = 0;  // IGNORED because it is a queue family release operation
-		imageReleaseInfos[i].dstAccessMask = 0; // IGNORED because it is a queue family release operation
+		imageReleaseInfos[i].dstStageMask = 0;
+		imageReleaseInfos[i].dstAccessMask = 0;
 		imageReleaseInfos[i].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		imageReleaseInfos[i].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		imageReleaseInfos[i].srcQueueFamilyIndex = vk_state->transferQueue.index;
@@ -265,8 +266,8 @@ void VulkanCommitTransfers()
 
 		imageAcquireInfos[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
 		imageAcquireInfos[i].pNext = nullptr;
-		imageAcquireInfos[i].srcStageMask = 0;  // IGNORED because it is a queue family acquire operation
-		imageAcquireInfos[i].srcAccessMask = 0; // IGNORED because it is a queue family acquire operation
+		imageAcquireInfos[i].srcStageMask = 0;
+		imageAcquireInfos[i].srcAccessMask = 0;
 		imageAcquireInfos[i].dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 		imageAcquireInfos[i].dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
 		imageAcquireInfos[i].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -315,7 +316,7 @@ void VulkanCommitTransfers()
 	signalSemaphores[0].pNext = nullptr;
 	signalSemaphores[0].semaphore = vk_state->transferState.uploadSemaphore.handle;
 	signalSemaphores[0].value = vk_state->transferState.uploadSemaphore.submitValue;
-	signalSemaphores[0].stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+	signalSemaphores[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 	signalSemaphores[0].deviceIndex = 0;
 
 	SubmitCommandBuffers(waitSemaphoreCount, waitSemaphores, signalSemaphoreCount, signalSemaphores, 1, &vk_state->transferState.transferCommandBuffers[vk_state->currentInFlightFrameIndex], nullptr);
