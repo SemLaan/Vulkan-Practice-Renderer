@@ -88,7 +88,7 @@ void CreateSwapchain(GrPresentMode requestedPresentMode)
 	u32 queueFamilyIndices[2] = { vk_state->graphicsQueue.index, vk_state->presentQueue.index };
 	if (vk_state->graphicsQueue.index != vk_state->presentQueue.index)
 	{
-		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		createInfo.queueFamilyIndexCount = 2;
 		createInfo.pQueueFamilyIndices = queueFamilyIndices;
 	}

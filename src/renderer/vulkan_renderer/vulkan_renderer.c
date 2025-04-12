@@ -928,12 +928,15 @@ bool BeginRendering()
 	if (vk_state->shouldRecreateSwapchain)
 		RecreateSwapchain();
 
+	// TODO: temporary fix for synch issues
+	vkDeviceWaitIdle(vk_state->device);
+
 	// ================================= Waiting for rendering resources to become available ==============================================================
 	// The GPU can work on multiple frames simultaneously (i.e. multiple frames can be "in flight"), but each frame has it's own resources
 	// that the GPU needs while it's rendering a frame. So we need to wait for one of those sets of resources to become available again (command buffers and binary semaphores).
-#define CPU_SIDE_WAIT_SEMAPHORE_COUNT 1
-	VkSemaphore waitSemaphores[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.handle };
-	u64 waitValues[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1) };
+#define CPU_SIDE_WAIT_SEMAPHORE_COUNT 2
+	VkSemaphore waitSemaphores[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.handle, vk_state->duplicatePrePresentCompleteSemaphore.handle };
+	u64 waitValues[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.submitValue, vk_state->duplicatePrePresentCompleteSemaphore.submitValue };
 
 	VkSemaphoreWaitInfo semaphoreWaitInfo = {};
 	semaphoreWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
@@ -992,10 +995,10 @@ void EndRendering()
 		VkImageMemoryBarrier2 rendertargetTransitionImageBarrierInfo = {};
 		rendertargetTransitionImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
 		rendertargetTransitionImageBarrierInfo.pNext = nullptr;
-		rendertargetTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		rendertargetTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 		rendertargetTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
 		rendertargetTransitionImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
-		rendertargetTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+		rendertargetTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
 		rendertargetTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		rendertargetTransitionImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		rendertargetTransitionImageBarrierInfo.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1102,7 +1105,7 @@ void EndRendering()
 		waitSemaphores[0].pNext = nullptr;
 		waitSemaphores[0].semaphore = vk_state->imageAvailableSemaphores[vk_state->currentInFlightFrameIndex];
 		waitSemaphores[0].value = 0;
-		waitSemaphores[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		waitSemaphores[0].stageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
 		waitSemaphores[0].deviceIndex = 0;
 
 		// Resource upload semaphores
@@ -1131,16 +1134,6 @@ void EndRendering()
 	// ============================== Telling the GPU to present this frame (after it's rendered of course, synced with a binary semaphore) =================================
 	// First acquiring ownership (present queue) of the swapchain image that is to be presented.
 	{
-		VkSemaphoreWaitInfo semaphoreWaitInfo = {};
-		semaphoreWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-		semaphoreWaitInfo.pNext = nullptr;
-		semaphoreWaitInfo.flags = 0;
-		semaphoreWaitInfo.semaphoreCount = 1;
-		semaphoreWaitInfo.pSemaphores = &vk_state->duplicatePrePresentCompleteSemaphore.handle;
-		u64 waitForValue = vk_state->duplicatePrePresentCompleteSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1);
-		semaphoreWaitInfo.pValues = &waitForValue;
-
-		VK_CHECK(vkWaitSemaphores(vk_state->device, &semaphoreWaitInfo, UINT64_MAX));
 		ResetAndBeginCommandBuffer(vk_state->presentCommandBuffers[vk_state->currentInFlightFrameIndex]);
 		VkCommandBuffer presentCommandBuffer = vk_state->presentCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
 
