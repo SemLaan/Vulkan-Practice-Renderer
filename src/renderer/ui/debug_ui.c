@@ -1186,7 +1186,6 @@ void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interac
 		sliderValueString[charWriteCount] = ' ';
 	sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE-1] = '\0';
 	f32 valueTextWidth = TextBatchGetTextWidth(menu->dynamicTextBatch, sliderValueString, MENU_TITLE_TEXT_SIZE);
-	_DEBUG("Text Width: %f", valueTextWidth);
 	vec2 valueTextPosition = vec2_create(interactableData->position.x + interactableData->size.x / 2.f - valueTextWidth / 2.f, interactableData->position.y + interactableData->size.y / 2.f - MENU_TITLE_TEXT_SIZE / 2.f);
 	TextBatchUpdateTextPosition(menu->dynamicTextBatch, sliderData->valueTextID, valueTextPosition);
 	TextBatchUpdateTextString(menu->dynamicTextBatch, sliderData->valueTextID, sliderValueString);
