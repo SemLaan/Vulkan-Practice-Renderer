@@ -226,11 +226,11 @@ void GameRenderingInit()
     RegisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
     DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
-	DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "r", 0.001f, 1, &renderingState->shaderParameters.uiColor.x);
-    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "g", 0.001f, 1, &renderingState->shaderParameters.uiColor.y);
-    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "b", 0.001f, 1, &renderingState->shaderParameters.uiColor.z);
-    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge thickness", 0.001f, 1, &renderingState->shaderParameters.uiOther.x);
-    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "roundedness", 0.001f, 1, &renderingState->shaderParameters.uiOther.y);
+	DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "r", 0, 1, &renderingState->shaderParameters.uiColor.x);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "g", 0, 1, &renderingState->shaderParameters.uiColor.y);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "b", 0, 1, &renderingState->shaderParameters.uiColor.z);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge thickness", 0, 1, &renderingState->shaderParameters.uiOther.x);
+    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "roundedness", 0, 1, &renderingState->shaderParameters.uiOther.y);
 	renderingState->shaderParameters.uiColor.w = 1;
 
 	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT] = POSSIBLE_BLUR_KERNEL_SIZES;
