@@ -554,6 +554,7 @@ void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosit
 	}
 
 	vec2 positionDelta = vec2_sub_vec2(newPosition, textBatch->textDataArray->data[textIndex].position);
+	textBatch->textDataArray->data[textIndex].position = newPosition;
 	for (int i = textBatch->textDataArray->data[textIndex].firstGlyphInstanceIndex; i < textBatch->textDataArray->data[textIndex].firstGlyphInstanceIndex + textBatch->textDataArray->data[textIndex].glyphInstanceCount; i++)
 	{
 		textBatch->glyphInstanceData->data[i].localPosition = vec2_add_vec2(textBatch->glyphInstanceData->data[i].localPosition, positionDelta);
