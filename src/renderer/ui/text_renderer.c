@@ -474,6 +474,65 @@ u64 TextBatchAddTextMaxWidth(TextBatch* textBatch, const char* text, vec2 positi
 	return state->nextTextId - 1;
 }
 
+f32 TextBatchGetTextWidth(TextBatch* textBatch, const char* text, f32 fontSize)
+{
+	f32 textWidth = -textBatch->font->xPadding * fontSize;
+	u32 stringLength = strlen(text);
+	
+	// Making sure leading whitespace is ignored
+	u32 startingIndex = 0;
+	for (u32 i = 0; i < stringLength; i++)
+	{
+		startingIndex = i;
+		if (text[i] != '\t' || text[i] != ' ')
+		break;
+	}
+	
+	// Making sure trailing whitespace is ignored
+	u32 truncatedStringLength = stringLength;
+	while (text[truncatedStringLength - 1] == '\t' || text[truncatedStringLength - 1] == ' ')
+	{
+		truncatedStringLength--;
+	}
+
+	GRASSERT_DEBUG(truncatedStringLength > 0);
+
+	for (u32 i = startingIndex; i < truncatedStringLength; i++)
+	{
+		GRASSERT_DEBUG(text[i] != '\n');// This function doesn't work with newlines
+
+		// If the glyph is a tab, dont add it to the glyph instance array
+		if (text[i] == '\t')
+		{
+			textWidth += textBatch->font->spaceAdvanceWidth * TAB_SIZE * fontSize;
+			continue;
+		}
+
+		// If the glyph is a space, dont add it to the glyph instance array
+		if (text[i] == ' ')
+		{
+			textWidth += textBatch->font->spaceAdvanceWidth * fontSize;
+			continue;
+		}
+
+		// Finding the index for the glyph to get it's data from the font
+		u32 glyphIndex = UINT32_MAX;
+		for (int j = 0; j < textBatch->font->characterCount; j++)
+		{
+			if (text[i] == textBatch->font->renderableCharacters[j])
+			{
+				glyphIndex = j;
+				break;
+			}
+		}
+
+		textWidth += textBatch->font->advanceWidths[glyphIndex] * fontSize;
+	}
+
+	GRASSERT_DEBUG(textWidth > 0);
+	return textWidth;
+}
+
 void TextBatchRemoveText(TextBatch* textBatch, u64 textId)
 {
 	// Getting the index of the text that corresponds to the given text id

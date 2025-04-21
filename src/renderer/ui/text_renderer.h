@@ -92,6 +92,9 @@ u64 TextBatchAddText(TextBatch* textBatch, const char* text, vec2 position, f32 
 
 u64 TextBatchAddTextMaxWidth(TextBatch* textBatch, const char* text, vec2 position, f32 fontSize, f32 maxLineWidth, f32* out_height);
 
+// Ignores leading and trailing whitespace, doesn't work with strings that contain newlines
+f32 TextBatchGetTextWidth(TextBatch* textBatch, const char* text, f32 fontSize);
+
 void TextBatchRemoveText(TextBatch* textBatch, u64 textId);
 
 void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosition);
