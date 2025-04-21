@@ -9,6 +9,8 @@
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
 
+#include <stdio.h>
+
 // STEPS TO ADD A NEW INTERACTABLE TYPE ==================================================================
 // Add it to the InteractableType enum
 // Increase the INTERACTABLE_TYPE_COUNT define by one
@@ -25,6 +27,7 @@
 #define MAX_DBG_MENUS 3                                    // Change if you need more
 #define ITERACTABLE_INTERNAL_DATA_ALLOCATOR_SIZE (KiB * 5) // This size is arbitrary :)
 #define NO_INTERACTABLE_ACTIVE_VALUE -1
+#define SLIDER_VALUE_STRING_MAX_SIZE (25 * 4)
 
 // ====================== Debug menu visual constant values =====================================
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
@@ -94,6 +97,7 @@ typedef struct MenuHandlebarInteractableData
 // Interactable internal data for the slider float
 typedef struct SliderFloatInteractableData
 {
+	u64 valueTextID;	// ID of the text
     f32* pSliderValue; // Pointer to a float that stores the value of the slider for the client to read out.
     f32 minValue;      // Minimum value of the slider.
     f32 maxValue;      // Maximum value of the slider.
@@ -107,6 +111,7 @@ typedef struct SliderIntInteractableData
     i64 minValue;      // Minimum value of the slider.
     i64 maxValue;      // Maximum value of the slider.
     u64 valueRange;    // Max value - Min value. Used for calculating the position of the slider dot.
+	u64 valueTextID;	// ID of the text
 } SliderIntInteractableData;
 
 // Interactable internal data for the slider discrete
@@ -117,6 +122,7 @@ typedef struct SliderDiscreteInteractableData
     // Min index not necessary because it will always be zero
     u64 maxIndex; // Maximum index of the slider.
                   // value range is also not necessary because it is equal to maxIndex
+	u64 valueTextID;	// ID of the text
 } SliderDiscreteInteractableData;
 
 // Interactable internal data for the slider log
@@ -124,6 +130,7 @@ typedef struct SliderLogInteractableData
 {
     // Pointer to a float that stores the exponentiated value of the slider for the client to read out.
     // This is the true value that the slider represents for the user, but not the position of the slider as it isn't linear but exponential.
+	u64 valueTextID;	// ID of the text
     f32* pSliderValue;
     f32 base;               // Base used in the log
     f32 minExponentValue;   // Minimum exponent value of the slider.
@@ -133,7 +140,7 @@ typedef struct SliderLogInteractableData
 
 typedef struct InteractableData
 {
-	u64 textID;
+	u64 elementNameTextID;
     vec2 position;
     vec2 size;
     u32 firstQuad;
@@ -151,6 +158,7 @@ typedef struct DebugMenu
     VertexBuffer quadsInstancedVB;        	// Vertex buffer with model matrices for quads.
     Material menuElementMaterial;         	// Material to render quads with.
 	TextBatch* elementTextBatch;			// Text batch for rendering the names of elements
+	TextBatch* dynamicTextBatch;			// Text batch for rendering numbers and other parts of elements that change frequently
     i32 activeInteractableIndex;          	// Index into interactables array, is -1 if no interactable is being interacted with. (If a button is being pressed or a slider is being dragged, this will indicate that.)
     u32 maxQuads;                         	// Max amount of quads
     u32 quadCount;                        	// Current amount of quads
@@ -414,6 +422,7 @@ DebugMenu* DebugUICreateMenu()
 
 	// Initiating the menu's text batches
 	menu->elementTextBatch = TextBatchCreate(DEBUG_UI_FONT_NAME);
+	menu->dynamicTextBatch = TextBatchCreate(DEBUG_UI_FONT_NAME);
 
     // Creating an instanced vertex buffer for all the quads that will be rendered in the menu.
     menu->quadsInstanceData = Alloc(GetGlobalAllocator(), sizeof(*menu->quadsInstanceData) * MAX_DBG_MENU_QUADS);
@@ -449,6 +458,7 @@ DebugMenu* DebugUICreateMenu()
 void DebugUIDestroyMenu(DebugMenu* menu)
 {
 	// Destroying text batches
+	TextBatchDestroy(menu->dynamicTextBatch);
 	TextBatchDestroy(menu->elementTextBatch);
 
     // Destroying graphics resources
@@ -499,6 +509,7 @@ void DebugUIRenderMenu(DebugMenu* menu)
     Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
 
 	TextBatchRender(menu->elementTextBatch, menuElementsView);
+	TextBatchRender(menu->dynamicTextBatch, menuElementsView);
 }
 
 void DebugUISetMaterialValues(DebugMenu* menu, vec4 color, vec4 other)
@@ -525,7 +536,7 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 
 	vec2 menuTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET, handlebarPosition.y + (HANDLEBAR_VERTICAL_SIZE / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f));
 
-	menu->interactablesArray[menu->interactablesCount].textID = TextBatchAddText(menu->elementTextBatch, text, menuTitlePosition, MENU_TITLE_TEXT_SIZE, false);
+	menu->interactablesArray[menu->interactablesCount].elementNameTextID = TextBatchAddText(menu->elementTextBatch, text, menuTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -564,7 +575,7 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
-	menu->interactablesArray[menu->interactablesCount].textID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
+	menu->interactablesArray[menu->interactablesCount].elementNameTextID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -604,7 +615,7 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
     menu->quadCount++;
     menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
-	menu->interactablesArray[menu->interactablesCount].textID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
+	menu->interactablesArray[menu->interactablesCount].elementNameTextID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -645,7 +656,7 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
 
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
-	menu->interactablesArray[menu->interactablesCount].textID = textID;
+	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
 
 	f32 halfDelta = 0; 
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -714,8 +725,8 @@ void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 ma
 	vec2 elementTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET, menu->nextElementYOffset + (SLIDER_BAR_SIZE.y / 2.f) - (MENU_TITLE_TEXT_SIZE / 2.f));
 
 	f32 finalTextVerticalSize;
-	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
-	menu->interactablesArray[menu->interactablesCount].textID = textID;
+	u64 nameTextID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
+	menu->interactablesArray[menu->interactablesCount].elementNameTextID = nameTextID;
 
 	f32 halfDelta = 0; 
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -728,12 +739,23 @@ void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 ma
 	if (finalTextVerticalSize > MENU_TITLE_TEXT_SIZE)
 	{
 		elementTitlePosition.y = menu->nextElementYOffset + halfDelta + (SLIDER_BAR_SIZE.y / 2.f) + (finalTextVerticalSize / 2.f) - MENU_TITLE_TEXT_SIZE;
-		TextBatchUpdateTextPosition(menu->elementTextBatch, textID, elementTitlePosition);
+		TextBatchUpdateTextPosition(menu->elementTextBatch, nameTextID, elementTitlePosition);
 	}
 
     vec2 sliderTotalPosition = vec2_create(MENU_ELEMENTS_OFFSET + TEXT_TO_ELEMENT_SEPARATION + ELEMENT_POST_TEXT_OFFSET, menu->nextElementYOffset + halfDelta);
     vec2 sliderTotalSize = vec2_create(SLIDER_BAR_SIZE.x, SLIDER_DOT_SIZE.y);
     
+	// Adding the text that displays the current value of the slider
+	char sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE] = {};
+	MemorySet(sliderValueString, ' ', SLIDER_VALUE_STRING_MAX_SIZE);
+	i32 charWriteCount = snprintf(sliderValueString, SLIDER_VALUE_STRING_MAX_SIZE, "%lli", *sliderData->pSliderValue);
+	if (charWriteCount < SLIDER_VALUE_STRING_MAX_SIZE - 1)
+		sliderValueString[charWriteCount] = ' ';
+	sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE-1] = '\0';
+	f32 valueTextWidth = TextBatchGetTextWidth(menu->dynamicTextBatch, sliderValueString, MENU_TITLE_TEXT_SIZE);
+	vec2 valueTextPosition = vec2_create(sliderTotalPosition.x + sliderTotalSize.x / 2.f - valueTextWidth / 2.f, sliderTotalPosition.y + sliderTotalSize.y / 2.f - MENU_TITLE_TEXT_SIZE / 2.f);
+	sliderData->valueTextID = TextBatchAddText(menu->dynamicTextBatch, sliderValueString, valueTextPosition, MENU_TITLE_TEXT_SIZE, true);
+
     mat4 sliderBarTransform = mat4_mul_mat4(mat4_2Dtranslate(sliderTotalPosition), mat4_2Dscale(sliderTotalSize));
     menu->quadsInstanceData[menu->quadCount].transform = sliderBarTransform;
     menu->quadsInstanceData[menu->quadCount].color = SLIDER_BAR_COLOR;
@@ -793,7 +815,7 @@ void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteVa
 
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
-	menu->interactablesArray[menu->interactablesCount].textID = textID;
+	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
 
 	f32 halfDelta = 0; 
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -871,7 +893,7 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
-	menu->interactablesArray[menu->interactablesCount].textID = textID;
+	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
 
 	f32 halfDelta = 0; 
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -1118,6 +1140,18 @@ void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interact
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
+	// Updating the slider value text
+	char sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE] = {};
+	MemorySet(sliderValueString, ' ', SLIDER_VALUE_STRING_MAX_SIZE);
+	i32 charWriteCount = snprintf(sliderValueString, SLIDER_VALUE_STRING_MAX_SIZE, "%lli", *sliderData->pSliderValue);
+	if (charWriteCount < SLIDER_VALUE_STRING_MAX_SIZE - 1)
+		sliderValueString[charWriteCount] = ' ';
+	sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE-1] = '\0';
+	f32 valueTextWidth = TextBatchGetTextWidth(menu->dynamicTextBatch, sliderValueString, MENU_TITLE_TEXT_SIZE);
+	vec2 valueTextPosition = vec2_create(interactableData->position.x + interactableData->size.x / 2.f - valueTextWidth / 2.f, interactableData->position.y + interactableData->size.y / 2.f - MENU_TITLE_TEXT_SIZE / 2.f);
+	TextBatchUpdateTextPosition(menu->dynamicTextBatch, sliderData->valueTextID, valueTextPosition);
+	TextBatchUpdateTextString(menu->dynamicTextBatch, sliderData->valueTextID, sliderValueString);
+
     // Updating the slider value for the client.
     *sliderData->pSliderValue = sliderData->minValue + (i64)mouseSliderPosition;
 }
@@ -1144,6 +1178,19 @@ void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interac
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
+	// Updating the slider value text
+	char sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE] = {};
+	MemorySet(sliderValueString, ' ', SLIDER_VALUE_STRING_MAX_SIZE);
+	i32 charWriteCount = snprintf(sliderValueString, SLIDER_VALUE_STRING_MAX_SIZE, "%lli", *sliderData->pSliderValue);
+	if (charWriteCount < SLIDER_VALUE_STRING_MAX_SIZE - 1)
+		sliderValueString[charWriteCount] = ' ';
+	sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE-1] = '\0';
+	f32 valueTextWidth = TextBatchGetTextWidth(menu->dynamicTextBatch, sliderValueString, MENU_TITLE_TEXT_SIZE);
+	_DEBUG("Text Width: %f", valueTextWidth);
+	vec2 valueTextPosition = vec2_create(interactableData->position.x + interactableData->size.x / 2.f - valueTextWidth / 2.f, interactableData->position.y + interactableData->size.y / 2.f - MENU_TITLE_TEXT_SIZE / 2.f);
+	TextBatchUpdateTextPosition(menu->dynamicTextBatch, sliderData->valueTextID, valueTextPosition);
+	TextBatchUpdateTextString(menu->dynamicTextBatch, sliderData->valueTextID, sliderValueString);
+
     // Updating the slider value for the client.
     *sliderData->pSliderValue = sliderData->minValue + (i64)mouseSliderPosition;
 }
@@ -1169,6 +1216,18 @@ void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactab
     mat4 sliderDotTransform = mat4_mul_mat4(mat4_3Dtranslate(sliderDotPosition), mat4_2Dscale(sliderDotSize));
     menu->quadsInstanceData[interactableData->firstQuad + 1 /*indexing into the dot quad*/].transform = sliderDotTransform;
     VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+	// Updating the slider value text
+	char sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE] = {};
+	MemorySet(sliderValueString, ' ', SLIDER_VALUE_STRING_MAX_SIZE);
+	i32 charWriteCount = snprintf(sliderValueString, SLIDER_VALUE_STRING_MAX_SIZE, "%lli", *sliderData->pSliderValue);
+	if (charWriteCount < SLIDER_VALUE_STRING_MAX_SIZE - 1)
+		sliderValueString[charWriteCount] = ' ';
+	sliderValueString[SLIDER_VALUE_STRING_MAX_SIZE-1] = '\0';
+	f32 valueTextWidth = TextBatchGetTextWidth(menu->dynamicTextBatch, sliderValueString, MENU_TITLE_TEXT_SIZE);
+	vec2 valueTextPosition = vec2_create(interactableData->position.x + interactableData->size.x / 2.f - valueTextWidth / 2.f, interactableData->position.y + interactableData->size.y / 2.f - MENU_TITLE_TEXT_SIZE / 2.f);
+	TextBatchUpdateTextPosition(menu->dynamicTextBatch, sliderData->valueTextID, valueTextPosition);
+	TextBatchUpdateTextString(menu->dynamicTextBatch, sliderData->valueTextID, sliderValueString);
 
     // Updating the slider value for the client.
     *sliderData->pSliderValue = sliderData->minValue + (i64)mouseSliderPosition;
