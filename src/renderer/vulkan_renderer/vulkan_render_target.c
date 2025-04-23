@@ -15,6 +15,8 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
     renderTarget->depthBufferUsage = depthBufferUsage;
     renderTarget->extent.width = width;
     renderTarget->extent.height = height;
+	renderTarget->colorImage.mipLevels = 1;
+	renderTarget->depthImage.mipLevels = 1;
 
     // Creating color buffer
     if (colorBufferUsage == RENDER_TARGET_USAGE_DISPLAY || colorBufferUsage == RENDER_TARGET_USAGE_TEXTURE)
@@ -29,6 +31,7 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
         createImageParameters.format = vk_state->renderTargetColorFormat;
         createImageParameters.tiling = VK_IMAGE_TILING_OPTIMAL;
         createImageParameters.usage = vulkanColorImageUsage;
+		createImageParameters.mipLevels = renderTarget->colorImage.mipLevels;
 
         ImageCreate(&createImageParameters, MemType(MEMORY_TYPE_STATIC), &renderTarget->colorImage.handle, &renderTarget->colorImage.memory);
         CreateImageView(&renderTarget->colorImage, VK_IMAGE_ASPECT_COLOR_BIT, vk_state->renderTargetColorFormat);
@@ -46,6 +49,7 @@ RenderTarget RenderTargetCreate(u32 width, u32 height, RenderTargetUsage colorBu
         createImageParameters.format = vk_state->renderTargetDepthFormat;
         createImageParameters.tiling = VK_IMAGE_TILING_OPTIMAL;
         createImageParameters.usage = vulkanDepthImageUsage;
+		createImageParameters.mipLevels = renderTarget->depthImage.mipLevels;
 
         ImageCreate(&createImageParameters, MemType(MEMORY_TYPE_STATIC), &renderTarget->depthImage.handle, &renderTarget->depthImage.memory);
         CreateImageView(&renderTarget->depthImage, VK_IMAGE_ASPECT_DEPTH_BIT, vk_state->renderTargetDepthFormat);

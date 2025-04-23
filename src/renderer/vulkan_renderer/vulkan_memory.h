@@ -12,6 +12,7 @@ typedef struct VulkanCreateImageParameters
 	VkFormat				format;
 	VkImageTiling			tiling;
 	VkImageUsageFlags		usage;
+	u32						mipLevels;
 } VulkanCreateImageParameters;
 
 void VulkanMemoryInit();

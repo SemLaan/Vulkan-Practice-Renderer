@@ -288,7 +288,7 @@ void ImageCreate(VulkanCreateImageParameters* pCreateParams, VkMemoryTypeHolder 
 	imageCreateInfo.extent.width = pCreateParams->width;
 	imageCreateInfo.extent.height = pCreateParams->height;
 	imageCreateInfo.extent.depth = 1;
-	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.mipLevels = pCreateParams->mipLevels;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageCreateInfo.tiling = pCreateParams->tiling;

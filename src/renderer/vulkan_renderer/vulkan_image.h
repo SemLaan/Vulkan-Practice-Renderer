@@ -6,3 +6,5 @@
 
 void CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkFormat format);
 
+void GenerateMips();
+

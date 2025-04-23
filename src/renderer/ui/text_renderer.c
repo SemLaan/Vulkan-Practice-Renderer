@@ -159,7 +159,7 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
 	font->characterCount = charCount;
 
-	font->glyphTextureAtlas = TextureCreate(textureAtlasWidth, textureAtlasHeight, texturePixelData, TEXTURE_STORAGE_RGBA8UNORM);
+	font->glyphTextureAtlas = TextureCreate(textureAtlasWidth, textureAtlasHeight, texturePixelData, TEXTURE_STORAGE_RGBA8UNORM, true);
 
 	Free(GetGlobalAllocator(), texturePixelData);
 

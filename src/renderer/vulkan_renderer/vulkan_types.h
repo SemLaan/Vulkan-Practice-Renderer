@@ -75,6 +75,9 @@ typedef struct VulkanImage
 	VkImage handle;
 	VkImageView view;
 	VulkanAllocation memory;
+	u32 width;
+	u32 height;
+	u32 mipLevels;
 } VulkanImage;
 
 typedef struct VulkanBufferCopyData
@@ -267,6 +270,8 @@ typedef struct TransferState
 	TransferMethod slowestTransferMethod;
 } TransferState;
 
+DEFINE_DARRAY_TYPE_REF(VulkanImage);
+
 typedef struct RendererState
 {
 	// Frequently used data (every frame)
@@ -311,6 +316,7 @@ typedef struct RendererState
 	SimpleMap* basicMeshMap;										// MeshData hashmap that maps basic mesh names to meshes.
 
 	// Data that is only used on startup/shutdown
+	VulkanImageRefDarray* mipGenerationQueue;						// Darray of images who's mips need to be generated at the start of the frame
 	VkFormat renderTargetColorFormat;								// Image format used for render target color textures
 	VkFormat renderTargetDepthFormat;								// Image format used for render target depth textures
 	VkInstance instance;											// Vulkan instance handle

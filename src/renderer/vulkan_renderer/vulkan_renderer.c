@@ -50,6 +50,7 @@ bool InitializeRenderer(RendererInitSettings settings)
 	vk_state->currentInFlightFrameIndex = 0;
 	vk_state->shouldRecreateSwapchain = false;
 	vk_state->requestedPresentMode = settings.presentMode;
+	vk_state->mipGenerationQueue = VulkanImageRefDarrayCreate(10, vk_state->rendererAllocator);
 
 	RegisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
@@ -510,7 +511,7 @@ bool InitializeRenderer(RendererInitSettings settings)
 		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		samplerCreateInfo.mipLodBias = 0.0f;
 		samplerCreateInfo.minLod = 0.0f;
-		samplerCreateInfo.maxLod = 0.0f;
+		samplerCreateInfo.maxLod = VK_LOD_CLAMP_NONE;
 		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
 
@@ -646,7 +647,7 @@ bool InitializeRenderer(RendererInitSettings settings)
 			}
 		}
 
-		vk_state->defaultTexture = TextureCreate(DEFAULT_TEXTURE_SIZE, DEFAULT_TEXTURE_SIZE, defaultTexturePixels, TEXTURE_STORAGE_RGBA8SRGB);
+		vk_state->defaultTexture = TextureCreate(DEFAULT_TEXTURE_SIZE, DEFAULT_TEXTURE_SIZE, defaultTexturePixels, TEXTURE_STORAGE_RGBA8SRGB, false);
 	}
 
 	// ============================================================================================================================================================
@@ -899,6 +900,7 @@ void ShutdownRenderer()
 	if (vk_state->instance)
 		vkDestroyInstance(vk_state->instance, vk_state->vkAllocator);
 
+	DarrayDestroy(vk_state->mipGenerationQueue);
 	DestroyFreelistAllocator(vk_state->rendererAllocator);
 	Free(GetGlobalAllocator(), vk_state);
 	vk_state = nullptr;
@@ -978,6 +980,10 @@ bool BeginRendering()
 	vkCmdPipelineBarrier2(currentCommandBuffer, vk_state->transferState.uploadAcquireDependencyInfo);
 	vk_state->transferState.uploadAcquireDependencyInfo = nullptr;
 	INSERT_DEBUG_MEMORY_BARRIER(currentCommandBuffer);
+
+	// Generating mips for newly uploaded images that need them
+	if (vk_state->mipGenerationQueue->size > 0)
+		GenerateMips();
 
 	// Binding global ubo
 	VulkanShader* defaultShader = SimpleMapLookup(vk_state->shaderMap, DEFAULT_SHADER_NAME);
