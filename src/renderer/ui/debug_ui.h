@@ -22,7 +22,7 @@ void UpdateDebugUI();
 
 /// @brief Creates a Debug UI menu instance.
 /// @return Pointer to the menu.
-DebugMenu* DebugUICreateMenu();
+DebugMenu* DebugUICreateMenu(const char* title);
 
 /// @brief Destroys the given Debug UI menu instance.
 /// @param menu Pointer to the menu.

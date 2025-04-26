@@ -29,7 +29,7 @@ void PlayerControllerInit()
     InputSetMouseCentered(controllerState->cameraControlActive);
 
     // Creating debug menu
-    controllerState->controllerSettingMenu = DebugUICreateMenu();
+    controllerState->controllerSettingMenu = DebugUICreateMenu("Mouse Settings");
     RegisterDebugMenu(controllerState->controllerSettingMenu);
     DebugUIAddButton(controllerState->controllerSettingMenu, "control camera", nullptr, &controllerState->controlCameraButtonPressed);
     DebugUIAddSliderLog(controllerState->controllerSettingMenu, "mouse sensitivity", 10.f, 0.0001f, 0.01f, &controllerState->mouseSensitivity);

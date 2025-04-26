@@ -412,7 +412,7 @@ static inline void RecalculateMenuBackgroundSize(DebugMenu* menu)
 	menu->quadsInstanceData[0].transform = mat4_mul_mat4(mat4_2Dtranslate(vec2_create(0, -menu->size.y)), mat4_2Dscale(menu->size));
 }
 
-DebugMenu* DebugUICreateMenu()
+DebugMenu* DebugUICreateMenu(const char* title)
 {
     // Allocating the DebugMenu struct
     DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu));
@@ -454,7 +454,7 @@ DebugMenu* DebugUICreateMenu()
     menu->activeInteractableIndex = NO_INTERACTABLE_ACTIVE_VALUE;
 
     // Adding the menu handlebar
-    DebugUIAddMenuHandlebar(menu, "placeholder text (TODO: make user adjustable)");
+    DebugUIAddMenuHandlebar(menu, title);
 
     return menu;
 }

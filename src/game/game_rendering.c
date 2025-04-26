@@ -222,7 +222,7 @@ void GameRenderingInit()
     }
 
     // Setting up debug ui's for shader parameters and terrain generation settings
-    renderingState->shaderParamDebugMenu = DebugUICreateMenu();
+    renderingState->shaderParamDebugMenu = DebugUICreateMenu("Shader Parameters");
     RegisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
     DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
@@ -236,7 +236,7 @@ void GameRenderingInit()
 	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT] = POSSIBLE_BLUR_KERNEL_SIZES;
 	MemoryCopy(renderingState->worldGenParams.blurKernelSizeOptions, blurKernelSizeOptions, sizeof(blurKernelSizeOptions));
 
-	renderingState->worldGenParamDebugMenu = DebugUICreateMenu();
+	renderingState->worldGenParamDebugMenu = DebugUICreateMenu("World Gen Parameters");
 	RegisterDebugMenu(renderingState->worldGenParamDebugMenu);
 	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Blur Iterations", MIN_BLUR_ITERATIONS, MAX_BLUR_ITERATIONS, &renderingState->worldGenParams.blurIterations);
 	DebugUIAddSliderDiscrete(renderingState->worldGenParamDebugMenu, "Blur Kernel Size", renderingState->worldGenParams.blurKernelSizeOptions, POSSIBLE_BLUR_KERNEL_SIZES_COUNT, &renderingState->worldGenParams.blurKernelSize);
