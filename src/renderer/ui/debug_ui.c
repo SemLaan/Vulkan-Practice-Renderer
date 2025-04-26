@@ -50,7 +50,7 @@
 #define SLIDER_DOT_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
 #define GREY_OUT_FACTOR 0.8f
 #define MENU_ELEMENT_OUTLINE_COLOR vec4_create(26.f/255.f, 188.f/255.f, 156.f/255.f, 1)
-#define MENU_ELEMENT_OUTLINE_DATA vec4_create(0.0258837286f, 0.0200286899f, 0, 0)
+#define MENU_ELEMENT_OUTLINE_DATA vec4_create(0.0222f, 0.0304f, 0.005f, 0)
 #define ELEMENT_TITLE_TEXT_SIZE .05f
 #define MENU_TITLE_TEXT_SIZE .1f
 

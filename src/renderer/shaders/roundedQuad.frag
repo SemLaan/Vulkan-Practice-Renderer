@@ -10,7 +10,7 @@ layout(location = 0) out vec4 outColor;
 layout(BIND 1) uniform UniformBufferObject
 {
     vec4 color;
-	vec4 other; // x: line thickness, y = roundedness 
+	vec4 other; // x: line thickness, y = corner Radius, z = transparency transition thickness
 } ubo;
 
 
@@ -23,20 +23,10 @@ void main() {
 	vec2 d = vec2(max(left - f_quadCoordAndSize.x, f_quadCoordAndSize.x - right), max(bottom - f_quadCoordAndSize.y, f_quadCoordAndSize.y - top));
 	float signedDistance = length(max(vec2(0.0), d)) + min(0.0, max(d.x, d.y));
 
-	if (signedDistance < ubo.other.x && signedDistance >= ubo.other.x - ubo.other.y)
+	if (signedDistance < ubo.other.y && signedDistance >= ubo.other.y - ubo.other.x)
 		finalColor = ubo.color.xyz;
 
-	signedDistance = max(0, signedDistance);
-	signedDistance *= (1/ubo.other.y);
-	signedDistance = 1 - signedDistance;
-	if (signedDistance > 0)
-		signedDistance = 1;
+	float alpha = clamp(mix(1, 0, (signedDistance - ubo.other.y + ubo.other.z) / ubo.other.z), 0, 1);
 
-	//float signedDistance = 1;
-	//if (max(d.x, d.y) > 0)
-	//	signedDistance = 0;
-
-    //outColor = vec4(vec3(44.0/255.0, 62.0/255.0, 80.0/255.0), 1);
-
-    outColor = ToLinearRGB(vec4(finalColor, signedDistance));
+	outColor = ToLinearRGB(vec4(finalColor, alpha));
 }

@@ -229,8 +229,9 @@ void GameRenderingInit()
 	DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "r", 0, 1, &renderingState->shaderParameters.uiColor.x);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "g", 0, 1, &renderingState->shaderParameters.uiColor.y);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "b", 0, 1, &renderingState->shaderParameters.uiColor.z);
-    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge thickness", 0, 1, &renderingState->shaderParameters.uiOther.x);
-    DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "roundedness", 0, 1, &renderingState->shaderParameters.uiOther.y);
+    DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "edge thickness", 10, 0.01f, 1, &renderingState->shaderParameters.uiOther.x);
+    DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "roundedness", 10, 0.01f, 1, &renderingState->shaderParameters.uiOther.y);
+    DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "transparency transition", 10, 0.01f, 1, &renderingState->shaderParameters.uiOther.z);
 	renderingState->shaderParameters.uiColor.w = 1;
 
 	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT] = POSSIBLE_BLUR_KERNEL_SIZES;
