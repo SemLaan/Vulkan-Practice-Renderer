@@ -8,7 +8,7 @@
 #include <string.h>
 
 #define FORMAT_4_MAX_SEGMENTS 200
-
+//#define DEBUG_FONT_LOADER
 
 typedef struct RawGlyphData
 {
@@ -80,6 +80,12 @@ GlyphData* LoadFont(const char* filename)
             _DEBUG("indexToLocFormat: %i", ttfData.fontHeaderTable.indexToLocFormat);
 			#endif
         }
+		else if (0 == strncmp(ttfData.tableRecords[i].tag, "OS/2", 4))					// Getting the OS/2 table for getting the height of the text in general
+		{
+			GRASSERT(0 == fseek(file, ttfData.tableRecords[i].offset, SEEK_SET));
+
+			ttfData.os2 = readOS2(file);
+		}
         else if (0 == strncmp(ttfData.tableRecords[i].tag, "hmtx", 4))                  // Getting advance widths and lefs side bearings from hmtx
         {
             GRASSERT(0 == fseek(file, ttfData.tableRecords[i].offset, SEEK_SET));
@@ -380,6 +386,9 @@ GlyphData* LoadFont(const char* filename)
     }
 
     Free(GetGlobalAllocator(), rawGlyphData);
+
+	glyphData->lowercaseFontHeight = (f32)ttfData.os2.sxHeight / (f32)ttfData.fontHeaderTable.unitsPerEm;
+	glyphData->uppercaseFontHeight = (f32)ttfData.os2.sCapHeight / (f32)ttfData.fontHeaderTable.unitsPerEm;
 
     return glyphData;
 }

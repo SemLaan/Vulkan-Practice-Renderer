@@ -17,6 +17,8 @@ typedef struct GlyphData
     f32 leftSideBearings[255]; // The point moved by the offset, index from 0 - 255
     vec2 glyphSizes[255];      // specific glyph size divided by global max glyph sizes
 	vec2 glyphBottomLeftAnchor[255]; // Bottom left em space position of the glyph
+	f32 lowercaseFontHeight;
+	f32 uppercaseFontHeight;
 } GlyphData;
 
 GlyphData* LoadFont(const char* filename);

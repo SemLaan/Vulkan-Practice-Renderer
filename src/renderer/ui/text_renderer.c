@@ -101,6 +101,8 @@ void TextLoadFont(const char* fontName, const char* fontFileString)
 
 	font->spaceAdvanceWidth = glyphData->advanceWidths[' '];
 	font->refCount = 0;
+	font->lowercaseFontHeight = glyphData->lowercaseFontHeight;
+	font->uppercaseFontHeight = glyphData->uppercaseFontHeight;
 
 	u32 glyphResolution = 32;
 	u32 paddingPixels = 2;
