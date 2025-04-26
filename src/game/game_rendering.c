@@ -317,10 +317,7 @@ void GameRenderingRender()
     Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
 
     // Rendering the debug menu's
-    for (u32 i = 0; i < renderingState->debugMenuDarray->size; i++)
-    {
-        DebugUIRenderMenu(renderingState->debugMenuDarray->data[i]);
-    }
+    DebugUIRenderMenus();
 
 	// TODO: this renders the glyph texture atlas, once texture rendering has been added to the debug ui this needs to be removed and rendered with the debug ui
 	//MeshData* quadMesh = GetBasicMesh(BASIC_MESH_NAME_QUAD);

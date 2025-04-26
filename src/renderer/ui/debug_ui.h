@@ -28,9 +28,8 @@ DebugMenu* DebugUICreateMenu(const char* title);
 /// @param menu Pointer to the menu.
 void DebugUIDestroyMenu(DebugMenu* menu);
 
-/// @brief Renders the given Debug UI menu instance.
-/// @param menu Pointer to the menu.
-void DebugUIRenderMenu(DebugMenu* menu);
+/// @brief Renders the active Debug UI menu instances.
+void DebugUIRenderMenus();
 
 void DebugUISetMaterialValues(DebugMenu* menu, vec4 color, vec4 other);
 
