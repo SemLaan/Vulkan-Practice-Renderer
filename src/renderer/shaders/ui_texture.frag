@@ -9,11 +9,12 @@ layout(location = 0) in vec2 texCoord;
 
 layout(BIND 1) uniform sampler2D tex;
 
-//layout(BIND 2) uniform UniformBufferObject
-//{
-//    float zNear;
-//    float zFar;
-//} ubo;
+layout(BIND 2) uniform UniformBufferObject
+{
+	float glyphThresholdSize;
+    float zNear;
+    float zFar;
+} ubo;
 
 // Only use if the projection is perspective because ortho is already linear
 float linearize_depth(float d,float zNear,float zFar)
@@ -30,13 +31,16 @@ void main()
 
 	float sdfValue = texture(tex, texCoord).x;
 
-	vec4 colorValue = vec4(0, 0, 0, 0);
+	float halfThresholdSize = ubo.glyphThresholdSize / 2.0;
+	float thresholdStart = 0.5 - halfThresholdSize;
+	float thresholdProgress = (sdfValue - thresholdStart) / ubo.glyphThresholdSize;
+	vec4 colorValue = vec4(clamp(mix(1, 0, thresholdProgress), 0, 1));
 
-	if (sdfValue < 0.55)
-		colorValue = vec4(0, 0, 0, 1);
-	if (sdfValue < 0.45)
-		colorValue = vec4(0, 1, 1, 1);
+	//vec4 colorValue = vec4(0, 0, 0, 0);
+
+	//if (sdfValue < 0.50)
+	//	colorValue = vec4(1, 1, 1, 1);
 
 	outColor = colorValue;
-	outColor = vec4(texture(tex, texCoord).xxx, 1);
+	//outColor = vec4(texture(tex, texCoord).xxx, 1);
 }

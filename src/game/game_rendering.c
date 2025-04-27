@@ -30,6 +30,7 @@ DEFINE_DARRAY_TYPE_REF(DebugMenu);
 typedef struct ShaderParameters
 {
     f32 normalEdgeThreshold;
+	f32 glyphThresholdSize;
     bool renderMarchingCubesMesh;
 	vec4 uiColor;
 	vec4 uiOther;
@@ -232,6 +233,7 @@ void GameRenderingInit()
     DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "edge thickness", 10, 0.01f, 1, &renderingState->shaderParameters.uiOther.x);
     DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "roundedness", 10, 0.01f, 1, &renderingState->shaderParameters.uiOther.y);
     DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "transparency transition", 10, 0.01f, 1, &renderingState->shaderParameters.uiOther.z);
+	DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "Glyph Threshold Size", 10, 0.001f, 1.0f, &renderingState->shaderParameters.glyphThresholdSize);
 	renderingState->shaderParameters.uiColor.w = 1;
 
 	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT] = POSSIBLE_BLUR_KERNEL_SIZES;
@@ -279,6 +281,7 @@ void GameRenderingRender()
     MaterialUpdateProperty(renderingState->outlineMaterial, "normalEdgeThreshold", &renderingState->shaderParameters.normalEdgeThreshold);
 	MaterialUpdateProperty(renderingState->uiTextureMaterial, "uiProjection", &renderingState->uiCamera.projection);
 	mat4 identity = mat4_identity();
+	MaterialUpdateProperty(renderingState->uiTextureMaterial, "glyphThresholdSize", &renderingState->shaderParameters.glyphThresholdSize);
 
     // ================== Camera calculations
     CameraRecalculateViewAndViewProjection(&renderingState->sceneCamera);
