@@ -43,7 +43,7 @@
 #define ELEMENT_POST_TEXT_OFFSET 1.f
 #define BUTTON_SIZE vec2_create(MENU_START_SIZE.x - MENU_ELEMENTS_OFFSET * 2, .3f)
 #define BUTTON_BASIC_COLOR vec4_create(155.f/255.f, 89.f/255.f, 182.f/255.f, 1)
-#define BUTTON_PRESSED_COLOR vec4_create(142.f/255.f, 68.f/255.f, 173.f/255.f, 1.0f)
+#define BUTTON_PRESSED_COLOR vec4_create(46.f/255.f, 204.f/255.f, 113.f/255.f, 1.0f)
 #define SLIDER_DOT_SIZE vec2_create(0.1f, 0.2f)
 #define SLIDER_BAR_SIZE vec2_create(MENU_START_SIZE.x - MENU_ELEMENTS_OFFSET * 2 - TEXT_TO_ELEMENT_SEPARATION - ELEMENT_POST_TEXT_OFFSET, 0.2f)
 #define SLIDER_BAR_COLOR vec4_create(52.f/255.f, 152.f/255.f, 219.f/255.f, 1)
@@ -1047,7 +1047,7 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	// Set the button to the pressed color
-	menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_PRESSED_COLOR;
+	menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_BASIC_COLOR, GREY_OUT_FACTOR);
 	VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 
 	// Set the state of the button to being pressed
@@ -1084,7 +1084,7 @@ void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* inter
 	ToggleButtonInteractableData* buttonData = interactableData->internalData;
 
 	// Set the button to the pressed color
-	if (buttonData->pStateBool)
+	if (*buttonData->pStateBool)
 		menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_PRESSED_COLOR, GREY_OUT_FACTOR);
 	else
 		menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_BASIC_COLOR, GREY_OUT_FACTOR);
@@ -1101,13 +1101,13 @@ void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interac
 	ToggleButtonInteractableData* buttonData = interactableData->internalData;
 
 	// If the player was still hovering over the button when they released it toggle it's state.
-	if (buttonData->pStateBool && PointInRect(vec2_add_vec2(interactableData->position, menu->position), interactableData->size, vec4_xy(mouseWorldPosition)))
+	if (PointInRect(vec2_add_vec2(interactableData->position, menu->position), interactableData->size, vec4_xy(mouseWorldPosition)))
 	{
 		*buttonData->pStateBool = !*buttonData->pStateBool;
 	}
 
 	// Changing the color of the button back to the non-pressed color
-	if (buttonData->pStateBool)
+	if (*buttonData->pStateBool)
 		menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_PRESSED_COLOR;
 	else
 		menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
