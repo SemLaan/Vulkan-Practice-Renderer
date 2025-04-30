@@ -931,7 +931,7 @@ bool BeginRendering()
 		RecreateSwapchain();
 
 	// TODO: temporary fix for synch issues
-	vkDeviceWaitIdle(vk_state->device);
+	//vkDeviceWaitIdle(vk_state->device);
 
 	// ================================= Waiting for rendering resources to become available ==============================================================
 	// The GPU can work on multiple frames simultaneously (i.e. multiple frames can be "in flight"), but each frame has it's own resources
@@ -1136,6 +1136,9 @@ void EndRendering()
 		// Submitting the command buffer which allows the GPU to actually start working on this frame
 		SubmitCommandBuffers(waitSemaphoreCount, waitSemaphores, signalSemaphoreCount, signalSemaphores, 1, &vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex], nullptr);
 	}
+
+	// TODO: this is for testing a synch error
+	//vkDeviceWaitIdle(vk_state->device);
 
 	// ============================== Telling the GPU to present this frame (after it's rendered of course, synced with a binary semaphore) =================================
 	// First acquiring ownership (present queue) of the swapchain image that is to be presented.
