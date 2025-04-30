@@ -1097,10 +1097,10 @@ void EndRendering()
 		vkCmdPipelineBarrier2(currentCommandBuffer, &rendertargetTransitionDependencyInfo);
 	}
 
-	// ================================= End command buffer recording ==================================================
+	// ================================= End graphics command buffer recording ==================================================
 	EndCommandBuffer(vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex]);
 
-	// =================================== Submitting command buffer ==============================================
+	// =================================== Submitting graphics command buffer ==============================================
 	{
 		// With all the synchronization that that entails...
 		const u32 waitSemaphoreCount = 2; // 1 swapchain image acquisition, 1 resourse upload waits
