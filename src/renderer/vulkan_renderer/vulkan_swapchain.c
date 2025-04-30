@@ -84,17 +84,16 @@ void CreateSwapchain(GrPresentMode requestedPresentMode)
 	createInfo.imageExtent = swapchainExtent;
 	createInfo.imageArrayLayers = 1;
 	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	u32 queueFamilyIndices[2] = { vk_state->graphicsQueue.index, vk_state->presentQueue.index };
 	if (vk_state->graphicsQueue.index != vk_state->presentQueue.index)
 	{
-		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		createInfo.queueFamilyIndexCount = 2;
 		createInfo.pQueueFamilyIndices = queueFamilyIndices;
 	}
 	else
 	{
-		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		createInfo.queueFamilyIndexCount = 0;
 		createInfo.pQueueFamilyIndices = 0;
 	}

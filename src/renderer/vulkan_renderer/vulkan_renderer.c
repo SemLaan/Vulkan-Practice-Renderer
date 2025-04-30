@@ -938,7 +938,7 @@ bool BeginRendering()
 	// that the GPU needs while it's rendering a frame. So we need to wait for one of those sets of resources to become available again (command buffers and binary semaphores).
 #define CPU_SIDE_WAIT_SEMAPHORE_COUNT 2
 	VkSemaphore waitSemaphores[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.handle, vk_state->duplicatePrePresentCompleteSemaphore.handle };
-	u64 waitValues[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.submitValue, vk_state->duplicatePrePresentCompleteSemaphore.submitValue };
+	u64 waitValues[CPU_SIDE_WAIT_SEMAPHORE_COUNT] = { vk_state->frameSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1), vk_state->duplicatePrePresentCompleteSemaphore.submitValue - (MAX_FRAMES_IN_FLIGHT - 1) };
 
 	VkSemaphoreWaitInfo semaphoreWaitInfo = {};
 	semaphoreWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
