@@ -1067,34 +1067,35 @@ void EndRendering()
 
 	// ====================================== Transition swapchain image to present ready and releasing from graphics queue ======================================================
 	{
-		VkImageMemoryBarrier2 rendertargetTransitionImageBarrierInfo = {};
-		rendertargetTransitionImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		rendertargetTransitionImageBarrierInfo.pNext = nullptr;
-		rendertargetTransitionImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
-		rendertargetTransitionImageBarrierInfo.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-		rendertargetTransitionImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-		rendertargetTransitionImageBarrierInfo.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-		rendertargetTransitionImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		rendertargetTransitionImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		rendertargetTransitionImageBarrierInfo.srcQueueFamilyIndex = vk_state->graphicsQueue.index;
-		rendertargetTransitionImageBarrierInfo.dstQueueFamilyIndex = vk_state->presentQueue.index;
-		rendertargetTransitionImageBarrierInfo.image = vk_state->swapchainImages[vk_state->currentSwapchainImageIndex];
-		rendertargetTransitionImageBarrierInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		rendertargetTransitionImageBarrierInfo.subresourceRange.baseMipLevel = 0;
-		rendertargetTransitionImageBarrierInfo.subresourceRange.levelCount = 1;
-		rendertargetTransitionImageBarrierInfo.subresourceRange.baseArrayLayer = 0;
-		rendertargetTransitionImageBarrierInfo.subresourceRange.layerCount = 1;
+		VkImageMemoryBarrier2 swapchainImageTransitionReleaseImageBarrierInfo = {};
+		swapchainImageTransitionReleaseImageBarrierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		swapchainImageTransitionReleaseImageBarrierInfo.pNext = nullptr;
+		swapchainImageTransitionReleaseImageBarrierInfo.srcStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+		swapchainImageTransitionReleaseImageBarrierInfo.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+		swapchainImageTransitionReleaseImageBarrierInfo.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		swapchainImageTransitionReleaseImageBarrierInfo.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+		swapchainImageTransitionReleaseImageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		swapchainImageTransitionReleaseImageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		swapchainImageTransitionReleaseImageBarrierInfo.srcQueueFamilyIndex = vk_state->graphicsQueue.index;
+		swapchainImageTransitionReleaseImageBarrierInfo.dstQueueFamilyIndex = vk_state->presentQueue.index;
+		swapchainImageTransitionReleaseImageBarrierInfo.image = vk_state->swapchainImages[vk_state->currentSwapchainImageIndex];
+		_DEBUG("Frame: %u, swapchain index: %u", vk_state->currentFrameIndex, vk_state->currentSwapchainImageIndex);
+		swapchainImageTransitionReleaseImageBarrierInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		swapchainImageTransitionReleaseImageBarrierInfo.subresourceRange.baseMipLevel = 0;
+		swapchainImageTransitionReleaseImageBarrierInfo.subresourceRange.levelCount = 1;
+		swapchainImageTransitionReleaseImageBarrierInfo.subresourceRange.baseArrayLayer = 0;
+		swapchainImageTransitionReleaseImageBarrierInfo.subresourceRange.layerCount = 1;
 
-		VkDependencyInfo rendertargetTransitionDependencyInfo = {};
-		rendertargetTransitionDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		rendertargetTransitionDependencyInfo.pNext = nullptr;
-		rendertargetTransitionDependencyInfo.dependencyFlags = 0;
-		rendertargetTransitionDependencyInfo.memoryBarrierCount = 0;
-		rendertargetTransitionDependencyInfo.bufferMemoryBarrierCount = 0;
-		rendertargetTransitionDependencyInfo.imageMemoryBarrierCount = 1;
-		rendertargetTransitionDependencyInfo.pImageMemoryBarriers = &rendertargetTransitionImageBarrierInfo;
+		VkDependencyInfo swapchainImageTransitionDependencyInfo = {};
+		swapchainImageTransitionDependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		swapchainImageTransitionDependencyInfo.pNext = nullptr;
+		swapchainImageTransitionDependencyInfo.dependencyFlags = 0;
+		swapchainImageTransitionDependencyInfo.memoryBarrierCount = 0;
+		swapchainImageTransitionDependencyInfo.bufferMemoryBarrierCount = 0;
+		swapchainImageTransitionDependencyInfo.imageMemoryBarrierCount = 1;
+		swapchainImageTransitionDependencyInfo.pImageMemoryBarriers = &swapchainImageTransitionReleaseImageBarrierInfo;
 
-		vkCmdPipelineBarrier2(currentCommandBuffer, &rendertargetTransitionDependencyInfo);
+		vkCmdPipelineBarrier2(currentCommandBuffer, &swapchainImageTransitionDependencyInfo);
 	}
 
 	// ================================= End graphics command buffer recording ==================================================
