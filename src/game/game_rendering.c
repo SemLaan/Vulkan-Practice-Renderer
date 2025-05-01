@@ -266,6 +266,10 @@ void GameRenderingInit()
 
 void GameRenderingRender()
 {
+	// ================== Start rendering
+    if (!BeginRendering())
+        return;
+
     vec4 testColor = vec4_create(0.2, 0.4f, 1, 1);
     f32 roughness = 0;
     MaterialUpdateProperty(renderingState->marchingCubesMaterial, "color", &testColor);
@@ -291,10 +295,6 @@ void GameRenderingRender()
     globalUniformObject.viewProjection = renderingState->sceneCamera.viewProjection;
     globalUniformObject.directionalLight = vec3_create(1, 0, 0);
     UpdateGlobalUniform(&globalUniformObject);
-
-    // ================== Start rendering
-    if (!BeginRendering())
-        return;
 
     // ================== Rendering normals and depth of the marching cubes mesh
     RenderTargetStartRendering(renderingState->normalAndDepthRenderTarget);

@@ -1079,7 +1079,6 @@ void EndRendering()
 		swapchainImageTransitionReleaseImageBarrierInfo.srcQueueFamilyIndex = vk_state->graphicsQueue.index;
 		swapchainImageTransitionReleaseImageBarrierInfo.dstQueueFamilyIndex = vk_state->presentQueue.index;
 		swapchainImageTransitionReleaseImageBarrierInfo.image = vk_state->swapchainImages[vk_state->currentSwapchainImageIndex];
-		_DEBUG("Frame: %u, swapchain index: %u", vk_state->currentFrameIndex, vk_state->currentSwapchainImageIndex);
 		swapchainImageTransitionReleaseImageBarrierInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		swapchainImageTransitionReleaseImageBarrierInfo.subresourceRange.baseMipLevel = 0;
 		swapchainImageTransitionReleaseImageBarrierInfo.subresourceRange.levelCount = 1;
@@ -1137,9 +1136,6 @@ void EndRendering()
 		// Submitting the command buffer which allows the GPU to actually start working on this frame
 		SubmitCommandBuffers(waitSemaphoreCount, waitSemaphores, signalSemaphoreCount, signalSemaphores, 1, &vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex], nullptr);
 	}
-
-	// TODO: this is for testing a synch error
-	//vkDeviceWaitIdle(vk_state->device);
 
 	// ============================== Telling the GPU to present this frame (after it's rendered of course, synced with a binary semaphore) =================================
 	// First acquiring ownership (present queue) of the swapchain image that is to be presented.
