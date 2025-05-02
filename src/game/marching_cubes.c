@@ -28,7 +28,7 @@ static inline f32 GetDensityValueRaw(f32* densityMap, u32 mapHeightTimesDepth, u
 }
 
 
-GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
+MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
 {
 	ArenaMarker marker = ArenaGetMarker(global->frameArena);
 
@@ -130,33 +130,31 @@ GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 dens
         }
     }
 
-	GPUMesh gpuMesh = {};
-
-	gpuMesh.vertexBuffer = VertexBufferCreate(vertArray, sizeof(*vertArray) * numberOfVertices);
-
-    // Making the index buffer by reusing the memory from the vert array
-    u32* indices = (u32*)vertArray;
+	GRASSERT_MSG(numberOfVertices > 0, "Marching cubes density function produced no vertices");
+	
+	// Creating the index buffer
+    u32* indices = AlignedAlloc(global->largeObjectAllocator, sizeof(*indices) * numberOfVertices, CACHE_ALIGN);
 
     for (int i = 0; i < numberOfVertices; i++)
     {
         indices[i] = i;
     }
 
-    GRASSERT_MSG(numberOfVertices > 0, "Marching cubes density function produced no vertices");
+	// Copying the vertex buffer to a permanent allocation
+	VertexT2* vertices = AlignedAlloc(global->largeObjectAllocator, sizeof(*vertices) * numberOfVertices, CACHE_ALIGN);
+	MemoryCopy(vertices, vertArray, sizeof(*vertices) * numberOfVertices);
 
-    // Generate mesh
-    gpuMesh.indexBuffer = IndexBufferCreate(indices, numberOfVertices);
+	MeshData meshData = {};
+	meshData.vertices = vertices;
+	meshData.vertexCount = numberOfVertices;
+	meshData.vertexStride = sizeof(*vertices);
+	meshData.indices = indices;
+	meshData.indexCount = numberOfVertices;
 
 	// "Freeing" the memory from the temporary vert and indices array, because they could be quite large and this function might be run multiple times per frame
 	ArenaFreeMarker(global->frameArena, marker);
 
-	return gpuMesh;
+	return meshData;
 }
 
-void MarchingCubesRegenerateMesh(GPUMesh* gpuMesh, f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
-{
-	VertexBufferDestroy(gpuMesh->vertexBuffer);
-	IndexBufferDestroy(gpuMesh->indexBuffer);
 
-	*gpuMesh = MarchingCubesGenerateMesh(densityMap, densityMapWidth, densityMapHeight, densityMapDepth);
-}

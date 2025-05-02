@@ -9,6 +9,7 @@
 #include "renderer/ui/text_renderer.h"
 #include "renderer/ui/profiling_ui.h"
 #include "terrain_density_functions.h"
+#include "core/engine.h"
 
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
 #define NORMAL_SHADER_NAME "normal_shader"
@@ -260,7 +261,10 @@ void GameRenderingInit()
         world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount);
         DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 		BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-		world->marchingCubesGpuMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+		MeshData mcMeshData = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+		world->marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(mcMeshData.vertices, mcMeshData.vertexStride * mcMeshData.vertexCount);
+		world->marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(mcMeshData.indices, mcMeshData.indexCount);
+		MarchingCubesFreeMeshData(mcMeshData);
     }
 }
 
@@ -404,5 +408,13 @@ void RegenerateMarchingCubesMesh()
 	World* world = &renderingState->world;
 	DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 	BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-	MarchingCubesRegenerateMesh(&world->marchingCubesGpuMesh, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+
+	VertexBufferDestroy(world->marchingCubesGpuMesh.vertexBuffer);
+	IndexBufferDestroy(world->marchingCubesGpuMesh.indexBuffer);
+
+	MeshData mcMeshData = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+	world->marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(mcMeshData.vertices, mcMeshData.vertexStride * mcMeshData.vertexCount);
+	world->marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(mcMeshData.indices, mcMeshData.indexCount);
+
+	MarchingCubesFreeMeshData(mcMeshData);
 }

@@ -48,6 +48,15 @@ typedef struct VertexT3
 	vec2 uvCoord;
 } VertexT3;
 
+typedef struct MeshData
+{
+	void* vertices;
+	u32* indices;
+	u32 indexCount;
+	u32 vertexCount;
+	u32 vertexStride;
+} MeshData;
+
 /// @brief Struct with a handle to a vertex buffer and an index buffer that make up a mesh.
 typedef struct GPUMesh
 {
