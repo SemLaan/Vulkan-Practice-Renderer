@@ -16,7 +16,7 @@ typedef struct ProfilingUIState
 	Material flatWhiteMaterial;
 	Material flatBlackMaterial;
 	TextBatch* frameStatsTextBatch;
-	MeshData* quadMesh;
+	GPUMesh* quadMesh;
 	mat4 projection;
 	u64 textId;
 } ProfilingUIState;

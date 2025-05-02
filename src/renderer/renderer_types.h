@@ -31,11 +31,11 @@ typedef struct IndexBuffer
 } IndexBuffer;
 
 /// @brief Struct with a handle to a vertex buffer and an index buffer that make up a mesh.
-typedef struct MeshData
+typedef struct GPUMesh
 {
 	VertexBuffer vertexBuffer;
 	IndexBuffer indexBuffer;
-} MeshData;
+} GPUMesh;
 
 // Handle to a texture
 typedef struct Texture

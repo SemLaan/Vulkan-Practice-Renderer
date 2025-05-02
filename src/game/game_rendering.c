@@ -52,7 +52,7 @@ typedef struct World
     u32 densityMapHeight;
     u32 densityMapDepth;
     u32 terrainSeed;
-    MeshData marchingCubesMesh;
+    GPUMesh marchingCubesGpuMesh;
 } World;
 
 typedef struct GameRenderingState
@@ -260,7 +260,7 @@ void GameRenderingInit()
         world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount);
         DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 		BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-		world->marchingCubesMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+		world->marchingCubesGpuMesh = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
     }
 }
 
@@ -301,7 +301,7 @@ void GameRenderingRender()
 
     // Rendering the marching cubes mesh
     MaterialBind(renderingState->normalRenderingMaterial);
-	Draw(1, &renderingState->world.marchingCubesMesh.vertexBuffer, renderingState->world.marchingCubesMesh.indexBuffer, &identity, 1);
+	Draw(1, &renderingState->world.marchingCubesGpuMesh.vertexBuffer, renderingState->world.marchingCubesGpuMesh.indexBuffer, &identity, 1);
 
     RenderTargetStopRendering(renderingState->normalAndDepthRenderTarget);
 
@@ -311,12 +311,12 @@ void GameRenderingRender()
     if (renderingState->shaderParameters.renderMarchingCubesMesh)
     {
         MaterialBind(renderingState->marchingCubesMaterial);
-		Draw(1, &renderingState->world.marchingCubesMesh.vertexBuffer, renderingState->world.marchingCubesMesh.indexBuffer, &identity, 1);
+		Draw(1, &renderingState->world.marchingCubesGpuMesh.vertexBuffer, renderingState->world.marchingCubesGpuMesh.indexBuffer, &identity, 1);
     }
 
     // Rendering the marching cubes mesh outline
     MaterialBind(renderingState->outlineMaterial);
-    MeshData* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
+    GPUMesh* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
     Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
 
     // Rendering the debug menu's
@@ -357,8 +357,8 @@ void GameRenderingShutdown()
 	{
 		World* world = &renderingState->world;
 		Free(GetGlobalAllocator(), world->terrainDensityMap);
-		VertexBufferDestroy(world->marchingCubesMesh.vertexBuffer);
-		IndexBufferDestroy(world->marchingCubesMesh.indexBuffer);
+		VertexBufferDestroy(world->marchingCubesGpuMesh.vertexBuffer);
+		IndexBufferDestroy(world->marchingCubesGpuMesh.indexBuffer);
 	}
 
     MaterialDestroy(renderingState->outlineMaterial);
@@ -404,5 +404,5 @@ void RegenerateMarchingCubesMesh()
 	World* world = &renderingState->world;
 	DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 	BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-	MarchingCubesRegenerateMesh(&world->marchingCubesMesh, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
+	MarchingCubesRegenerateMesh(&world->marchingCubesGpuMesh, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
 }

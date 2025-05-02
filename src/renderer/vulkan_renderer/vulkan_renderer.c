@@ -677,7 +677,7 @@ bool InitializeRenderer(RendererInitSettings settings)
 
 	u32 currentBasicMeshIndex = 0;
 
-	MeshData* basicMeshDataArray = Alloc(vk_state->rendererAllocator, sizeof(*basicMeshDataArray) * BASIC_MESH_COUNT);
+	GPUMesh* basicMeshDataArray = Alloc(vk_state->rendererAllocator, sizeof(*basicMeshDataArray) * BASIC_MESH_COUNT);
 	LoadObj("models/quad.obj", &basicMeshDataArray[currentBasicMeshIndex].vertexBuffer, &basicMeshDataArray[currentBasicMeshIndex].indexBuffer, false);
 	SimpleMapInsert(vk_state->basicMeshMap, BASIC_MESH_NAME_QUAD, basicMeshDataArray + currentBasicMeshIndex);
 	currentBasicMeshIndex++;
@@ -745,7 +745,7 @@ void ShutdownRenderer()
 	// ============================ Destroying basic meshes ======================================================================================================
 	// ============================================================================================================================================================
 	// See the creation of the basic meshes to understand why this works
-	MeshData* basicMeshDataArray = SimpleMapLookup(vk_state->basicMeshMap, BASIC_MESH_NAME_QUAD);
+	GPUMesh* basicMeshDataArray = SimpleMapLookup(vk_state->basicMeshMap, BASIC_MESH_NAME_QUAD);
 
 	for (int i = 0; i < BASIC_MESH_COUNT; i++)
 	{
@@ -1286,7 +1286,7 @@ RenderTarget GetMainRenderTarget()
 	return vk_state->mainRenderTarget;
 }
 
-MeshData* GetBasicMesh(const char* meshName)
+GPUMesh* GetBasicMesh(const char* meshName)
 {
 	return SimpleMapLookup(vk_state->basicMeshMap, meshName);
 }

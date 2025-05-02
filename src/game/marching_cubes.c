@@ -34,7 +34,7 @@ static inline f32 GetDensityValueRaw(f32* densityMap, u32 mapHeightTimesDepth, u
 }
 
 
-MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
+GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
 {
 	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
 
@@ -136,9 +136,9 @@ MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 den
         }
     }
 
-	MeshData meshData = {};
+	GPUMesh gpuMesh = {};
 
-	meshData.vertexBuffer = VertexBufferCreate(vertArray, sizeof(*vertArray) * numberOfVertices);
+	gpuMesh.vertexBuffer = VertexBufferCreate(vertArray, sizeof(*vertArray) * numberOfVertices);
 
     // Making the index buffer by reusing the memory from the vert array
     u32* indices = (u32*)vertArray;
@@ -151,18 +151,18 @@ MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 den
     GRASSERT_MSG(numberOfVertices > 0, "Marching cubes density function produced no vertices");
 
     // Generate mesh
-    meshData.indexBuffer = IndexBufferCreate(indices, numberOfVertices);
+    gpuMesh.indexBuffer = IndexBufferCreate(indices, numberOfVertices);
 
 	// "Freeing" the memory from the temporary vert and indices array, because they could be quite large and this function might be run multiple times per frame
 	ArenaFreeMarker(grGlobals->frameArena, marker);
 
-	return meshData;
+	return gpuMesh;
 }
 
-void MarchingCubesRegenerateMesh(MeshData* meshData, f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
+void MarchingCubesRegenerateMesh(GPUMesh* gpuMesh, f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
 {
-	VertexBufferDestroy(meshData->vertexBuffer);
-	IndexBufferDestroy(meshData->indexBuffer);
+	VertexBufferDestroy(gpuMesh->vertexBuffer);
+	IndexBufferDestroy(gpuMesh->indexBuffer);
 
-	*meshData = MarchingCubesGenerateMesh(densityMap, densityMapWidth, densityMapHeight, densityMapDepth);
+	*gpuMesh = MarchingCubesGenerateMesh(densityMap, densityMapWidth, densityMapHeight, densityMapDepth);
 }

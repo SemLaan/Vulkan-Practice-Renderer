@@ -174,7 +174,7 @@ DEFINE_DARRAY_TYPE_REF(DebugMenu);
 typedef struct DebugUIState
 {
 	DebugMenuRefDarray* debugMenuDarray;          // Dynamic array with all the debug menu instances that exist
-	MeshData* quadMesh;                           // Mesh with the data to make quad instances.
+	GPUMesh* quadMesh;                           // Mesh with the data to make quad instances.
 	mat4 uiProjView;                              // Projection and view matrix for all debug menu's
 	mat4 inverseProjView;                         // Inverted proj view matrix.
 	Allocator* interactableInternalDataAllocator; // Allocator for allocating interactable internal data.
