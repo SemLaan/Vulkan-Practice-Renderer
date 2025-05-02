@@ -10,12 +10,6 @@
 
 #define INITIAL_VERT_RESERVATION 1000
 
-/// @brief Vertex struct for the vertices of the marching cubes mesh
-typedef struct MCVert
-{
-    vec3 pos;    // Position
-    vec3 normal; // Normal
-} MCVert;
 
 // Indexes into a densityMap
 static inline f32* GetDensityValueRef(f32* densityMap, u32 mapHeightTimesDepth, u32 mapDepth, u32 x, u32 y, u32 z)
@@ -39,7 +33,7 @@ GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 dens
 	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
 
 	u32 reserved = INITIAL_VERT_RESERVATION;
-	MCVert* vertArray = ArenaAlloc(grGlobals->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
+	VertexT2* vertArray = ArenaAlloc(grGlobals->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
     u32 numberOfVertices = 0;
 
 	u32 densityMapHeightTimesDepth = densityMapHeight * densityMapDepth;
@@ -86,7 +80,7 @@ GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 dens
                         // Getting the edge that the current vertex needs to be on by first getting its index and then using a lookup table
                         // to get the corresponding position of the center of the edge relative to the origin of the cube (which is in one of the corners not the center).
                         i32 edgeIndex = triTable[cubeIndex][i];
-                        vertArray[numberOfVertices].pos = edgeIndexToPositionTable[edgeIndex];
+                        vertArray[numberOfVertices].position = edgeIndexToPositionTable[edgeIndex];
 
                         // Interpolating the vertex position based on the two density points connected to the edge that this vertex is on
                         f32 value1 = cubeValues[edgeToCornerTable[edgeIndex][0]];
@@ -95,17 +89,17 @@ GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 dens
                         surfaceLevel /= value2;
 
                         // The vertex only gets interpolated along one direction so we need to check which dimension of the vert position needs to be changed to the interpolated value
-                        if (vertArray[numberOfVertices].pos.x == 0.5f)
-							vertArray[numberOfVertices].pos.x = surfaceLevel;
-                        if (vertArray[numberOfVertices].pos.y == 0.5f)
-							vertArray[numberOfVertices].pos.y = surfaceLevel;
-                        if (vertArray[numberOfVertices].pos.z == 0.5f)
-							vertArray[numberOfVertices].pos.z = surfaceLevel;
+                        if (vertArray[numberOfVertices].position.x == 0.5f)
+							vertArray[numberOfVertices].position.x = surfaceLevel;
+                        if (vertArray[numberOfVertices].position.y == 0.5f)
+							vertArray[numberOfVertices].position.y = surfaceLevel;
+                        if (vertArray[numberOfVertices].position.z == 0.5f)
+							vertArray[numberOfVertices].position.z = surfaceLevel;
 
                         // Calculating the vertex position relative to the mesh origin rather than the cube origin
-                        vertArray[numberOfVertices].pos.x += x;
-                        vertArray[numberOfVertices].pos.y += y;
-                        vertArray[numberOfVertices].pos.z += z;
+                        vertArray[numberOfVertices].position.x += x;
+                        vertArray[numberOfVertices].position.y += y;
+                        vertArray[numberOfVertices].position.z += z;
 
                         // Adding the vertex
                         numberOfVertices++;
@@ -121,8 +115,8 @@ GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 dens
                             // Taking the cross product of two of the edges of the triangle to calculate the normal
                             // (because the cross product calculates a vector that is orthogonal to the two vectors that are suplied this vector wil always be the normal of a triangle,
                             // it points to the ouside of the triangle as long as we supply the correct edges)
-                            vec3 edgeA = vec3_sub_vec3(vertArray[numberOfVertices - 2].pos, vertArray[numberOfVertices - 1].pos);
-                            vec3 edgeB = vec3_sub_vec3(vertArray[numberOfVertices - 3].pos, vertArray[numberOfVertices - 1].pos);
+                            vec3 edgeA = vec3_sub_vec3(vertArray[numberOfVertices - 2].position, vertArray[numberOfVertices - 1].position);
+                            vec3 edgeB = vec3_sub_vec3(vertArray[numberOfVertices - 3].position, vertArray[numberOfVertices - 1].position);
                             vec3 normal = vec3_cross_vec3(edgeA, edgeB);
 
                             // Setting the normal for the three most recently added verts

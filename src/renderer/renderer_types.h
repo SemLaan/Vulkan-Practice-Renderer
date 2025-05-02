@@ -30,6 +30,24 @@ typedef struct IndexBuffer
     void* internalState;
 } IndexBuffer;
 
+typedef struct VertexT1
+{
+	vec3 position;
+} VertexT1;
+
+typedef struct VertexT2
+{
+	vec3 position;
+	vec3 normal;
+} VertexT2;
+
+typedef struct VertexT3
+{
+	vec3 position;
+	vec3 normal;
+	vec2 uvCoord;
+} VertexT3;
+
 /// @brief Struct with a handle to a vertex buffer and an index buffer that make up a mesh.
 typedef struct GPUMesh
 {

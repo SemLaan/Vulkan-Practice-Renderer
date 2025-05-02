@@ -9,12 +9,6 @@
 #define DARRAY_START_CAPACITY 100
 
 
-typedef struct ObjVertex
-{
-    vec3 position;
-    vec3 normal;
-    vec2 uvCoord;
-} ObjVertex;
 
 typedef struct ObjVertexIndices
 {
@@ -23,7 +17,7 @@ typedef struct ObjVertexIndices
 } ObjVertexIndices;
 
 DEFINE_DARRAY_TYPE(u32);
-DEFINE_DARRAY_TYPE(ObjVertex);
+DEFINE_DARRAY_TYPE(VertexT3);
 DEFINE_DARRAY_TYPE(ObjVertexIndices);
 
 bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bool flipWindingOrder)
@@ -144,7 +138,7 @@ bool LoadObj(const char* filename, VertexBuffer* out_vb, IndexBuffer* out_ib, bo
     }
 
     // ============================== Creating the final vertices array ===============================================
-    ObjVertexDarray* objVerticesDarray = ObjVertexDarrayCreateWithSize(uniqueVertices->size, GetGlobalAllocator());
+    VertexT3Darray* objVerticesDarray = VertexT3DarrayCreateWithSize(uniqueVertices->size, GetGlobalAllocator());
 
     for (int i = 0; i < uniqueVertices->size; i++)
     {
