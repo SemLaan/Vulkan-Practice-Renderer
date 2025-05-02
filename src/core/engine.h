@@ -15,6 +15,7 @@ typedef struct EngineInitSettings
 typedef struct GRGlobals
 {
 	Allocator* gameAllocator;
+	Allocator* largeObjectAllocator;
 	Arena* frameArena;
 	Timer timer;
 	f64 deltaTime;
