@@ -87,13 +87,13 @@ void UpdateProfilingUI()
     MaterialUpdateProperty(state->flatBlackMaterial, "color", &black);
 
 	u32 fps = 0;
-	if (grGlobals->deltaTime != 0)
-		fps = 1.0 / grGlobals->deltaTime;
+	if (global->deltaTime != 0)
+		fps = 1.0 / global->deltaTime;
 	
 	if (fps > 9999)
 		fps = 9999;
 	
-	char* fpsString = ArenaAlloc(grGlobals->frameArena, sizeof("FPS: 0000"));
+	char* fpsString = ArenaAlloc(global->frameArena, sizeof("FPS: 0000"));
 	MemoryCopy(fpsString, "FPS: 0000", sizeof("FPS: 0000"));
 
 	char fpsShortString[5] = {};

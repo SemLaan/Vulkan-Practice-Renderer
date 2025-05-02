@@ -30,10 +30,10 @@ static inline f32 GetDensityValueRaw(f32* densityMap, u32 mapHeightTimesDepth, u
 
 GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 densityMapHeight, u32 densityMapDepth)
 {
-	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
+	ArenaMarker marker = ArenaGetMarker(global->frameArena);
 
 	u32 reserved = INITIAL_VERT_RESERVATION;
-	VertexT2* vertArray = ArenaAlloc(grGlobals->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
+	VertexT2* vertArray = ArenaAlloc(global->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
     u32 numberOfVertices = 0;
 
 	u32 densityMapHeightTimesDepth = densityMapHeight * densityMapDepth;
@@ -106,7 +106,7 @@ GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 dens
 						if (numberOfVertices >= reserved)
 						{
 							reserved += INITIAL_VERT_RESERVATION;
-							ArenaAlloc(grGlobals->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
+							ArenaAlloc(global->frameArena, sizeof(*vertArray) * INITIAL_VERT_RESERVATION);
 						}
 
                         // If a triangle was completed this loop calculate and set the normal for all verts of that triangle
@@ -148,7 +148,7 @@ GPUMesh MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 dens
     gpuMesh.indexBuffer = IndexBufferCreate(indices, numberOfVertices);
 
 	// "Freeing" the memory from the temporary vert and indices array, because they could be quite large and this function might be run multiple times per frame
-	ArenaFreeMarker(grGlobals->frameArena, marker);
+	ArenaFreeMarker(global->frameArena, marker);
 
 	return gpuMesh;
 }

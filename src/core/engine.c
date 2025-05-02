@@ -14,7 +14,7 @@
 #include "engine.h"
 
 
-GRGlobals* grGlobals = nullptr;
+GRGlobals* global = nullptr;
 
 // Forward declarations
 static bool OnQuit(EventCode type, EventData data);
@@ -32,12 +32,12 @@ void EngineInit(EngineInitSettings settings)
 	InitializeMemory(ENGINE_TOTAL_MEMORY_RESERVE);
 
 	// Setting up engine globals, before initializing the other subsystems because they might need the globals
-	grGlobals = AlignedAlloc(GetGlobalAllocator(), sizeof(*grGlobals), CACHE_ALIGN);
-	grGlobals->deltaTime = 0.f;
-	grGlobals->framerateLimit = settings.framerateLimit;
-	grGlobals->frameArena = Alloc(GetGlobalAllocator(), sizeof(*grGlobals->frameArena));
-	*grGlobals->frameArena = ArenaCreate(GetGlobalAllocator(), FRAME_ARENA_SIZE);
-	CreateFreelistAllocator("Game Allocator", GetGlobalAllocator(), GAME_ALLOCATOR_SIZE, &grGlobals->gameAllocator, false);
+	global = AlignedAlloc(GetGlobalAllocator(), sizeof(*global), CACHE_ALIGN);
+	global->deltaTime = 0.f;
+	global->framerateLimit = settings.framerateLimit;
+	global->frameArena = Alloc(GetGlobalAllocator(), sizeof(*global->frameArena));
+	*global->frameArena = ArenaCreate(GetGlobalAllocator(), FRAME_ARENA_SIZE);
+	CreateFreelistAllocator("Game Allocator", GetGlobalAllocator(), GAME_ALLOCATOR_SIZE, &global->gameAllocator, false);
 
 	RendererInitSettings rendererInitSettings = {};
 	rendererInitSettings.presentMode = settings.presentMode;
@@ -50,10 +50,10 @@ void EngineInit(EngineInitSettings settings)
 	InitializeDebugUI();
 	InitializeProfilingUI();
 
-	grGlobals->appRunning = true;
-	grGlobals->appSuspended = false;
-	StartOrResetTimer(&grGlobals->timer);
-	grGlobals->previousFrameTime = TimerSecondsSinceStart(grGlobals->timer);
+	global->appRunning = true;
+	global->appSuspended = false;
+	StartOrResetTimer(&global->timer);
+	global->previousFrameTime = TimerSecondsSinceStart(global->timer);
 
 	RegisterEventListener(EVCODE_QUIT, OnQuit);
 	RegisterEventListener(EVCODE_WINDOW_RESIZED, OnResize);
@@ -61,22 +61,22 @@ void EngineInit(EngineInitSettings settings)
 
 bool EngineUpdate()
 {
-	ArenaClear(grGlobals->frameArena);
-	f64 currentTime = TimerSecondsSinceStart(grGlobals->timer);
-	grGlobals->deltaTime = currentTime - grGlobals->previousFrameTime;
-	while (grGlobals->deltaTime <= 1.f / (f32)grGlobals->framerateLimit)
+	ArenaClear(global->frameArena);
+	f64 currentTime = TimerSecondsSinceStart(global->timer);
+	global->deltaTime = currentTime - global->previousFrameTime;
+	while (global->deltaTime <= 1.f / (f32)global->framerateLimit)
 	{
-		currentTime = TimerSecondsSinceStart(grGlobals->timer);
-		grGlobals->deltaTime = currentTime - grGlobals->previousFrameTime;
+		currentTime = TimerSecondsSinceStart(global->timer);
+		global->deltaTime = currentTime - global->previousFrameTime;
 	}
-	grGlobals->previousFrameTime = currentTime;
+	global->previousFrameTime = currentTime;
 
 	PreMessagesInputUpdate();
 	PlatformProcessMessage();
 	PostMessagesInputUpdate();
 
 	// TODO: sleep platform every loop if app suspended to not waste pc resources
-	while (grGlobals->appSuspended)
+	while (global->appSuspended)
 	{
 		PreMessagesInputUpdate();
 		PlatformProcessMessage();
@@ -95,7 +95,7 @@ bool EngineUpdate()
 		InvokeEvent(EVCODE_QUIT, evdata);
 	}
 
-	return grGlobals->appRunning;
+	return global->appRunning;
 }
 
 void EngineShutdown()
@@ -114,10 +114,10 @@ void EngineShutdown()
 	ShutdownInput();
 	ShutdownEvent();
 
-	ArenaDestroy(grGlobals->frameArena, GetGlobalAllocator());
-	Free(GetGlobalAllocator(), grGlobals->frameArena);
-	DestroyFreelistAllocator(grGlobals->gameAllocator);
-	Free(GetGlobalAllocator(), grGlobals);
+	ArenaDestroy(global->frameArena, GetGlobalAllocator());
+	Free(GetGlobalAllocator(), global->frameArena);
+	DestroyFreelistAllocator(global->gameAllocator);
+	Free(GetGlobalAllocator(), global);
 
 	ShutdownMemory();
 	SHUTDOWN_MEMORY_DEBUG_SUBSYS();
@@ -129,7 +129,7 @@ void EngineShutdown()
 static bool OnQuit(EventCode type, EventData data)
 {
 	WaitForGPUIdle();
-	grGlobals->appRunning = false;
+	global->appRunning = false;
 	return false;
 }
 
@@ -137,12 +137,12 @@ static bool OnResize(EventCode type, EventData data)
 {
 	if (data.u32[0] == 0 || data.u32[1] == 0)
 	{
-		grGlobals->appSuspended = true;
+		global->appSuspended = true;
 		_INFO("App suspended");
 	}
-	else if (grGlobals->appSuspended)
+	else if (global->appSuspended)
 	{
-		grGlobals->appSuspended = false;
+		global->appSuspended = false;
 		_INFO("App unsuspended");
 	}
 	return false;

@@ -40,14 +40,14 @@ void CreateImageView(VulkanImage* pImage, VkImageAspectFlags aspectMask, VkForma
 
 void GenerateMips()
 {
-	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
+	ArenaMarker marker = ArenaGetMarker(global->frameArena);
 
 	VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
 
 	// Setting the first mip level of all the images to TRANSFER_SRC and all the other levels to TRANSFER_DST
 	{
 		u32 imageTransitionBarrierCount = vk_state->mipGenerationQueue->size * 2;
-		VkImageMemoryBarrier2* imageTransitionBarriers = ArenaAlloc(grGlobals->frameArena, sizeof(*imageTransitionBarriers) * imageTransitionBarrierCount);
+		VkImageMemoryBarrier2* imageTransitionBarriers = ArenaAlloc(global->frameArena, sizeof(*imageTransitionBarriers) * imageTransitionBarrierCount);
 
 		for (u32 i = 0; i < vk_state->mipGenerationQueue->size; i++)
 		{
@@ -176,7 +176,7 @@ void GenerateMips()
 	// Setting all the image layouts of all the mips to shader read optimal
 	{
 		u32 imageTransitionBarrierCount = vk_state->mipGenerationQueue->size;
-		VkImageMemoryBarrier2* imageTransitionBarriers = ArenaAlloc(grGlobals->frameArena, sizeof(*imageTransitionBarriers) * imageTransitionBarrierCount);
+		VkImageMemoryBarrier2* imageTransitionBarriers = ArenaAlloc(global->frameArena, sizeof(*imageTransitionBarriers) * imageTransitionBarrierCount);
 
 		for (u32 i = 0; i < vk_state->mipGenerationQueue->size; i++)
 		{
@@ -212,7 +212,7 @@ void GenerateMips()
 
 	DarraySetSize(vk_state->mipGenerationQueue, 0);
 
-	ArenaFreeMarker(grGlobals->frameArena, marker);
+	ArenaFreeMarker(global->frameArena, marker);
 }
 
 Texture TextureCreate(u32 width, u32 height, void* pixels, TextureStorageType textureStorageType, bool mipmapped)

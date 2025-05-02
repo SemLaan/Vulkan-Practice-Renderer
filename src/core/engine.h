@@ -24,7 +24,7 @@ typedef struct GRGlobals
 	bool appSuspended;
 } GRGlobals;
 
-extern GRGlobals* grGlobals;
+extern GRGlobals* global;
 
 void EngineInit(EngineInitSettings settings);
 bool EngineUpdate();

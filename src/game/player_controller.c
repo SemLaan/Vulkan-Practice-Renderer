@@ -71,7 +71,7 @@ void PlayerControllerUpdate()
             frameMovement.y -= 1;
         if (GetKeyDown(KEY_SPACE))
             frameMovement.y += 1;
-        sceneCamera->position = vec3_add_vec3(sceneCamera->position, vec3_mul_f32(frameMovement, controllerState->movementSpeed * grGlobals->deltaTime));
+        sceneCamera->position = vec3_add_vec3(sceneCamera->position, vec3_mul_f32(frameMovement, controllerState->movementSpeed * global->deltaTime));
     }
 
     // If the control camera button is pressed or if the camera control is enabled and the player presses LMB.

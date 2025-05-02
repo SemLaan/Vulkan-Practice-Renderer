@@ -49,11 +49,11 @@ static inline bool CheckDstBufferOverlap(VkBufferCopy* a, VkBufferCopy* b)
 
 void VulkanCommitTransfers()
 {
-	VkImageMemoryBarrier2* imageAcquireInfos = ArenaAlloc(grGlobals->frameArena, sizeof(*imageAcquireInfos) * vk_state->transferState.bufferToImageCopyOperations->size);
-	vk_state->transferState.uploadAcquireDependencyInfo = ArenaAlloc(grGlobals->frameArena, sizeof(*vk_state->transferState.uploadAcquireDependencyInfo));
-	VkBufferMemoryBarrier2* bufferAcquireInfos = ArenaAlloc(grGlobals->frameArena, sizeof(*bufferAcquireInfos) * vk_state->transferState.bufferCopyOperations->size);
+	VkImageMemoryBarrier2* imageAcquireInfos = ArenaAlloc(global->frameArena, sizeof(*imageAcquireInfos) * vk_state->transferState.bufferToImageCopyOperations->size);
+	vk_state->transferState.uploadAcquireDependencyInfo = ArenaAlloc(global->frameArena, sizeof(*vk_state->transferState.uploadAcquireDependencyInfo));
+	VkBufferMemoryBarrier2* bufferAcquireInfos = ArenaAlloc(global->frameArena, sizeof(*bufferAcquireInfos) * vk_state->transferState.bufferCopyOperations->size);
 
-	ArenaMarker marker = ArenaGetMarker(grGlobals->frameArena);
+	ArenaMarker marker = ArenaGetMarker(global->frameArena);
 
 	ResetAndBeginCommandBuffer(vk_state->transferState.transferCommandBuffers[vk_state->currentInFlightFrameIndex]);
 	VkCommandBuffer currentCommandBuffer = vk_state->transferState.transferCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
@@ -121,7 +121,7 @@ void VulkanCommitTransfers()
 			vkCmdCopyBuffer(currentCommandBuffer, bufferCopyOperations->data[i].srcBuffer, bufferCopyOperations->data[i].dstBuffer, copyRegionCount, copyRegions);
 	}
 
-	VkBufferMemoryBarrier2* bufferReleaseInfos = ArenaAlloc(grGlobals->frameArena, sizeof(*bufferReleaseInfos) * bufferCopyOperations->size);
+	VkBufferMemoryBarrier2* bufferReleaseInfos = ArenaAlloc(global->frameArena, sizeof(*bufferReleaseInfos) * bufferCopyOperations->size);
 	u32 bufferMemoryBarrierCount = 0;
 
 	for (u32 i = 0; i < bufferCopyOperations->size; i++)
@@ -193,8 +193,8 @@ void VulkanCommitTransfers()
 	// =============================================== Copying images
 	VulkanBufferToImageUploadDataDarray* bufferToImageCopyOperations = vk_state->transferState.bufferToImageCopyOperations;
 
-	VkImageMemoryBarrier2* imageTransitionInfos = ArenaAlloc(grGlobals->frameArena, sizeof(*imageTransitionInfos) * bufferToImageCopyOperations->size);
-	VkImageMemoryBarrier2* imageReleaseInfos = ArenaAlloc(grGlobals->frameArena, sizeof(*imageReleaseInfos) * bufferToImageCopyOperations->size);
+	VkImageMemoryBarrier2* imageTransitionInfos = ArenaAlloc(global->frameArena, sizeof(*imageTransitionInfos) * bufferToImageCopyOperations->size);
+	VkImageMemoryBarrier2* imageReleaseInfos = ArenaAlloc(global->frameArena, sizeof(*imageReleaseInfos) * bufferToImageCopyOperations->size);
 
 	for (u32 i = 0; i < bufferToImageCopyOperations->size; i++)
 	{
@@ -332,7 +332,7 @@ void VulkanCommitTransfers()
 	vk_state->transferState.uploadAcquireDependencyInfo->imageMemoryBarrierCount = bufferToImageCopyOperations->size;
 	vk_state->transferState.uploadAcquireDependencyInfo->pImageMemoryBarriers = imageAcquireInfos;
 
-	ArenaFreeMarker(grGlobals->frameArena, marker);
+	ArenaFreeMarker(global->frameArena, marker);
 
 	DarraySetSize(vk_state->transferState.bufferCopyOperations, 0);
 	DarraySetSize(vk_state->transferState.bufferToImageCopyOperations, 0);
