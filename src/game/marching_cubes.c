@@ -118,6 +118,7 @@ MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 den
                             vec3 edgeA = vec3_sub_vec3(vertArray[numberOfVertices - 2].position, vertArray[numberOfVertices - 1].position);
                             vec3 edgeB = vec3_sub_vec3(vertArray[numberOfVertices - 3].position, vertArray[numberOfVertices - 1].position);
                             vec3 normal = vec3_cross_vec3(edgeA, edgeB);
+							normal = vec3_normalize(normal);
 
                             // Setting the normal for the three most recently added verts
                             vertArray[numberOfVertices - 1].normal = normal;
@@ -151,7 +152,7 @@ MeshData MarchingCubesGenerateMesh(f32* densityMap, u32 densityMapWidth, u32 den
 	meshData.indices = indices;
 	meshData.indexCount = numberOfVertices;
 
-	// "Freeing" the memory from the temporary vert and indices array, because they could be quite large and this function might be run multiple times per frame
+	// "Freeing" the memory from the temporary vert array, because they could be quite large and this function might be run multiple times per frame
 	ArenaFreeMarker(global->frameArena, marker);
 
 	return meshData;
