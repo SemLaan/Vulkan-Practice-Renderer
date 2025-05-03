@@ -18,22 +18,7 @@ MeshData MeshOptimizerMergeNormals(MeshData originalMesh, u32 positionOffset, u3
 
 	ArenaMarker marker = ArenaGetMarker(global->frameArena);
 
-	// Calculating cross product for each triangle
-	u32 triangleCount = originalMesh.indexCount / 3;
-	vec3* triangleCrossProducts = ArenaAlignedAlloc(global->frameArena, sizeof(*triangleCrossProducts) * triangleCount, CACHE_ALIGN);
-	for (u32 i = 0; i < triangleCount; i++)
-	{
-		u32 triangleStartIndex = i * 3;
-		vec3 v1 = *((vec3*)(vertices + positionOffset + originalMesh.vertexStride * newMesh.indices[triangleStartIndex]));
-		vec3 v2 = *((vec3*)(vertices + positionOffset + originalMesh.vertexStride * newMesh.indices[triangleStartIndex + 1]));
-		vec3 v3 = *((vec3*)(vertices + positionOffset + originalMesh.vertexStride * newMesh.indices[triangleStartIndex + 2]));
-		vec3 edge1 = vec3_sub_vec3(v2, v3);
-		vec3 edge2 = vec3_sub_vec3(v1, v3);
-		triangleCrossProducts[i] = vec3_cross_vec3(edge1, edge2);
-	}
-
 	// Finding indices of duplicate vertices, 
-	// adding all the normals of the triangles connected to the vertices that are left over
 	// making a mapping from the old vertex indices to the new vertex indices
 	u32* duplicateVertexIndices = ArenaAlignedAlloc(global->frameArena, sizeof(*duplicateVertexIndices) * originalMesh.vertexCount, CACHE_ALIGN);
 	u32* originalVertexIndexToNewVertexIndex = ArenaAlignedAlloc(global->frameArena, sizeof(*originalVertexIndexToNewVertexIndex) * originalMesh.vertexCount, CACHE_ALIGN);
@@ -53,13 +38,6 @@ MeshData MeshOptimizerMergeNormals(MeshData originalMesh, u32 positionOffset, u3
 				duplicateVertexCount++;
 
 				originalVertexIndexToNewVertexIndex[i] = originalVertexIndexToNewVertexIndex[j];
-
-				vec3* newVertexNormalTotal = (vec3*)(vertices + normalOffset + originalMesh.vertexStride * j);
-				//*newVertexNormalTotal = vec3_add_vec3(*newVertexNormalTotal, triangleCrossProducts[i / 3]);
-				//vec3* oldVertexNormal =  (vec3*)(vertices + normalOffset + originalMesh.vertexStride * i);
-				//newVertexNormalTotal->x += oldVertexNormal->x;
-				//newVertexNormalTotal->y += oldVertexNormal->y;
-				//newVertexNormalTotal->z += oldVertexNormal->z;
 
 				break;
 			}
@@ -94,13 +72,16 @@ MeshData MeshOptimizerMergeNormals(MeshData originalMesh, u32 positionOffset, u3
 	newMesh.vertexCount = originalMesh.vertexCount - removedVertexCount;
 	newMesh.vertices = Realloc(global->largeObjectAllocator, newMesh.vertices, newMesh.vertexCount * newMesh.vertexStride);
 
+	// ======================================== Recalculating normals
+	// Zeroing the normals
 	for (u32 i = 0; i < newMesh.vertexCount; i++)
 	{
 		vec3* v = (vec3*)(vertices + normalOffset + originalMesh.vertexStride * i);
 		*v = vec3_create(0, 0, 0);
 	}
 
-	for (u32 i = 0; i < triangleCount; i++)
+	// Accumulating cross products of all triangles connected to each vertex
+	for (u32 i = 0; i < newMesh.indexCount / 3; i++)
 	{
 		u32 triangleStartIndex = i * 3;
 		vec3 v1 = *((vec3*)(vertices + positionOffset + originalMesh.vertexStride * newMesh.indices[triangleStartIndex]));
