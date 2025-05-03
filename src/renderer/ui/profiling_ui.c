@@ -81,11 +81,6 @@ void ShutdownProfilingUI()
 
 void UpdateProfilingUI()
 {
-	vec4 white = vec4_create(1, 1, 1, 1);
-	vec4 black = vec4_create(0, 0, 0, 1);
-    MaterialUpdateProperty(state->flatWhiteMaterial, "color", &white);
-    MaterialUpdateProperty(state->flatBlackMaterial, "color", &black);
-
 	u32 fps = 0;
 	if (global->deltaTime != 0)
 		fps = 1.0 / global->deltaTime;
@@ -106,6 +101,11 @@ void UpdateProfilingUI()
 
 void DrawFrameStats()
 {
+	vec4 white = vec4_create(1, 1, 1, 1);
+	vec4 black = vec4_create(0, 0, 0, 1);
+    MaterialUpdateProperty(state->flatWhiteMaterial, "color", &white);
+    MaterialUpdateProperty(state->flatBlackMaterial, "color", &black);
+	
 	const f32 orthoHeigh = 10;
 	const f32 blockHeight = 0.15f;
 	const f32 blockWidth = 3.f;

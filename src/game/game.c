@@ -16,7 +16,7 @@ int main()
 	engineSettings.presentMode = GR_PRESENT_MODE_FIFO;
 	engineSettings.startResolution = (vec2i){ .x = 200, .y = 200};
 	engineSettings.windowTitle = "Beefbal Beefer 44";
-	engineSettings.framerateLimit = 14000;
+	engineSettings.framerateLimit = 122;
     EngineInit(engineSettings);
 
     GameRenderingInit();
