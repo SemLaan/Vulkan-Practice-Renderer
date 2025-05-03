@@ -10,6 +10,7 @@
 #include "renderer/ui/profiling_ui.h"
 #include "terrain_density_functions.h"
 #include "core/engine.h"
+#include "renderer/mesh_optimizer.h"
 
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
 #define NORMAL_SHADER_NAME "normal_shader"
@@ -32,9 +33,11 @@ typedef struct ShaderParameters
 {
     f32 normalEdgeThreshold;
 	f32 glyphThresholdSize;
-    bool renderMarchingCubesMesh;
 	vec4 uiColor;
 	vec4 uiOther;
+    bool renderMarchingCubesMesh;
+	bool renderMarchingCubesNormals;
+	bool renderOutlines;
 } ShaderParameters;
 
 typedef struct WorldGenParameters
@@ -224,10 +227,13 @@ void GameRenderingInit()
     }
 
     // Setting up debug ui's for shader parameters and terrain generation settings
+	renderingState->shaderParameters.renderOutlines = true;
     renderingState->shaderParamDebugMenu = DebugUICreateMenu("Shader Parameters");
     RegisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
     DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
+    DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render mesh normals", &renderingState->shaderParameters.renderMarchingCubesNormals);
+    DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes outline", &renderingState->shaderParameters.renderOutlines);
 	DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "r", 0, 1, &renderingState->shaderParameters.uiColor.x);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "g", 0, 1, &renderingState->shaderParameters.uiColor.y);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "b", 0, 1, &renderingState->shaderParameters.uiColor.z);
@@ -314,14 +320,20 @@ void GameRenderingRender()
 
     if (renderingState->shaderParameters.renderMarchingCubesMesh)
     {
-        MaterialBind(renderingState->marchingCubesMaterial);
+		if (renderingState->shaderParameters.renderMarchingCubesNormals)
+			MaterialBind(renderingState->normalRenderingMaterial);
+		else
+	        MaterialBind(renderingState->marchingCubesMaterial);
 		Draw(1, &renderingState->world.marchingCubesGpuMesh.vertexBuffer, renderingState->world.marchingCubesGpuMesh.indexBuffer, &identity, 1);
     }
 
     // Rendering the marching cubes mesh outline
-    MaterialBind(renderingState->outlineMaterial);
-    GPUMesh* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
-    Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
+	if (renderingState->shaderParameters.renderOutlines)
+	{
+		MaterialBind(renderingState->outlineMaterial);
+		GPUMesh* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
+		Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
+	}
 
     // Rendering the debug menu's
     DebugUIRenderMenus();
@@ -413,8 +425,12 @@ void RegenerateMarchingCubesMesh()
 	IndexBufferDestroy(world->marchingCubesGpuMesh.indexBuffer);
 
 	MeshData mcMeshData = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-	world->marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(mcMeshData.vertices, mcMeshData.vertexStride * mcMeshData.vertexCount);
-	world->marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(mcMeshData.indices, mcMeshData.indexCount);
+
+	MeshData smoothedMCMeshData = MeshOptimizerMergeNormals(mcMeshData, offsetof(VertexT2, position), offsetof(VertexT2, normal));
+
+	world->marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(smoothedMCMeshData.vertices, smoothedMCMeshData.vertexStride * smoothedMCMeshData.vertexCount);
+	world->marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(smoothedMCMeshData.indices, smoothedMCMeshData.indexCount);
 
 	MarchingCubesFreeMeshData(mcMeshData);
+	MeshOptimizerFreeMeshData(smoothedMCMeshData);
 }
