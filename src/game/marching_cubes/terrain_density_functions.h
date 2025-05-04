@@ -22,6 +22,8 @@ void DensityFuncSphereHole(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 map
 
 typedef struct BezierDensityFuncSettings
 {
+	f32 baseSphereRadius;
+
 	i64 bezierTunnelCount;
 	f32 bezierTunnelRadius;
 	i64 bezierTunnelControlPoints;
@@ -31,7 +33,7 @@ typedef struct BezierDensityFuncSettings
 } BezierDensityFuncSettings;
 
 
-void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generationSettings, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth);
+void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generationSettings, f32* densityMap, u32 mapSize);
 
 void DensityFuncRandomSpheres(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth);
 

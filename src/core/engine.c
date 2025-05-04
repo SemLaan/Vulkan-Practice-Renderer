@@ -20,7 +20,7 @@ GRGlobals* global = nullptr;
 static bool OnQuit(EventCode type, EventData data);
 static bool OnResize(EventCode type, EventData data);
 
-#define ENGINE_TOTAL_MEMORY_RESERVE (400 * MiB)
+#define ENGINE_TOTAL_MEMORY_RESERVE (800 * MiB)
 #define FRAME_ARENA_SIZE (100 * MiB)
 #define GAME_ALLOCATOR_SIZE (100 * MiB)
 #define LARGE_OBJECT_ALLOCATOR_SIZE (50 * MiB)

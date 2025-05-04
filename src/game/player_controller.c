@@ -37,7 +37,6 @@ void PlayerControllerInit()
 
     // Creating debug menu
     controllerState->controllerSettingMenu = DebugUICreateMenu("Mouse Settings");
-    RegisterDebugMenu(controllerState->controllerSettingMenu);
     DebugUIAddButton(controllerState->controllerSettingMenu, "control camera", nullptr, &controllerState->controlCameraButtonPressed);
     DebugUIAddButton(controllerState->controllerSettingMenu, "control arcball camera", nullptr, &controllerState->controlArcballCameraButtonPressed);
     DebugUIAddSliderLog(controllerState->controllerSettingMenu, "mouse sensitivity", 10.f, 0.0001f, 0.01f, &controllerState->mouseSensitivity);
@@ -137,13 +136,12 @@ void PlayerControllerUpdate()
 
         vec3 forwardVector = {-rotation.values[2 + COL4(0)], -rotation.values[2 + COL4(1)], -rotation.values[2 + COL4(2)]};
 
-		sceneCamera->position = vec3_add_vec3(vec3_from_float(50), vec3_mul_f32(forwardVector, -controllerState->arcballRadius));
+		sceneCamera->position = vec3_mul_f32(forwardVector, -controllerState->arcballRadius);
 	}
 }
 
 void PlayerControllerShutdown()
 {
-    UnregisterDebugMenu(controllerState->controllerSettingMenu);
     DebugUIDestroyMenu(controllerState->controllerSettingMenu);
 
     Free(GetGlobalAllocator(), controllerState);

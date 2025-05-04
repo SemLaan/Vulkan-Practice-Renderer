@@ -5,7 +5,6 @@
 #include "marching_cubes_lut.h"
 #include "math/lin_alg.h"
 #include "renderer/renderer.h"
-#include "game.h"
 #include "core/engine.h"
 
 #define INITIAL_VERT_RESERVATION 1000

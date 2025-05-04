@@ -2,15 +2,14 @@
 
 #include "core/event.h"
 #include "core/platform.h"
-#include "marching_cubes.h"
 #include "math/lin_alg.h"
 #include "renderer/render_target.h"
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
 #include "renderer/ui/profiling_ui.h"
-#include "terrain_density_functions.h"
 #include "core/engine.h"
 #include "renderer/mesh_optimizer.h"
+#include "world_generation.h"
 
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
 #define NORMAL_SHADER_NAME "normal_shader"
@@ -25,7 +24,6 @@
 #define UI_NEAR_PLANE -1
 #define UI_FAR_PLANE 1
 #define UI_ORTHO_HEIGHT 10
-#define DENSITY_MAP_SIZE 100 // width, heigth and depth of the density map
 
 DEFINE_DARRAY_TYPE_REF(DebugMenu);
 
@@ -40,32 +38,10 @@ typedef struct ShaderParameters
 	bool renderOutlines;
 } ShaderParameters;
 
-typedef struct WorldGenParameters
-{
-	BezierDensityFuncSettings bezierDensityFuncSettings;
-
-	i64 blurIterations;
-	i64 blurKernelSize;
-	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT];
-} WorldGenParameters;
-
-typedef struct World
-{
-    f32* terrainDensityMap;
-    u32 densityMapWidth;
-    u32 densityMapHeight;
-    u32 densityMapDepth;
-    u32 terrainSeed;
-    GPUMesh marchingCubesGpuMesh;
-} World;
-
 typedef struct GameRenderingState
 {
-    // Debug menu's
-    DebugMenuRefDarray* debugMenuDarray;
     // Debug menu for adjusting shader parameters
     DebugMenu* shaderParamDebugMenu;
-	DebugMenu* worldGenParamDebugMenu;
 
     // Materials
     Material marchingCubesMaterial;
@@ -80,12 +56,8 @@ typedef struct GameRenderingState
     Camera sceneCamera;
     Camera uiCamera;
 
-    // World data (meshes and related data)
-    World world;
-
-    // Data controlled by debug menu's
+    // Data controlled by debug menu
     ShaderParameters shaderParameters;
-	WorldGenParameters worldGenParams;
 } GameRenderingState;
 
 static GameRenderingState* renderingState = nullptr;
@@ -127,9 +99,6 @@ void GameRenderingInit()
     renderingState->sceneCamera.rotation = vec3_create(0, 0, 0);
     renderingState->uiCamera.position = vec3_create(0, 0, 0);
     renderingState->uiCamera.rotation = vec3_create(0, 0, 0);
-
-    // Creating darray for debug ui's
-    renderingState->debugMenuDarray = DebugMenuRefDarrayCreate(5, GetGlobalAllocator());
 
     // Loading fonts
     TextLoadFont(FONT_NAME_ROBOTO, "Roboto-Black.ttf");
@@ -229,7 +198,6 @@ void GameRenderingInit()
     // Setting up debug ui's for shader parameters and terrain generation settings
 	renderingState->shaderParameters.renderOutlines = true;
     renderingState->shaderParamDebugMenu = DebugUICreateMenu("Shader Parameters");
-    RegisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIAddSliderFloat(renderingState->shaderParamDebugMenu, "edge detection normal threshold", 0.001f, 1, &renderingState->shaderParameters.normalEdgeThreshold);
     DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render marching cubes mesh", &renderingState->shaderParameters.renderMarchingCubesMesh);
     DebugUIAddToggleButton(renderingState->shaderParamDebugMenu, "Render mesh normals", &renderingState->shaderParameters.renderMarchingCubesNormals);
@@ -242,36 +210,6 @@ void GameRenderingInit()
     DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "transparency transition", 10, 0.01f, 1, &renderingState->shaderParameters.uiOther.z);
 	DebugUIAddSliderLog(renderingState->shaderParamDebugMenu, "Glyph Threshold Size", 10, 0.001f, 1.0f, &renderingState->shaderParameters.glyphThresholdSize);
 	renderingState->shaderParameters.uiColor.w = 1;
-
-	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT] = POSSIBLE_BLUR_KERNEL_SIZES;
-	MemoryCopy(renderingState->worldGenParams.blurKernelSizeOptions, blurKernelSizeOptions, sizeof(blurKernelSizeOptions));
-
-	renderingState->worldGenParamDebugMenu = DebugUICreateMenu("World Gen Parameters");
-	RegisterDebugMenu(renderingState->worldGenParamDebugMenu);
-	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Blur Iterations", MIN_BLUR_ITERATIONS, MAX_BLUR_ITERATIONS, &renderingState->worldGenParams.blurIterations);
-	DebugUIAddSliderDiscrete(renderingState->worldGenParamDebugMenu, "Blur Kernel Size", renderingState->worldGenParams.blurKernelSizeOptions, POSSIBLE_BLUR_KERNEL_SIZES_COUNT, &renderingState->worldGenParams.blurKernelSize);
-	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Bezier tunnel count", MIN_BEZIER_TUNNEL_COUNT, MAX_BEZIER_TUNNEL_COUNT, &renderingState->worldGenParams.bezierDensityFuncSettings.bezierTunnelCount);
-	DebugUIAddSliderFloat(renderingState->worldGenParamDebugMenu, "Bezier tunnel radius", MIN_BEZIER_TUNNEL_RADIUS, MAX_BEZIER_TUNNEL_RADIUS, &renderingState->worldGenParams.bezierDensityFuncSettings.bezierTunnelRadius);
-	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Bezier tunnel control points", MIN_BEZIER_TUNNEL_CONTROL_POINTS, MAX_BEZIER_TUNNEL_CONTROL_POINTS, &renderingState->worldGenParams.bezierDensityFuncSettings.bezierTunnelControlPoints);
-	DebugUIAddSliderInt(renderingState->worldGenParamDebugMenu, "Sphere hole count", MIN_SPHERE_HOLE_COUNT, MAX_SPHERE_HOLE_COUNT, &renderingState->worldGenParams.bezierDensityFuncSettings.sphereHoleCount);
-	DebugUIAddSliderFloat(renderingState->worldGenParamDebugMenu, "Sphere hole radius", MIN_SPHERE_HOLE_RADIUS, MAX_SPHERE_HOLE_RADIUS, &renderingState->worldGenParams.bezierDensityFuncSettings.sphereHoleRadius);
-
-	// Generating marching cubes terrain
-    {
-		World* world = &renderingState->world;
-        world->terrainSeed = 0;
-        world->densityMapWidth = DENSITY_MAP_SIZE;
-        world->densityMapHeight = DENSITY_MAP_SIZE;
-        world->densityMapDepth = DENSITY_MAP_SIZE;
-        u32 densityMapValueCount = world->densityMapWidth * world->densityMapHeight * world->densityMapDepth;
-        world->terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world->terrainDensityMap) * densityMapValueCount);
-        DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-		BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-		MeshData mcMeshData = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-		world->marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(mcMeshData.vertices, mcMeshData.vertexStride * mcMeshData.vertexCount);
-		world->marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(mcMeshData.indices, mcMeshData.indexCount);
-		MarchingCubesFreeMeshData(mcMeshData);
-    }
 }
 
 void GameRenderingRender()
@@ -294,7 +232,6 @@ void GameRenderingRender()
     MaterialUpdateProperty(renderingState->outlineMaterial, "screenHeight", &windowSize.y);
     MaterialUpdateProperty(renderingState->outlineMaterial, "normalEdgeThreshold", &renderingState->shaderParameters.normalEdgeThreshold);
 	MaterialUpdateProperty(renderingState->uiTextureMaterial, "uiProjection", &renderingState->uiCamera.projection);
-	mat4 identity = mat4_identity();
 	MaterialUpdateProperty(renderingState->uiTextureMaterial, "glyphThresholdSize", &renderingState->shaderParameters.glyphThresholdSize);
 
     // ================== Camera calculations
@@ -311,7 +248,7 @@ void GameRenderingRender()
 
     // Rendering the marching cubes mesh
     MaterialBind(renderingState->normalRenderingMaterial);
-	Draw(1, &renderingState->world.marchingCubesGpuMesh.vertexBuffer, renderingState->world.marchingCubesGpuMesh.indexBuffer, &identity, 1);
+	WorldGenerationDrawWorld();
 
     RenderTargetStopRendering(renderingState->normalAndDepthRenderTarget);
 
@@ -324,8 +261,8 @@ void GameRenderingRender()
 			MaterialBind(renderingState->normalRenderingMaterial);
 		else
 	        MaterialBind(renderingState->marchingCubesMaterial);
-		Draw(1, &renderingState->world.marchingCubesGpuMesh.vertexBuffer, renderingState->world.marchingCubesGpuMesh.indexBuffer, &identity, 1);
-    }
+		WorldGenerationDrawWorld();
+	}
 
     // Rendering the marching cubes mesh outline
 	if (renderingState->shaderParameters.renderOutlines)
@@ -361,21 +298,7 @@ void GameRenderingShutdown()
     TextUnloadFont(FONT_NAME_NICOLAST);
 
     // Destroying debug menu for shader params and darray for debug ui's
-    UnregisterDebugMenu(renderingState->shaderParamDebugMenu);
     DebugUIDestroyMenu(renderingState->shaderParamDebugMenu);
-    DarrayDestroy(renderingState->debugMenuDarray);
-
-	// Destroying debug menu for world gen parameters
-	UnregisterDebugMenu(renderingState->worldGenParamDebugMenu);
-    DebugUIDestroyMenu(renderingState->worldGenParamDebugMenu);
-
-    // Destroying world data
-	{
-		World* world = &renderingState->world;
-		Free(GetGlobalAllocator(), world->terrainDensityMap);
-		VertexBufferDestroy(world->marchingCubesGpuMesh.vertexBuffer);
-		IndexBufferDestroy(world->marchingCubesGpuMesh.indexBuffer);
-	}
 
     MaterialDestroy(renderingState->outlineMaterial);
     MaterialDestroy(renderingState->normalRenderingMaterial);
@@ -398,39 +321,4 @@ GameCameras GetGameCameras()
     return gameCameras;
 }
 
-void RegisterDebugMenu(DebugMenu* debugMenu)
-{
-    DebugMenuRefDarrayPushback(renderingState->debugMenuDarray, &debugMenu);
-}
 
-void UnregisterDebugMenu(DebugMenu* debugMenu)
-{
-    for (u32 i = 0; i < renderingState->debugMenuDarray->size; i++)
-    {
-        if (renderingState->debugMenuDarray->data[i] == debugMenu)
-        {
-            DarrayPopAt(renderingState->debugMenuDarray, i);
-            return;
-        }
-    }
-}
-
-void RegenerateMarchingCubesMesh()
-{
-	World* world = &renderingState->world;
-	DensityFuncBezierCurveHole(&world->terrainSeed, &renderingState->worldGenParams.bezierDensityFuncSettings, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-	BlurDensityMapGaussian(renderingState->worldGenParams.blurIterations, renderingState->worldGenParams.blurKernelSize, world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-
-	VertexBufferDestroy(world->marchingCubesGpuMesh.vertexBuffer);
-	IndexBufferDestroy(world->marchingCubesGpuMesh.indexBuffer);
-
-	MeshData mcMeshData = MarchingCubesGenerateMesh(world->terrainDensityMap, world->densityMapWidth, world->densityMapHeight, world->densityMapDepth);
-
-	MeshData smoothedMCMeshData = MeshOptimizerMergeNormals(mcMeshData, offsetof(VertexT2, position), offsetof(VertexT2, normal));
-
-	world->marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(smoothedMCMeshData.vertices, smoothedMCMeshData.vertexStride * smoothedMCMeshData.vertexCount);
-	world->marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(smoothedMCMeshData.indices, smoothedMCMeshData.indexCount);
-
-	MarchingCubesFreeMeshData(mcMeshData);
-	MeshOptimizerFreeMeshData(smoothedMCMeshData);
-}

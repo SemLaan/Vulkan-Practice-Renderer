@@ -5,7 +5,7 @@
 #include "core/input.h"
 #include "core/logger.h"
 #include "game_rendering.h"
-#include "marching_cubes.h"
+#include "world_generation.h"
 #include "math/lin_alg.h"
 #include "player_controller.h"
 
@@ -19,6 +19,7 @@ int main()
 	engineSettings.framerateLimit = 122;
     EngineInit(engineSettings);
 
+	WorldGenerationInit();
     GameRenderingInit();
     PlayerControllerInit();
 
@@ -26,11 +27,7 @@ int main()
     while (EngineUpdate())
     {
         // =========================== Update ===================================
-        if (GetButtonDown(BUTTON_RIGHTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_RIGHTMOUSEBTN))
-        {
-            RegenerateMarchingCubesMesh();
-        }
-
+		WorldGenerationUpdate();
         PlayerControllerUpdate();
         GameRenderingRender();
     }
@@ -38,6 +35,7 @@ int main()
     // ================================================================== Shutdown
     PlayerControllerShutdown();
     GameRenderingShutdown();
+	WorldGenerationShutdown();
 
     EngineShutdown();
 }

@@ -948,6 +948,9 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 {
 	f32 oneOverLogBase = 1.f / logf(base);
 
+	if (*pSliderValue <= minValue)
+		*pSliderValue = minValue;
+
 	// Allocating internal slider data and saving the pointer to the slider value
 	SliderLogInteractableData* sliderData = Alloc(state->interactableInternalDataAllocator, sizeof(*sliderData));
 	sliderData->pSliderValue = pSliderValue;

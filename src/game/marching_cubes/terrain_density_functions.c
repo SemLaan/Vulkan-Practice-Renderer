@@ -1,7 +1,6 @@
 #include "terrain_density_functions.h"
 
 #include "core/engine.h"
-#include "game.h"
 
 // Indexes into a densityMap
 static inline f32* GetDensityValueRef(f32* densityMap, u32 mapHeightTimesDepth, u32 mapDepth, u32 x, u32 y, u32 z)
@@ -59,12 +58,11 @@ void DensityFuncSphereHole(f32* densityMap, u32 mapWidth, u32 mapHeight, u32 map
 
 #define SAMPLES_PER_BEZIER 20
 
-void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generationSettings, f32* densityMap, u32 mapWidth, u32 mapHeight, u32 mapDepth)
+void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generationSettings, f32* densityMap, u32 mapResolution)
 {
-    u32 mapHeightTimesDepth = mapHeight * mapDepth;
+    u32 mapHeightTimesDepth = mapResolution * mapResolution;
 
-    vec3 sphereCenter = vec3_from_float(mapWidth / 2);
-    f32 sphereRadius = 20;
+    vec3 sphereCenter = vec3_from_float(mapResolution / 2);
 
 	// Generating random bezier curves
 	u64 totalBezierCurvePoints = generationSettings->bezierTunnelControlPoints * generationSettings->bezierTunnelCount;
@@ -76,9 +74,9 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 		for (int j = 0; j < generationSettings->bezierTunnelControlPoints; j++)
 		{
 			if (j == 0 || j + 1 == generationSettings->bezierTunnelControlPoints)
-				bezierCurvePoints[i * generationSettings->bezierTunnelControlPoints + j] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(seed), sphereRadius), sphereCenter);
+				bezierCurvePoints[i * generationSettings->bezierTunnelControlPoints + j] = vec3_add_vec3(vec3_mul_f32(RandomPointOnUnitSphere(seed), generationSettings->baseSphereRadius), sphereCenter);
 			else
-				bezierCurvePoints[i * generationSettings->bezierTunnelControlPoints + j] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(seed), sphereRadius), sphereCenter);
+				bezierCurvePoints[i * generationSettings->bezierTunnelControlPoints + j] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(seed), generationSettings->baseSphereRadius), sphereCenter);
 		}
 	}
 
@@ -108,23 +106,23 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 
 	for (int i = 0; i < generationSettings->sphereHoleCount; i++)
 	{
-		sphereHoleCenters[i] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(seed), sphereRadius), sphereCenter);
+		sphereHoleCenters[i] = vec3_add_vec3(vec3_mul_f32(RandomPointInUnitSphere(seed), generationSettings->baseSphereRadius), sphereCenter);
 	}
 
     // Looping over every density point and calculating the density.
-    for (u32 x = 0; x < mapWidth; x++)
+    for (u32 x = 0; x < mapResolution; x++)
     {
-        for (u32 y = 0; y < mapHeight; y++)
+        for (u32 y = 0; y < mapResolution; y++)
         {
-            for (u32 z = 0; z < mapDepth; z++)
+            for (u32 z = 0; z < mapResolution; z++)
             {
                 vec3 currentPoint = vec3_create(x, y, z);
 
                 // Calculating whether the current point is in the sphere or in the bezier curve hole
-                f32 sphereValue = vec3_distance(currentPoint, sphereCenter) - sphereRadius;
+                f32 sphereValue = vec3_distance(currentPoint, sphereCenter) - generationSettings->baseSphereRadius;
                 if (sphereValue >= 0)
 				{
-					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1;
+					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapResolution, x, y, z) = 1;
 					continue;
 				}
                 if (sphereValue <= -2)
@@ -142,7 +140,7 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 				closestSphereDistance -= generationSettings->sphereHoleRadius;
 				if (closestSphereDistance <= -2)
 				{
-					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1 + sphereValue - closestSphereDistance;
+					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapResolution, x, y, z) = 1 + sphereValue - closestSphereDistance;
 					continue;
 				}
 
@@ -160,7 +158,7 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 
                 if (closestBezierDistance <= -2)
 				{
-					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1 + sphereValue - closestBezierDistance;
+					*GetDensityValueRef(densityMap, mapHeightTimesDepth, mapResolution, x, y, z) = 1 + sphereValue - closestBezierDistance;
 					continue;
 				}
 				
@@ -170,7 +168,7 @@ void DensityFuncBezierCurveHole(u32* seed, BezierDensityFuncSettings* generation
 				f32 closestAirDistance = fmin(closestSphereDistance, closestBezierDistance);
 
                 // Calculating the density value
-                *GetDensityValueRef(densityMap, mapHeightTimesDepth, mapDepth, x, y, z) = 1 + sphereValue - closestAirDistance;
+                *GetDensityValueRef(densityMap, mapHeightTimesDepth, mapResolution, x, y, z) = 1 + sphereValue - closestAirDistance;
             }
         }
     }
