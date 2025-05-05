@@ -104,12 +104,20 @@ typedef struct VertexBufferLayout
 #define CULL_BACK 0
 #define CULL_FRONT 1
 
+typedef enum RasterizerMode
+{
+	RASTERIZER_MODE_TRIANGLES_FILLED = 0,
+	RASTERIZER_MODE_LINE_SEGMENTS = 1,
+	// TODO: add this: RASTERIZER_MODE_TRIANGLES_OUTLINES = 2,
+} RasterizerMode;
+
 typedef struct ShaderCreateInfo
 {
     const char* vertexShaderName;          // String with the filepath of the vertex shader.
     const char* fragmentShaderName;        // String with the filepath of the fragment shader. If this is nullptr the pipeline will be created without a fragment shader, this can be usefull for certain rendering techniques (e.g. shadowmaps).
     VertexBufferLayout vertexBufferLayout; // Struct with information about the per vertex and instanced vertex layout.
 	u32 cullMode;						   // Leave zeroed for back face, 1 for front face
+	RasterizerMode rasterizerMode;
     bool renderTargetColor;                // Whether or not the render target has a color buffer.
     bool renderTargetDepth;                // Whether or not the render target has a depth buffer (also determines if depth testing is on or off).
     bool renderTargetStencil;              // TODO: this does nothing yet

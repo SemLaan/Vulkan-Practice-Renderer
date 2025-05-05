@@ -331,7 +331,10 @@ void ShaderCreate(const char* shaderName, ShaderCreateInfo* pCreateInfo)
     inputAssemblerCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssemblerCreateInfo.pNext = nullptr;
     inputAssemblerCreateInfo.flags = 0;
-    inputAssemblerCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	if (pCreateInfo->rasterizerMode == RASTERIZER_MODE_TRIANGLES_FILLED)
+		inputAssemblerCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	else if (pCreateInfo->rasterizerMode == RASTERIZER_MODE_LINE_SEGMENTS)
+	    inputAssemblerCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
     inputAssemblerCreateInfo.primitiveRestartEnable = VK_FALSE;
 
     // Viewport state

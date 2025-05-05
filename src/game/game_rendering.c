@@ -123,6 +123,7 @@ void GameRenderingInit()
             shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
             shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
             shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
+			shaderCreateInfo.rasterizerMode = RASTERIZER_MODE_TRIANGLES_FILLED;
 
             shaderCreateInfo.vertexShaderName = "marchingCubes";
             shaderCreateInfo.fragmentShaderName = "marchingCubes";
@@ -138,6 +139,7 @@ void GameRenderingInit()
             shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
             shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
             shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
+			shaderCreateInfo.rasterizerMode = RASTERIZER_MODE_TRIANGLES_FILLED;
 
             shaderCreateInfo.vertexShaderName = "normal";
             shaderCreateInfo.fragmentShaderName = "normal";
@@ -153,6 +155,7 @@ void GameRenderingInit()
             shaderCreateInfo.vertexBufferLayout.perVertexAttributes[0] = VERTEX_ATTRIBUTE_TYPE_VEC3;
             shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC2;
             shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
+			shaderCreateInfo.rasterizerMode = RASTERIZER_MODE_TRIANGLES_FILLED;
 
             shaderCreateInfo.vertexShaderName = "fullscreen";
             shaderCreateInfo.fragmentShaderName = "outline";
@@ -169,6 +172,7 @@ void GameRenderingInit()
             shaderCreateInfo.vertexBufferLayout.perVertexAttributes[1] = VERTEX_ATTRIBUTE_TYPE_VEC3;
             shaderCreateInfo.vertexBufferLayout.perVertexAttributes[2] = VERTEX_ATTRIBUTE_TYPE_VEC2;
             shaderCreateInfo.vertexBufferLayout.perInstanceAttributeCount = 0;
+			shaderCreateInfo.rasterizerMode = RASTERIZER_MODE_TRIANGLES_FILLED;
 
             shaderCreateInfo.vertexShaderName = "ui_texture";
             shaderCreateInfo.fragmentShaderName = "ui_texture";
