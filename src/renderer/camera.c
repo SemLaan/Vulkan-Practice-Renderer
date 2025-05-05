@@ -60,6 +60,8 @@ vec4 CameraScreenToWorldSpace(Camera* camera, vec2 screenPosition)
 
 	position = mat4_mul_vec4(camera->inverseViewProjection, position);
 
+	position = vec4_mul_f32(position, 1.f / position.w); // Perspective division
+
     return position;
 }
 
