@@ -12,7 +12,6 @@ typedef struct ControllerState
     f32 mouseSensitivity;
     f32 movementSpeed;
 	f32 arcballRadius;
-	Camera freeCameraState;
 	Camera arcballCameraState;
     bool cameraControlActive; // Whether the player can currently control the camera or not.
 	bool controllingArcball;
@@ -43,8 +42,6 @@ void PlayerControllerInit()
     DebugUIAddSliderLog(controllerState->controllerSettingMenu, "move speed", 10.f, 1.f, 1000.f, &controllerState->movementSpeed);
 	DebugUIAddSliderFloat(controllerState->controllerSettingMenu, "Arcball Radius", 10, 100, &controllerState->arcballRadius);
 
-	controllerState->freeCameraState.position = vec3_create(0, 0, 0);
-	controllerState->freeCameraState.rotation = vec3_create(0, 0, 0);
 	controllerState->arcballCameraState.position = vec3_create(0, 0, 0);
 	controllerState->arcballCameraState.rotation = vec3_create(0, 0, 0);
 }
@@ -60,8 +57,6 @@ void PlayerControllerUpdate()
 		controllerState->controllingArcball = false;
 		controllerState->cameraControlActive = true;
         InputSetMouseCentered(true);
-		sceneCamera->position = controllerState->freeCameraState.position;
-		sceneCamera->rotation = controllerState->freeCameraState.rotation;
     }
 
 	if (controllerState->controlArcballCameraButtonPressed)
@@ -80,8 +75,6 @@ void PlayerControllerUpdate()
 		controllerState->cameraControlActive = false;
 		if (controllerState->controllingArcball)
 			controllerState->arcballCameraState = *sceneCamera;
-		else
-			controllerState->freeCameraState = *sceneCamera;
 	}
 
     // Calculating the player movement and camera movement, if camera control is active
