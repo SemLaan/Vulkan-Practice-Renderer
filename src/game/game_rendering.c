@@ -21,7 +21,7 @@
 #define FONT_NAME_NICOLAST "nicolast"
 #define DEFAULT_FOV 45.0f
 #define DEFAULT_NEAR_PLANE 1.0f
-#define DEFAULT_FAR_PLANE 200.0f
+#define DEFAULT_FAR_PLANE 400.0f
 #define UI_NEAR_PLANE -1
 #define UI_FAR_PLANE 1
 #define UI_ORTHO_HEIGHT 10

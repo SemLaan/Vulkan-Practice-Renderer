@@ -1233,7 +1233,6 @@ void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* inter
 	// Updating the slider value for the client.
 	mouseSliderPosition /= SLIDER_BAR_SIZE.x - SLIDER_DOT_SIZE.x; // Normalizing mouseSliderPosition (or remapping it to [0, 1])
 	*sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
-	_DEBUG("Slider value: %f", *sliderData->pSliderValue);
 }
 
 void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
