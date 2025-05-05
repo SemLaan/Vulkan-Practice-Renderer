@@ -19,6 +19,8 @@ void ShutdownDebugUI();
 /// Handles user interaction with the menu.
 void UpdateDebugUI();
 
+bool DebugUIGetInputConsumed();
+
 
 /// @brief Creates a Debug UI menu instance.
 /// @return Pointer to the menu.

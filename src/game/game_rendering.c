@@ -10,6 +10,7 @@
 #include "core/engine.h"
 #include "renderer/mesh_optimizer.h"
 #include "world_generation.h"
+#include "raycast_demo.h"
 
 #define MARCHING_CUBES_SHADER_NAME "marchingCubes"
 #define NORMAL_SHADER_NAME "normal_shader"
@@ -72,6 +73,7 @@ static bool OnWindowResize(EventCode type, EventData data)
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
     renderingState->sceneCamera.projection = mat4_perspective(DEFAULT_FOV, windowAspectRatio, DEFAULT_NEAR_PLANE, DEFAULT_FAR_PLANE);
     renderingState->uiCamera.projection = mat4_orthographic(0, UI_ORTHO_HEIGHT * windowAspectRatio, 0, UI_ORTHO_HEIGHT, UI_NEAR_PLANE, UI_FAR_PLANE);
+	renderingState->sceneCamera.inverseProjection = mat4_inverse(renderingState->sceneCamera.projection);
 
     // Resizing framebuffer
     RenderTargetDestroy(renderingState->normalAndDepthRenderTarget);
@@ -92,6 +94,7 @@ void GameRenderingInit()
     float windowAspectRatio = windowSize.x / (float)windowSize.y;
     renderingState->sceneCamera.projection = mat4_perspective(DEFAULT_FOV, windowAspectRatio, DEFAULT_NEAR_PLANE, DEFAULT_FAR_PLANE);
     renderingState->uiCamera.projection = mat4_orthographic(0, UI_ORTHO_HEIGHT * windowAspectRatio, 0, UI_ORTHO_HEIGHT, UI_NEAR_PLANE, UI_FAR_PLANE);
+	renderingState->sceneCamera.inverseProjection = mat4_inverse(renderingState->sceneCamera.projection);
 
     RegisterEventListener(EVCODE_SWAPCHAIN_RESIZED, OnWindowResize);
 
@@ -239,8 +242,6 @@ void GameRenderingRender()
 	MaterialUpdateProperty(renderingState->uiTextureMaterial, "glyphThresholdSize", &renderingState->shaderParameters.glyphThresholdSize);
 
     // ================== Camera calculations
-    CameraRecalculateViewAndViewProjection(&renderingState->sceneCamera);
-
     GlobalUniformObject globalUniformObject = {};
     globalUniformObject.viewPosition = vec3_invert_sign(renderingState->sceneCamera.position);
     globalUniformObject.viewProjection = renderingState->sceneCamera.viewProjection;
@@ -275,6 +276,8 @@ void GameRenderingRender()
 		GPUMesh* fullscreenTriangleMesh = GetBasicMesh(BASIC_MESH_NAME_FULL_SCREEN_TRIANGLE);
 		Draw(1, &fullscreenTriangleMesh->vertexBuffer, fullscreenTriangleMesh->indexBuffer, nullptr, 1);
 	}
+
+	RaycastDemoRender();
 
     // Rendering the debug menu's
     DebugUIRenderMenus();

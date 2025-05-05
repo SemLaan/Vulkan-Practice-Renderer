@@ -180,6 +180,7 @@ typedef struct DebugUIState
 	Allocator* interactableInternalDataAllocator; // Allocator for allocating interactable internal data.
 	Font* font;
 	u32 menuOrderIndices[MAX_DBG_MENUS];
+	bool inputConsumed;
 } DebugUIState;
 
 static DebugUIState* state = nullptr;
@@ -246,6 +247,7 @@ bool InitializeDebugUI()
 
 	TextLoadFont(DEBUG_UI_FONT_NAME, "Roboto-Black.ttf");
 	state->font = TextGetFont(DEBUG_UI_FONT_NAME);
+	state->inputConsumed = false;
 
 	// Creating interactable internal data allocator
 	CreateFreelistAllocator("DebugUI interactable internal data", GetGlobalAllocator(), ITERACTABLE_INTERNAL_DATA_ALLOCATOR_SIZE, &state->interactableInternalDataAllocator, true);
@@ -296,6 +298,8 @@ void ShutdownDebugUI()
 
 void UpdateDebugUI()
 {
+	state->inputConsumed = false;
+
 	void (*interaction_start_func_ptr_arr[])(DebugMenu*, InteractableData*, vec4) =
 	{
 		HandleButtonInteractionStart,
@@ -332,8 +336,8 @@ void UpdateDebugUI()
 	};
 	GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_end_func_ptr_arr) / sizeof(*interaction_end_func_ptr_arr)))
 
-		// Getting the mouse position in world space.
-		vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1); // A mouse position is 2d but we pad the z with 0 and w with 1, so that we can do matrix math
+	// Getting the mouse position in world space.
+	vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1); // A mouse position is 2d but we pad the z with 0 and w with 1, so that we can do matrix math
 	vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
 	vec4 mouseWorldPos = mat4_mul_vec4(state->inverseProjView, clipCoords);
 
@@ -354,6 +358,8 @@ void UpdateDebugUI()
 		// If a button or slider is being interacted with already
 		if (menu->activeInteractableIndex != NO_INTERACTABLE_ACTIVE_VALUE)
 		{
+			state->inputConsumed = true;
+
 			// If the user let go of their mouse button then interaction end will be called for the active interactable.
 			if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
 			{
@@ -384,6 +390,8 @@ void UpdateDebugUI()
 			// If the mouse is in this menu, loop through all the elements in this menu to see which one needs to be interacted with.
 			if (mouseInMenu)
 			{
+				state->inputConsumed = true;
+
 				// First make sure that this menu now gets drawn on top of the other menu's since it's now the menu that was last interacted with
 				newActiveMenuOrderIndicesIndex = i;
 
@@ -421,6 +429,11 @@ void UpdateDebugUI()
 		
 		state->menuOrderIndices[0] = menuIndex;
 	}
+}
+
+bool DebugUIGetInputConsumed()
+{
+	return state->inputConsumed;
 }
 
 static inline void RecalculateMenuBackgroundSize(DebugMenu* menu)

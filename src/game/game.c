@@ -8,6 +8,7 @@
 #include "world_generation.h"
 #include "math/lin_alg.h"
 #include "player_controller.h"
+#include "raycast_demo.h"
 
 int main()
 {
@@ -21,6 +22,7 @@ int main()
 
 	WorldGenerationInit();
     GameRenderingInit();
+	RaycastDemoInit();
     PlayerControllerInit();
 
     // ================================================================= Game loop
@@ -29,11 +31,13 @@ int main()
         // =========================== Update ===================================
 		WorldGenerationUpdate();
         PlayerControllerUpdate();
+		RaycastDemoUpdate();
         GameRenderingRender();
     }
 
     // ================================================================== Shutdown
     PlayerControllerShutdown();
+	RaycastDemoShutdown();
     GameRenderingShutdown();
 	WorldGenerationShutdown();
 

@@ -138,6 +138,8 @@ void PlayerControllerUpdate()
 
 		sceneCamera->position = vec3_mul_f32(forwardVector, -controllerState->arcballRadius);
 	}
+
+	CameraRecalculateViewAndViewProjection(sceneCamera);
 }
 
 void PlayerControllerShutdown()
