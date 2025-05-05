@@ -165,6 +165,11 @@ static vec3 vec3_create(f32 x, f32 y, f32 z)
 	return out;
 }
 
+static f32 vec3_dot(vec3 v1, vec3 v2)
+{
+	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}
+
 static f32 vec3_magnitude(vec3 a)
 {
 	return sqrtf(a.x * a.x + a.y * a.y + a.z * a.z);
