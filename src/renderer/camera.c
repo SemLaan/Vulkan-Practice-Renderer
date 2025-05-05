@@ -48,9 +48,9 @@ vec4 CameraScreenToWorldSpace(Camera* camera, vec2 screenPosition)
     screenPosition.x = screenPosition.x / windowSize.x;
     screenPosition.y = screenPosition.y / windowSize.y;
     screenPosition.x = screenPosition.x * 2;
-    screenPosition.y = screenPosition.y * -2;
+    screenPosition.y = screenPosition.y * 2;
     screenPosition.x -= 1;
-    screenPosition.y += 1;
+    screenPosition.y -= 1;
 
     vec4 position = {};
     position.x = screenPosition.x;

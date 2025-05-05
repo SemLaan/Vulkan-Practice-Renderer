@@ -40,7 +40,7 @@ void PlayerControllerInit()
     DebugUIAddButton(controllerState->controllerSettingMenu, "control arcball camera", nullptr, &controllerState->controlArcballCameraButtonPressed);
     DebugUIAddSliderLog(controllerState->controllerSettingMenu, "mouse sensitivity", 10.f, 0.0001f, 0.01f, &controllerState->mouseSensitivity);
     DebugUIAddSliderLog(controllerState->controllerSettingMenu, "move speed", 10.f, 1.f, 1000.f, &controllerState->movementSpeed);
-	DebugUIAddSliderFloat(controllerState->controllerSettingMenu, "Arcball Radius", 10, 100, &controllerState->arcballRadius);
+	DebugUIAddSliderFloat(controllerState->controllerSettingMenu, "Arcball Radius", 10, 200, &controllerState->arcballRadius);
 
 	controllerState->arcballCameraState.position = vec3_create(0, 0, 0);
 	controllerState->arcballCameraState.rotation = vec3_create(0, 0, 0);
