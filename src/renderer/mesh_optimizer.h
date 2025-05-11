@@ -9,5 +9,7 @@ static inline void MeshOptimizerFreeMeshData(MeshData meshData)
 {
 	Free(global->largeObjectAllocator, meshData.vertices);
 	Free(global->largeObjectAllocator, meshData.indices);
+	meshData.vertices = nullptr;
+	meshData.indices = nullptr;
 }
 

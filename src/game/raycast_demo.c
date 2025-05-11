@@ -7,6 +7,8 @@
 #include "renderer/camera.h"
 #include "game_rendering.h"
 #include "core/input.h"
+#include "collision.h"
+#include "world_generation.h"
 
 #define RAY_RENDERING_SHADER_NAME "line_shader"
 #define RAY_ORBIT_DISTANCE 55
@@ -27,6 +29,8 @@ typedef struct RaycastDemoState
 } RaycastDemoState;
 
 static RaycastDemoState state;
+
+static inline void CalculateRayMeshIntersect();
 
 void RaycastDemoInit()
 {
@@ -127,6 +131,8 @@ void RaycastDemoUpdate()
 		state.vertices[1].position = state.rayOrbPosition;
 		VertexBufferUpdate(state.rayMesh.vertexBuffer, state.vertices, sizeof(state.vertices));
 
+		CalculateRayMeshIntersect();
+
 		if (!GetButtonDown(BUTTON_LEFTMOUSEBTN))
 			state.movingRayOrb = false;
 	}
@@ -156,4 +162,14 @@ void RaycastDemoShutdown()
 	ShaderDestroy(RAY_RENDERING_SHADER_NAME);
 }
 
+static inline void CalculateRayMeshIntersect()
+{
+	MeshData colliderMesh = WorldGenerationGetColliderMesh();
+	vec3 origin = state.vertices[1].position;
+	vec3 direction = vec3_normalize(vec3_sub_vec3(state.vertices[0].position, state.vertices[1].position));
+	mat4 model = WorldGenerationGetModelMatrix();
+	RaycastHit hit = RaycastMesh(origin, direction, colliderMesh, model, offsetof(VertexT2, position), offsetof(VertexT2, normal));
+	_DEBUG("Hit triangle: %u", hit.triangleFirstIndex);
+	_DEBUG("Distance: %f", hit.hitDistance);
+}
 

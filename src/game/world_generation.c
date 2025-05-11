@@ -4,6 +4,7 @@
 #include "renderer/ui/debug_ui.h"
 #include "game_rendering.h"
 #include "core/input.h"
+#include "renderer/mesh_optimizer.h"
 
 #define DEFAULT_DENSITY_MAP_RESOLUTION 100
 
@@ -21,7 +22,7 @@ void WorldGenerationInit()
 {
 	i64 blurKernelSizeOptions[POSSIBLE_BLUR_KERNEL_SIZES_COUNT] = POSSIBLE_BLUR_KERNEL_SIZES;
 	MemoryCopy(worldGenParams.blurKernelSizeOptions, blurKernelSizeOptions, sizeof(blurKernelSizeOptions));
-	worldGenParams.densityMapResolution = DEFAULT_DENSITY_MAP_RESOLUTION;
+	worldGenParams.densityMapResolution = 50;
 
 	worldGenParamDebugMenu = DebugUICreateMenu("World Gen Parameters");
 	DebugUIAddSliderInt(worldGenParamDebugMenu, "Density map resolution", 10, 200, &worldGenParams.densityMapResolution);
@@ -61,6 +62,20 @@ void WorldGenerationDrawWorld()
 	Draw(1, &world.marchingCubesGpuMesh.vertexBuffer, world.marchingCubesGpuMesh.indexBuffer, &world.terrainModelMatrix, 1);
 }
 
+MeshData WorldGenerationGetColliderMesh()
+{
+	return world.colliderMesh;
+}
+
+mat4 WorldGenerationGetModelMatrix()
+{
+	// Calculating the model matrix to center 
+	mat4 scale = mat4_3Dscale(vec3_from_float(DEFAULT_DENSITY_MAP_RESOLUTION / (f32)worldGenParams.densityMapResolution));
+	mat4 translation = mat4_3Dtranslate(vec3_from_float(-DEFAULT_DENSITY_MAP_RESOLUTION * 0.5f));
+	world.terrainModelMatrix =  mat4_mul_mat4(translation, scale);
+	return world.terrainModelMatrix;
+}
+
 static inline void GenerateMarchingCubesWorld()
 {
 	// Allocating memory for the density map
@@ -83,17 +98,20 @@ static inline void GenerateMarchingCubesWorld()
 
 	// Generating the mesh
 	MeshData mcMeshData = MarchingCubesGenerateMesh(world.terrainDensityMap, worldGenParams.densityMapResolution, worldGenParams.densityMapResolution, worldGenParams.densityMapResolution);
-	world.marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(mcMeshData.vertices, mcMeshData.vertexStride * mcMeshData.vertexCount);
-	world.marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(mcMeshData.indices, mcMeshData.indexCount);
-	MarchingCubesFreeMeshData(mcMeshData);
 
-	// TODO: This is for smoothing the mesh normals and removing duplicate vertices, used for raycasting
-	//MeshData smoothedMCMeshData = MeshOptimizerMergeNormals(mcMeshData, offsetof(VertexT2, position), offsetof(VertexT2, normal));
-	// TODO: free this as well when it's added, will probably have to be freed in DestroyMarchingCubesWorld
+	// This is for smoothing the mesh normals and removing duplicate vertices, used for raycasting
+	world.colliderMesh = MeshOptimizerMergeNormals(mcMeshData, offsetof(VertexT2, position), offsetof(VertexT2, normal));
+	
+	// Uploading the mesh
+	world.marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(world.colliderMesh.vertices, world.colliderMesh.vertexStride * world.colliderMesh.vertexCount);
+	world.marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(world.colliderMesh.indices, world.colliderMesh.indexCount);
+
+	MarchingCubesFreeMeshData(mcMeshData);
 }
 
 static inline void DestroyMarchingCubesWorld()
 {
+	MeshOptimizerFreeMeshData(world.colliderMesh);
 	Free(GetGlobalAllocator(), world.terrainDensityMap);
 	VertexBufferDestroy(world.marchingCubesGpuMesh.vertexBuffer);
 	IndexBufferDestroy(world.marchingCubesGpuMesh.indexBuffer);

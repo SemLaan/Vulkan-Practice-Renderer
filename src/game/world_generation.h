@@ -16,6 +16,7 @@ typedef struct WorldGenParameters
 typedef struct World
 {
     f32* terrainDensityMap;
+	MeshData colliderMesh;
     GPUMesh marchingCubesGpuMesh;
 	mat4 terrainModelMatrix;
     u32 terrainSeed;
@@ -26,4 +27,6 @@ void WorldGenerationUpdate();
 void WorldGenerationShutdown();
 
 void WorldGenerationDrawWorld();
+MeshData WorldGenerationGetColliderMesh();
+mat4 WorldGenerationGetModelMatrix();
 
