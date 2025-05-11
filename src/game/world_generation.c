@@ -103,8 +103,8 @@ static inline void GenerateMarchingCubesWorld()
 	world.colliderMesh = MeshOptimizerMergeNormals(mcMeshData, offsetof(VertexT2, position), offsetof(VertexT2, normal));
 	
 	// Uploading the mesh
-	world.marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(world.colliderMesh.vertices, world.colliderMesh.vertexStride * world.colliderMesh.vertexCount);
-	world.marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(world.colliderMesh.indices, world.colliderMesh.indexCount);
+	world.marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(mcMeshData.vertices, mcMeshData.vertexStride * mcMeshData.vertexCount);
+	world.marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(mcMeshData.indices, mcMeshData.indexCount);
 
 	MarchingCubesFreeMeshData(mcMeshData);
 }
