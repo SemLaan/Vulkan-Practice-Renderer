@@ -514,3 +514,16 @@ static vec4 mat4_mul_vec4(mat4 A, vec4 b)
 
 	return result;
 }
+
+static vec3 mat4_mul_vec3_extend(mat4 A, vec3 b, f32 w)
+{
+	vec4 result = {};
+	vec4 temp = vec4_create(b.x, b.y, b.z, w);
+
+	for (u32 i = 0; i < 3; ++i)
+	{
+		result.values[i] = A.values[i + COL4(0)] * temp.values[0] + A.values[i + COL4(1)] * temp.values[1] + A.values[i + COL4(2)] * temp.values[2] + A.values[i + COL4(3)] * temp.values[3];
+	}
+
+	return vec3_create(result.x, result.y, result.z);
+}
