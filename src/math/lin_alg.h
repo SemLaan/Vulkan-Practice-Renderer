@@ -206,6 +206,11 @@ static vec4 vec4_sub_vec4(vec4 a, vec4 b)
 	return vec4_create(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
 }
 
+static vec4 vec4_add_vec4(vec4 a, vec4 b)
+{
+	return vec4_create(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+}
+
 static vec2 vec4_xy(vec4 v)
 {
 	return vec2_create(v.x, v.y);
