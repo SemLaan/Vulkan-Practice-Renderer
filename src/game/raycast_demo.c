@@ -144,6 +144,7 @@ void RaycastDemoUpdate()
 			}
 		}
 
+		state.rayVertices[0].position = vec3_mul_f32(vec3_sub_vec3(vec3_create(0, 0, 0), state.rayOrbPosition), 100);
 		state.rayVertices[1].position = state.rayOrbPosition;
 		VertexBufferUpdate(state.rayMesh.vertexBuffer, state.rayVertices, sizeof(state.rayVertices));
 
