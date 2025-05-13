@@ -157,8 +157,16 @@ void RaycastDemoUpdate()
 
 void RaycastDemoRender()
 {
-	vec4 color = vec4_create(.2f, 0.7f, 0.6f, 1);
+	vec4 color = vec4_create(1, 1, 1, 1);
 	vec4 rayColor = vec4_create(1, 1, 1, 1);
+	if (state.rayHitting)
+	{
+		vec3 normal = vec3_normalize(vec3_cross_vec3(vec3_sub_vec3(state.triangleVertices[1].position, state.triangleVertices[0].position), 
+													 vec3_sub_vec3(state.triangleVertices[2].position, state.triangleVertices[0].position)));
+		
+		color = vec4_add_vec4(vec4_mul_f32(vec4_create(normal.x, normal.y, normal.z, 1), 0.5f), vec4_create(0.5f, 0.5f, 0.5f, 0.5f));
+		//rayColor = vec4_add_vec4(vec4_mul_f32(vec4_sub_vec4(rayColor, vec4_create(0.5f, 0.5f, 0.5f, 0.0f)), -1.f), vec4_create(0.5f, 0.5f, 0.5f, 2.0f));
+	}
 	MaterialUpdateProperty(state.raycastOriginMaterial, "color", &color);
 	MaterialUpdateProperty(state.rayRenderMaterial, "color", &rayColor);
 
