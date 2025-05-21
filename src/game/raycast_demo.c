@@ -9,6 +9,7 @@
 #include "core/input.h"
 #include "collision.h"
 #include "world_generation.h"
+#include "core/platform.h"
 
 #define RAY_RENDERING_SHADER_NAME "line_shader"
 #define RAY_ORBIT_DISTANCE 55
@@ -129,6 +130,7 @@ void RaycastDemoUpdate()
 
 		f32 discriminant = b * b - 4 * a * c;
 
+		// If the user hits the invisible sphere, simply find the intersection point and put the ray orb there
 		if (discriminant > 0)
 		{
 			discriminant = sqrtf(discriminant);
@@ -141,6 +143,50 @@ void RaycastDemoUpdate()
 			if (t1 > 0)
 			{
 				state.rayOrbPosition = vec3_add_vec3(rayOrigin, vec3_mul_f32(rayDirection, t1));
+			}
+		}
+		else // If the user aimed somewhere outside the sphere, calculate the tangent line of the sphere that goes through 
+			 // the camera position and has a direction that is closest to the direction of the camera ray
+		{
+			// Sphere sphere intersection
+			// https://gamedev.stackexchange.com/questions/75756/sphere-sphere-intersection-and-circle-sphere-intersection
+			f32 distance = vec3_magnitude(rayOrigin); // The main sphere's center is at 0, 0, 0 so the distance from the camera is just the length of ray origin
+
+			// Sphere one is the ray orbit sphere, sphere two is the sphere that originates at the camera and has a radius so it passes through the center of sphere one
+
+			// Original formula in the answer can be simplified since we only care about a specific case where the center of sphere two is always outside sphere one 
+			// and its radius is the same as the distance between the two centers so that it passes through the center of sphere one
+			//f32 h = 1/2 + (RAY_ORBIT_DISTANCE * RAY_ORBIT_DISTANCE - distance * distance)/(2 * distance * distance);
+			f32 h = (RAY_ORBIT_DISTANCE * RAY_ORBIT_DISTANCE)/(2 * distance * distance); // h is the interpolation value to get from the centers of the spheres to the center of the intersection (c_i = c_1 + h * (c_2 - c_1))
+
+			f32 intersectionRadius = sqrt(RAY_ORBIT_DISTANCE * RAY_ORBIT_DISTANCE - h*h*distance*distance);
+
+			// Formula can be simplified again because sphere one is always at 0,0,0
+			//vec3 intersectionCenter = vec3_add_vec3(vec3_create(0, 0, 0), vec3_mul_f32(vec3_sub_vec3(rayOrigin, vec3_create(0, 0, 0)), h));
+			vec3 intersectionCenter = vec3_mul_f32(rayOrigin, h);
+
+			vec2 mouseScreenPosition = vec2_create(GetMousePos().x, GetMousePos().y);
+			vec2i windowSize = GetPlatformWindowSize();
+
+    		mouseScreenPosition.x = mouseScreenPosition.x / windowSize.x;
+    		mouseScreenPosition.y = mouseScreenPosition.y / windowSize.y;
+    		mouseScreenPosition.x = mouseScreenPosition.x * 2;
+    		mouseScreenPosition.y = mouseScreenPosition.y * 2;
+    		mouseScreenPosition.x -= 1;
+    		mouseScreenPosition.y -= 1;
+			mouseScreenPosition = vec2_normalize(mouseScreenPosition);
+
+			vec3 tangent = vec3_add_vec3(vec3_mul_f32(CameraGetRight(state.sceneCamera), mouseScreenPosition.x), vec3_mul_f32(CameraGetUp(state.sceneCamera), mouseScreenPosition.y));
+			
+			vec3 intersection = vec3_add_vec3(intersectionCenter, vec3_mul_f32(tangent, intersectionRadius));
+			vec3 intersection2 = vec3_add_vec3(intersectionCenter, vec3_mul_f32(tangent, -intersectionRadius));
+
+			f32 alignmentValue1 = vec3_dot(rayDirection, intersection);
+			f32 alignmentValue2 = vec3_dot(rayDirection, intersection2);
+
+			if (alignmentValue2 > alignmentValue1)
+			{
+				intersection = intersection2;
 			}
 		}
 
