@@ -34,8 +34,7 @@ vec3 CameraGetRight(Camera* camera)
 
 vec3 CameraGetUp(Camera* camera)
 {
-	// TODO: 
-	return vec3_create(0, 0, 0);
+    return vec3_create(camera->view.values[1 + COL4(0)], camera->view.values[1 + COL4(1)], camera->view.values[1 + COL4(2)]);
 }
 
 // Gives the point on the near plane that corresponds to the given screen position
