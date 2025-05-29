@@ -3,6 +3,7 @@
 #include "renderer/renderer.h"
 #include "renderer/material.h"
 #include "math/lin_alg.h"
+#include "math/algebra.h"
 #include "renderer/ui/debug_ui.h"
 #include "renderer/camera.h"
 #include "game_rendering.h"
@@ -123,34 +124,20 @@ void RaycastDemoUpdate()
 		// Calculating if the player clicked the ray origin orb
 		vec3 rayOrigin = state.sceneCamera->position;
 		vec3 rayDirection = vec3_normalize(vec3_sub_vec3(vec3_create(mouseWorldPos.x, mouseWorldPos.y, mouseWorldPos.z), rayOrigin));
-		vec3 L = rayOrigin;
-		f32 a = vec3_dot(rayDirection, rayDirection);
-		f32 b = 2.f * vec3_dot(L, rayDirection);
-		f32 c = vec3_dot(L, L) - RAY_ORBIT_DISTANCE * RAY_ORBIT_DISTANCE;
-
-		f32 discriminant = b * b - 4 * a * c;
+		
+		f32 t = SolveRaySphereIntersection(rayOrigin, rayDirection, vec3_create(0, 0, 0), RAY_ORBIT_DISTANCE);
 
 		// If the user hits the invisible sphere, simply find the intersection point and put the ray orb there
-		if (discriminant > 0)
+		if (t != -1.f)
 		{
-			discriminant = sqrtf(discriminant);
-			f32 t1 = (-b + discriminant) / 2 * a;
-			f32 t2 = (-b - discriminant) / 2 * a;
-
-			if (t2 < t1 && t2 > 0)
-				t1 = t2;
-
-			if (t1 > 0)
-			{
-				state.rayOrbPosition = vec3_add_vec3(rayOrigin, vec3_mul_f32(rayDirection, t1));
-			}
+			state.rayOrbPosition = vec3_add_vec3(rayOrigin, vec3_mul_f32(rayDirection, t));
 		}
 		else // If the user aimed somewhere outside the sphere, calculate the tangent line of the sphere that goes through 
 			 // the camera position and has a direction that is closest to the direction of the camera ray
 		{
 			// Sphere sphere intersection
 			// https://gamedev.stackexchange.com/questions/75756/sphere-sphere-intersection-and-circle-sphere-intersection
-			f32 distance = vec3_magnitude(rayOrigin); // The main sphere's center is at 0, 0, 0 so the distance from the camera is just the length of ray origin
+			f32 distance = vec3_magnitude(rayOrigin) / 2; // The main sphere's center is at 0, 0, 0 so the distance from the camera is just the length of ray origin
 
 			// Sphere one is the ray orbit sphere, sphere two is the sphere that originates at the camera and has a radius so it passes through the center of sphere one
 
@@ -163,31 +150,33 @@ void RaycastDemoUpdate()
 
 			// Formula can be simplified again because sphere one is always at 0,0,0
 			//vec3 intersectionCenter = vec3_add_vec3(vec3_create(0, 0, 0), vec3_mul_f32(vec3_sub_vec3(rayOrigin, vec3_create(0, 0, 0)), h));
-			vec3 intersectionCenter = vec3_mul_f32(rayOrigin, h);
+			vec3 intersectionCenter = vec3_mul_f32(rayOrigin, h * 0.5f);
 
-			vec2 mouseScreenPosition = vec2_create(GetMousePos().x, GetMousePos().y);
-			vec2i windowSize = GetPlatformWindowSize();
-
-    		mouseScreenPosition.x = mouseScreenPosition.x / windowSize.x;
-    		mouseScreenPosition.y = mouseScreenPosition.y / windowSize.y;
-    		mouseScreenPosition.x = mouseScreenPosition.x * 2;
-    		mouseScreenPosition.y = mouseScreenPosition.y * 2;
-    		mouseScreenPosition.x -= 1;
-    		mouseScreenPosition.y -= 1;
-			mouseScreenPosition = vec2_normalize(mouseScreenPosition);
-
-			vec3 tangent = vec3_add_vec3(vec3_mul_f32(CameraGetRight(state.sceneCamera), mouseScreenPosition.x), vec3_mul_f32(CameraGetUp(state.sceneCamera), mouseScreenPosition.y));
+			vec3 originToCenter = vec3_sub_vec3(vec3_create(0, 0, 0), rayOrigin);
+			// sign of this tangent doesn't matter
+			vec3 tangent = vec3_normalize(vec3_cross_vec3(vec3_cross_vec3(rayDirection, originToCenter), originToCenter));
 			
-			vec3 intersection = vec3_add_vec3(intersectionCenter, vec3_mul_f32(tangent, intersectionRadius));
+			vec3 intersection1 = vec3_add_vec3(intersectionCenter, vec3_mul_f32(tangent, intersectionRadius));
 			vec3 intersection2 = vec3_add_vec3(intersectionCenter, vec3_mul_f32(tangent, -intersectionRadius));
 
-			f32 alignmentValue1 = vec3_dot(rayDirection, intersection);
-			f32 alignmentValue2 = vec3_dot(rayDirection, intersection2);
+			vec3 rayDirection1 = vec3_sub_vec3(intersection1, rayOrigin);
+			vec3 rayDirection2 = vec3_sub_vec3(intersection2, rayOrigin);
 
+			// Calculating which sphere-sphere-plane intersection has the most similar direction to our original ray direction.
+			f32 alignmentValue1 = vec3_dot(rayDirection, rayDirection1);
+			f32 alignmentValue2 = vec3_dot(rayDirection, rayDirection2);
+
+			rayDirection = rayDirection1;
 			if (alignmentValue2 > alignmentValue1)
-			{
-				intersection = intersection2;
-			}
+				rayDirection = rayDirection2;
+			
+			rayDirection = vec3_normalize(rayDirection);
+
+			// Calculating the intersection point of the new ray with the sphere and putting the ray orb there.
+			// Thise is a severely simplified ray sphere intersection because we know a = 1, D = 0 and center = (0, 0, 0)
+			//f32 t = SolveRaySphereIntersection(rayOrigin, rayDirection, vec3_create(0, 0, 0), RAY_ORBIT_DISTANCE);
+			f32 t = -vec3_dot(rayOrigin, rayDirection);
+			state.rayOrbPosition = vec3_add_vec3(rayOrigin, vec3_mul_f32(rayDirection, t));
 		}
 
 		state.rayVertices[0].position = vec3_mul_f32(vec3_sub_vec3(vec3_create(0, 0, 0), state.rayOrbPosition), 100);
