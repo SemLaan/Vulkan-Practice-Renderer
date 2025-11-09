@@ -5,6 +5,7 @@
 #include "game_rendering.h"
 #include "core/input.h"
 #include "renderer/mesh_optimizer.h"
+#include "core/profiler.h"
 
 #define DEFAULT_DENSITY_MAP_RESOLUTION 100
 
@@ -43,8 +44,10 @@ void WorldGenerationUpdate()
 {
 	if (GetButtonDown(BUTTON_RIGHTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_RIGHTMOUSEBTN))
 	{
+		StartScope("test scope");
 		DestroyMarchingCubesWorld();
 		GenerateMarchingCubesWorld();
+		EndScope();
 	}
 }
 

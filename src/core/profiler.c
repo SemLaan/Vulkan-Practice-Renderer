@@ -13,9 +13,8 @@
 typedef struct Scope
 {
 	const char* name;
-	f64 time;
-	u32 count;
-	u32 depth;
+	f64 startTime;
+	//u32 depth; to add in the future if desired
 } Scope;
 
 DEFINE_DARRAY_TYPE(Scope);
@@ -23,11 +22,8 @@ DEFINE_DARRAY_TYPE(Scope);
 typedef struct ProfilerState
 {
 	Timer perfTimer;
-	ScopeDarray* frameScopes;
-	const char* frameName;
+	ScopeDarray* scopesDarray;
 	u32 scopeDepth;
-	u32 currentScopeStartTimes[MAX_SCOPE_DEPTH];
-	bool recordingFrame;
 } ProfilerState;
 
 static ProfilerState state;
@@ -35,49 +31,38 @@ static ProfilerState state;
 
 void InitializeProfiler()
 {
-	state.recordingFrame = false;
 	StartOrResetTimer(&state.perfTimer);
-	state.frameScopes = ScopeDarrayCreate(100, GetGlobalAllocator());
+	state.scopesDarray = ScopeDarrayCreate(MAX_SCOPE_DEPTH, GetGlobalAllocator());
+	state.scopeDepth = 0;
 }
 
 void ShutdownProfiler()
 {
-	state.recordingFrame = false;
-	DarrayDestroy(state.frameScopes);
-}
-
-void RecordFrame(const char* frameScopeName)
-{
-	GRASSERT_MSG((state.recordingFrame || state.frameName), "There is a frame already being recorded");
-	state.recordingFrame = false;
-	state.frameName = frameScopeName;
-	state.scopeDepth = 0;
-	state.frameScopes->size = 0; // Resetting the frame scopes darray
+	DarrayDestroy(state.scopesDarray);
 }
 
 void StartScope(const char* name)
 {
-	if (!state.recordingFrame && state.frameName == nullptr)
-		return;
-
-	if (!state.recordingFrame && 0 == strncmp(state.frameName, name, strlen(state.frameName)))
-	{
-		state.recordingFrame = true;
-	}
+	GRASSERT(state.scopeDepth < MAX_SCOPE_DEPTH)
 
 	Scope scope = {};
 	scope.name = name;
-	scope.count = 1;
-	scope.depth = state.scopeDepth;
+	scope.startTime = TimerSecondsSinceStart(state.perfTimer);
 
-	ScopeDarrayPushback(state.frameScopes, &scope);
+	ScopeDarrayPushback(state.scopesDarray, &scope);
 
 	state.scopeDepth++;
 }
 
 void EndScope()
 {
-	
+	state.scopeDepth--;
+	GRASSERT(state.scopeDepth >= 0 && state.scopeDepth != UINT32_MAX);
+
+	Scope scope = state.scopesDarray->data[state.scopeDepth];
+	_DEBUG("Profiler: Scope %s, took %f seconds.", scope.name, TimerSecondsSinceStart(state.perfTimer) - scope.startTime);
+
+	DarrayPop(state.scopesDarray);
 }
 
 
