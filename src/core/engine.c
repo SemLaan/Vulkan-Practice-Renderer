@@ -4,6 +4,7 @@
 #include "core/logger.h"
 #include "core/meminc.h"
 #include "core/platform.h"
+#include "core/profiler.h"
 #include "defines.h"
 #include "game/game.h"
 #include "renderer/renderer.h"
@@ -47,6 +48,7 @@ void EngineInit(EngineInitSettings settings)
 	InitializeEvent();
 	InitializeInput();
 	InitializePlatform(settings.windowTitle, settings.startResolution.x, settings.startResolution.y);
+	INITIALIZE_PROFILER();
 	InitializeRenderer(rendererInitSettings);
 	InitializeTextRenderer();
 	InitializeDebugUI();
@@ -112,6 +114,7 @@ void EngineShutdown()
 	ShutdownDebugUI();
 	ShutdownTextRenderer();
 	ShutdownRenderer();
+	SHUTDOWN_PROFILER();
 	ShutdownPlatform();
 	ShutdownInput();
 	ShutdownEvent();
