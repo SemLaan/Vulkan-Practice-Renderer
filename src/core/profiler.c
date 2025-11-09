@@ -37,13 +37,13 @@ void InitializeProfiler()
 {
 	state.recordingFrame = false;
 	StartOrResetTimer(&state.perfTimer);
-	ScopeDarrayCreate(100, GetGlobalAllocator());
+	state.frameScopes = ScopeDarrayCreate(100, GetGlobalAllocator());
 }
 
 void ShutdownProfiler()
 {
 	state.recordingFrame = false;
-	//DarrayDestroy(state.frameScopes);
+	DarrayDestroy(state.frameScopes);
 }
 
 void RecordFrame(const char* frameScopeName)
