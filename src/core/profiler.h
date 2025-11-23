@@ -3,17 +3,17 @@
 
 #ifndef PROFILING
 
-void InitializeProfiler();
-void ShutdownProfiler();
+void _InitializeProfiler();
+void _ShutdownProfiler();
 
-#define INITIALIZE_PROFILER() InitializeProfiler()
-#define SHUTDOWN_PROFILER() ShutdownProfiler()
+#define INITIALIZE_PROFILER() _InitializeProfiler()
+#define SHUTDOWN_PROFILER() _ShutdownProfiler()
 
-void StartScope(const char* name);
-void EndScope();
+void _StartScope(const char* name);
+void _EndScope();
 
-#define START_SCOPE(name)
-#define END_SCOPE()
+#define START_SCOPE(name) _StartScope(name)
+#define END_SCOPE() _EndScope()
 
 #else
 

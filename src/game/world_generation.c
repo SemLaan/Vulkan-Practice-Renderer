@@ -44,10 +44,12 @@ void WorldGenerationUpdate()
 {
 	if (GetButtonDown(BUTTON_RIGHTMOUSEBTN) && !GetButtonDownPrevious(BUTTON_RIGHTMOUSEBTN))
 	{
-		StartScope("test scope");
+		START_SCOPE("Destroy marching cubes world");
 		DestroyMarchingCubesWorld();
+		END_SCOPE();
+		START_SCOPE("Create marching cubes world");
 		GenerateMarchingCubesWorld();
-		EndScope();
+		END_SCOPE();
 	}
 }
 

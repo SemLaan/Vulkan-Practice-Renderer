@@ -29,19 +29,19 @@ typedef struct ProfilerState
 static ProfilerState state;
 
 
-void InitializeProfiler()
+void _InitializeProfiler()
 {
 	StartOrResetTimer(&state.perfTimer);
 	state.scopesDarray = ScopeDarrayCreate(MAX_SCOPE_DEPTH, GetGlobalAllocator());
 	state.scopeDepth = 0;
 }
 
-void ShutdownProfiler()
+void _ShutdownProfiler()
 {
 	DarrayDestroy(state.scopesDarray);
 }
 
-void StartScope(const char* name)
+void _StartScope(const char* name)
 {
 	GRASSERT(state.scopeDepth < MAX_SCOPE_DEPTH)
 
@@ -54,13 +54,13 @@ void StartScope(const char* name)
 	state.scopeDepth++;
 }
 
-void EndScope()
+void _EndScope()
 {
 	state.scopeDepth--;
 	GRASSERT(state.scopeDepth >= 0 && state.scopeDepth != UINT32_MAX);
 
 	Scope scope = state.scopesDarray->data[state.scopeDepth];
-	_DEBUG("Profiler: Scope %s, took %f seconds.", scope.name, TimerSecondsSinceStart(state.perfTimer) - scope.startTime);
+	_DEBUG("Profiler: Scope \"%s\", took %f seconds.", scope.name, TimerSecondsSinceStart(state.perfTimer) - scope.startTime);
 
 	DarrayPop(state.scopesDarray);
 }
