@@ -83,9 +83,11 @@ mat4 WorldGenerationGetModelMatrix()
 
 static inline void GenerateMarchingCubesWorld()
 {
+	START_SCOPE("Allocate memory");
 	// Allocating memory for the density map
 	u32 densityMapValueCount = worldGenParams.densityMapResolution * worldGenParams.densityMapResolution * worldGenParams.densityMapResolution;
 	world.terrainDensityMap = Alloc(GetGlobalAllocator(), sizeof(*world.terrainDensityMap) * densityMapValueCount);
+	END_SCOPE();
 
 	// Calculating the model matrix to center 
 	mat4 scale = mat4_3Dscale(vec3_from_float(DEFAULT_DENSITY_MAP_RESOLUTION / (f32)worldGenParams.densityMapResolution));
@@ -98,20 +100,30 @@ static inline void GenerateMarchingCubesWorld()
 	densitySettingsCopy.bezierTunnelRadius = densitySettingsCopy.bezierTunnelRadius * worldGenParams.densityMapResolution / DEFAULT_DENSITY_MAP_RESOLUTION;
 	densitySettingsCopy.sphereHoleRadius = densitySettingsCopy.sphereHoleRadius * worldGenParams.densityMapResolution / DEFAULT_DENSITY_MAP_RESOLUTION;
 
+	START_SCOPE("Generating voxel data");
 	DensityFuncBezierCurveHole(&world.terrainSeed, &densitySettingsCopy, world.terrainDensityMap, worldGenParams.densityMapResolution);
+	END_SCOPE();
+	START_SCOPE("Blurring voxel data");
 	BlurDensityMapGaussian(worldGenParams.blurIterations, worldGenParams.blurKernelSize, world.terrainDensityMap, worldGenParams.densityMapResolution, worldGenParams.densityMapResolution, worldGenParams.densityMapResolution);
+	END_SCOPE();
 
 	// Generating the mesh
+	START_SCOPE("Generating mesh with marching cubes");
 	MeshData mcMeshData = MarchingCubesGenerateMesh(world.terrainDensityMap, worldGenParams.densityMapResolution, worldGenParams.densityMapResolution, worldGenParams.densityMapResolution);
+	END_SCOPE();
 
 	// This is for smoothing the mesh normals and removing duplicate vertices, used for raycasting
+	START_SCOPE("Merge normals");
 	world.colliderMesh = MeshOptimizerMergeNormals(mcMeshData, offsetof(VertexT2, position), offsetof(VertexT2, normal));
-	
+	END_SCOPE();
+
 	// Uploading the mesh
+	START_SCOPE("Upload mesh and free cpu data");
 	world.marchingCubesGpuMesh.vertexBuffer = VertexBufferCreate(mcMeshData.vertices, mcMeshData.vertexStride * mcMeshData.vertexCount);
 	world.marchingCubesGpuMesh.indexBuffer = IndexBufferCreate(mcMeshData.indices, mcMeshData.indexCount);
 
 	MarchingCubesFreeMeshData(mcMeshData);
+	END_SCOPE();
 }
 
 static inline void DestroyMarchingCubesWorld()
