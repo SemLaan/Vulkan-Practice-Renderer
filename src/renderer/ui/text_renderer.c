@@ -757,7 +757,7 @@ void TextBatchSetTextActive(TextBatch* textBatch, u64 textId, bool active)
 		{
 			u64 rangeStartInstanceIndex = textBatch->glyphInstanceRanges[i].startIndexInBytes / sizeof(GlyphInstanceData);
 			// If this is the glyph instance range this text resides in
-			if (textData->firstGlyphInstanceIndex >= rangeStartInstanceIndex)
+			if (textData->firstGlyphInstanceIndex >= rangeStartInstanceIndex && textData->firstGlyphInstanceIndex + textData->glyphInstanceCount <= rangeStartInstanceIndex + textBatch->glyphInstanceRanges[i].instanceCount)
 			{
 				// assertion that checks that this text is not already disabled
 				GRASSERT_DEBUG(textData->firstGlyphInstanceIndex + textData->glyphInstanceCount <= rangeStartInstanceIndex + textBatch->glyphInstanceRanges[i].instanceCount);
