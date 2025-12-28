@@ -29,6 +29,9 @@
 #define NO_INTERACTABLE_ACTIVE_VALUE -1
 #define SLIDER_VALUE_STRING_MAX_SIZE (25 * 4)
 #define ADDED_F_DISPLAY_PRECISION 2
+#define DBG_MENU_COLLAPSED_QUAD_COUNT 1
+#define DBG_MENU_COLLAPSED_FIRST_INSTANCE 1
+#define DBG_MENU_COLLAPSED_INTERACTABLES_COUNT 1
 
 // ====================== Debug menu visual constant values =====================================
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
@@ -166,6 +169,7 @@ typedef struct DebugMenu
 	u32 interactablesCount;               	// Amount of buttons, sliders or other elements in the menu.
 	f32 nextElementYOffset;               	// Y offset that the next element needs to have to not overlap with everything else in the menu.
 	bool active;
+	bool collapsed;
 } DebugMenu;
 
 DEFINE_DARRAY_TYPE_REF(DebugMenu);
@@ -388,7 +392,38 @@ void UpdateDebugUI()
 			bool mouseInMenu = PointInRect(vec2_create(menu->position.x, menu->position.y - menu->size.y), menu->size, vec4_xy(mouseWorldPos));
 
 			// If the mouse is in this menu, loop through all the elements in this menu to see which one needs to be interacted with.
-			if (mouseInMenu)
+			// if the menu is collapsed, only check the first two elements and only consume the input is actually interacting with these elements since the rest of the menu is inactive
+			if (mouseInMenu && menu->collapsed)
+			{
+				// Gets set to true if an element is found to be interacted with so we can break out of the menu loop
+				bool elementInteractedWith = false;
+
+				for (int j = 0; j < DBG_MENU_COLLAPSED_INTERACTABLES_COUNT; j++)
+				{
+					// If the mouse is on element j, handle the interaction start and set it as the active interactable.
+					if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
+					{
+						state->inputConsumed = true;
+
+						// First make sure that this menu now gets drawn on top of the other menu's since it's now the menu that was last interacted with
+						newActiveMenuOrderIndicesIndex = i;
+
+						GRASSERT_DEBUG(menu->interactablesArray[j].interactableType < INTERACTABLE_TYPE_COUNT);
+
+						// Calling the correct InteractionStart function
+						(*interaction_start_func_ptr_arr[menu->interactablesArray[j].interactableType])(menu, &menu->interactablesArray[j], mouseWorldPos);
+
+						menu->activeInteractableIndex = j; // Here j is the index of the interactable that is now being interacted with.
+						elementInteractedWith = true;
+						break;
+					}
+				}
+
+				// Breaking out of the menu loop if an element was clicked so that only one menu can be interacted with at a time
+				if (elementInteractedWith)
+					break;
+			}
+			else if (mouseInMenu && !menu->collapsed) // This is the regular menu interaction case where the menu is not collapsed
 			{
 				state->inputConsumed = true;
 
@@ -448,6 +483,7 @@ DebugMenu* DebugUICreateMenu(const char* title)
 	DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu));
 
 	menu->active = true;
+	menu->collapsed = true;
 
 	// Positioning the menu
 	menu->position = MENU_START_POSITION;
@@ -564,7 +600,7 @@ void DebugUIRenderMenus()
 		DebugMenu* menu = state->debugMenuDarray->data[state->menuOrderIndices[i]];
 
 		if (!menu->active)
-		return;
+			return;
 		
 		mat4 menuElementsView = mat4_mul_mat4(state->uiProjView, mat4_2Dtranslate(vec2_create(menu->position.x, menu->position.y)));
 		vec4 outlineColor = MENU_ELEMENT_OUTLINE_COLOR;
@@ -574,12 +610,19 @@ void DebugUIRenderMenus()
 		MaterialUpdateProperty(menu->menuElementMaterial, "other", &outlineData);
 		MaterialBind(menu->menuElementMaterial);
 		
-		VertexBuffer vertexBuffers[2] = { state->quadMesh->vertexBuffer, menu->quadsInstancedVB };
+		VertexBuffer vertexBuffers[INSTANCING_VERTEX_BUFFER_COUNT] = { state->quadMesh->vertexBuffer, menu->quadsInstancedVB };
 		
-		Draw(2, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
-		
-		TextBatchRender(menu->elementTextBatch, menuElementsView);
-		TextBatchRender(menu->dynamicTextBatch, menuElementsView);
+		if (menu->collapsed)
+		{
+			DrawInstancedIndexed(INSTANCING_VERTEX_BUFFER_COUNT, vertexBuffers, state->quadMesh->indexBuffer, nullptr, DBG_MENU_COLLAPSED_QUAD_COUNT, DBG_MENU_COLLAPSED_FIRST_INSTANCE);
+			TextBatchRender(menu->elementTextBatch, menuElementsView);
+		}
+		else
+		{
+			Draw(INSTANCING_VERTEX_BUFFER_COUNT, vertexBuffers, state->quadMesh->indexBuffer, nullptr, menu->quadCount);
+			TextBatchRender(menu->elementTextBatch, menuElementsView);
+			TextBatchRender(menu->dynamicTextBatch, menuElementsView);
+		}
 	}
 }
 
@@ -647,6 +690,8 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
 	menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
+	if (menu->collapsed)
+		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -687,6 +732,8 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
 	menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
+	if (menu->collapsed)
+		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -728,6 +775,8 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
+	if (menu->collapsed)
+		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	f32 halfDelta = 0;
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -810,6 +859,8 @@ void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 ma
 	f32 finalTextVerticalSize;
 	u64 nameTextID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = nameTextID;
+	if (menu->collapsed)
+		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	f32 halfDelta = 0;
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -899,6 +950,8 @@ void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteVa
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
+	if (menu->collapsed)
+		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	f32 halfDelta = 0;
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -991,6 +1044,8 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 	f32 finalTextVerticalSize;
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
+	if (menu->collapsed)
+		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	f32 halfDelta = 0;
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
