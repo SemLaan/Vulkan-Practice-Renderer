@@ -1255,6 +1255,31 @@ void Draw(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer 
 	vkCmdDrawIndexed(currentCommandBuffer, indexBuffer->indexCount, instanceCount, 0, 0, 0);
 }
 
+void DrawInstancedIndexed(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, IndexBuffer clientIndexBuffer, mat4* pushConstantValues, u32 instanceCount, u32 firstInstance)
+{
+	VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
+	VulkanIndexBuffer* indexBuffer = clientIndexBuffer.internalState;
+
+	GRASSERT_DEBUG(vertexBufferCount <= MAX_VERTEX_BUFFERS_PER_DRAW_CALL);
+
+	// Getting vertex buffer vulkan handles for binding
+	VkBuffer vertexBuffers[MAX_VERTEX_BUFFERS_PER_DRAW_CALL] = {};
+	for (int i = 0; i < vertexBufferCount; i++)
+	{
+		VulkanVertexBuffer* vb = clientVertexBuffers[i].internalState;
+		vertexBuffers[i] = vb->handle;
+	}
+
+	// binding index and vertex buffers
+	VkDeviceSize offsets[2] = { 0, 0 };
+	vkCmdBindVertexBuffers(currentCommandBuffer, 0, vertexBufferCount, vertexBuffers, offsets);
+	vkCmdBindIndexBuffer(currentCommandBuffer, indexBuffer->handle, offsets[0], VK_INDEX_TYPE_UINT32);
+
+	if (pushConstantValues)
+		vkCmdPushConstants(currentCommandBuffer, vk_state->boundShader->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(*pushConstantValues), pushConstantValues);
+	vkCmdDrawIndexed(currentCommandBuffer, indexBuffer->indexCount, instanceCount, 0, 0, firstInstance);
+}
+
 void DrawBufferRange(u32 vertexBufferCount, VertexBuffer* clientVertexBuffers, u64* vbOffsets, IndexBuffer clientIndexBuffer, mat4* pushConstantValues, u32 instanceCount)
 {
 	VkCommandBuffer currentCommandBuffer = vk_state->graphicsCommandBuffers[vk_state->currentInFlightFrameIndex].handle;
