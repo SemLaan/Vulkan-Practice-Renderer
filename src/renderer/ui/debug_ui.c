@@ -29,9 +29,9 @@
 #define NO_INTERACTABLE_ACTIVE_VALUE -1
 #define SLIDER_VALUE_STRING_MAX_SIZE (25 * 4)
 #define ADDED_F_DISPLAY_PRECISION 2
-#define DBG_MENU_COLLAPSED_QUAD_COUNT 1
+#define DBG_MENU_COLLAPSED_QUAD_COUNT 2
 #define DBG_MENU_COLLAPSED_FIRST_INSTANCE 1
-#define DBG_MENU_COLLAPSED_INTERACTABLES_COUNT 1
+#define DBG_MENU_COLLAPSED_INTERACTABLES_COUNT 2
 
 // ====================== Debug menu visual constant values =====================================
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
@@ -68,6 +68,7 @@ typedef enum InteractableType
 {
 	INTERACTABLE_TYPE_BUTTON,
 	INTERACTABLE_TYPE_TOGGLE_BUTTON,
+	INTERACTABLE_TYPE_MENU_COLLAPSE_BUTTON,
 	INTERACTABLE_TYPE_MENU_HANDLEBAR,
 	INTERACTABLE_TYPE_SLIDER_FLOAT,
 	INTERACTABLE_TYPE_SLIDER_INT,
@@ -76,7 +77,7 @@ typedef enum InteractableType
 	INTERACTABLE_TYPE_NONE_COUNT
 } InteractableType;
 
-#define INTERACTABLE_TYPE_COUNT 7
+#define INTERACTABLE_TYPE_COUNT 8
 
 // Interactable internal data for a button
 typedef struct ButtonInteractableData
@@ -189,6 +190,7 @@ typedef struct DebugUIState
 
 static DebugUIState* state = nullptr;
 
+// Adds both the handlebar and the collapse button
 static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text);
 
 // Function prototypes for interactable handling functions, full functions are at the bottom of this file.
@@ -199,6 +201,10 @@ void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableD
 void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleToggleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+
+void HandleMenuCollapseInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleMenuCollapseInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
 void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
@@ -308,6 +314,7 @@ void UpdateDebugUI()
 	{
 		HandleButtonInteractionStart,
 		HandleToggleButtonInteractionStart,
+		HandleMenuCollapseInteractionStart,
 		HandleMenuHandlebarInteractionStart,
 		HandleSliderFloatInteractionStart,
 		HandleSliderIntInteractionStart,
@@ -320,6 +327,7 @@ void UpdateDebugUI()
 	{
 		HandleButtonInteractionUpdate,
 		HandleToggleButtonInteractionUpdate,
+		HandleMenuCollapseInteractionUpdate,
 		HandleMenuHandlebarInteractionUpdate,
 		HandleSliderFloatInteractionUpdate,
 		HandleSliderIntInteractionUpdate,
@@ -332,6 +340,7 @@ void UpdateDebugUI()
 	{
 		HandleButtonInteractionEnd,
 		HandleToggleButtonInteractionEnd,
+		HandleMenuCollapseInteractionEnd,
 		HandleMenuHandlebarInteractionEnd,
 		HandleSliderFloatInteractionEnd,
 		HandleSliderIntInteractionEnd,
@@ -637,8 +646,10 @@ void DebugUIMenuSetActive(DebugMenu* menu, bool active)
 	menu->active = active;
 }
 
+// Adds both the handlebar and the collapse button in the handlebar
 static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 {
+	// Adding the handlebar
 	menu->nextElementYOffset -= HANDLEBAR_VERTICAL_SIZE;
 	vec2 handlebarPosition = vec2_create(0, menu->nextElementYOffset);
 	vec2 handlebarSize = vec2_create(menu->size.x, HANDLEBAR_VERTICAL_SIZE);
@@ -667,6 +678,29 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 	menu->interactablesArray[menu->interactablesCount].size = handlebarSize;
 	menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_MENU_HANDLEBAR;
 	menu->interactablesArray[menu->interactablesCount].internalData = handlebarData;
+
+	menu->interactablesCount++;
+	GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
+
+	// Adding the collapse button
+	f32 collapseButtonEdgeOffset = (handlebarSize.y - BUTTON_SIZE.y) / 2.f;
+	vec2 buttonPosition = vec2_create(collapseButtonEdgeOffset, handlebarPosition.y + collapseButtonEdgeOffset);
+	vec2 buttonSize = vec2_create(BUTTON_SIZE.y, BUTTON_SIZE.y);
+	mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
+	menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
+	menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
+	menu->quadCount++;
+	menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
+
+	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
+
+	VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+
+	menu->interactablesArray[menu->interactablesCount].firstQuad = menu->quadCount - 1; // Minus one because this function added one quad that belongs to the button.
+	menu->interactablesArray[menu->interactablesCount].quadCount = 1;
+	menu->interactablesArray[menu->interactablesCount].position = buttonPosition;
+	menu->interactablesArray[menu->interactablesCount].size = buttonSize;
+	menu->interactablesArray[menu->interactablesCount].interactableType = INTERACTABLE_TYPE_MENU_COLLAPSE_BUTTON;
 
 	menu->interactablesCount++;
 	GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
@@ -1184,6 +1218,22 @@ void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interac
 		menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
 
 	VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+}
+
+/// ============================================= Menu Collapse button
+void HandleMenuCollapseInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+
+}
+
+void HandleMenuCollapseInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+
+}
+
+void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+{
+
 }
 
 /// ============================================= Menu Handlebar
