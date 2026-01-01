@@ -349,8 +349,8 @@ void UpdateDebugUI()
 	};
 	GRASSERT_DEBUG(INTERACTABLE_TYPE_COUNT == (sizeof(interaction_end_func_ptr_arr) / sizeof(*interaction_end_func_ptr_arr)))
 
-	// Getting the mouse position in world space.
-	vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1); // A mouse position is 2d but we pad the z with 0 and w with 1, so that we can do matrix math
+		// Getting the mouse position in world space.
+		vec4 mouseScreenPos = vec4_create(GetMousePos().x, GetMousePos().y, 0, 1); // A mouse position is 2d but we pad the z with 0 and w with 1, so that we can do matrix math
 	vec4 clipCoords = ScreenToClipSpace(mouseScreenPos);
 	vec4 mouseWorldPos = mat4_mul_vec4(state->inverseProjView, clipCoords);
 
@@ -469,8 +469,8 @@ void UpdateDebugUI()
 	{
 		u32 menuIndex = state->menuOrderIndices[newActiveMenuOrderIndicesIndex];
 		for (u32 i = newActiveMenuOrderIndicesIndex; i > 0; i--)
-			state->menuOrderIndices[i] = state->menuOrderIndices[i-1];
-		
+			state->menuOrderIndices[i] = state->menuOrderIndices[i - 1];
+
 		state->menuOrderIndices[0] = menuIndex;
 	}
 }
@@ -610,7 +610,7 @@ void DebugUIRenderMenus()
 
 		if (!menu->active)
 			return;
-		
+
 		mat4 menuElementsView = mat4_mul_mat4(state->uiProjView, mat4_2Dtranslate(vec2_create(menu->position.x, menu->position.y)));
 		vec4 outlineColor = MENU_ELEMENT_OUTLINE_COLOR;
 		vec4 outlineData = MENU_ELEMENT_OUTLINE_DATA;
@@ -618,9 +618,9 @@ void DebugUIRenderMenus()
 		MaterialUpdateProperty(menu->menuElementMaterial, "color", &outlineColor);
 		MaterialUpdateProperty(menu->menuElementMaterial, "other", &outlineData);
 		MaterialBind(menu->menuElementMaterial);
-		
+
 		VertexBuffer vertexBuffers[INSTANCING_VERTEX_BUFFER_COUNT] = { state->quadMesh->vertexBuffer, menu->quadsInstancedVB };
-		
+
 		if (menu->collapsed)
 		{
 			DrawInstancedIndexed(INSTANCING_VERTEX_BUFFER_COUNT, vertexBuffers, state->quadMesh->indexBuffer, nullptr, DBG_MENU_COLLAPSED_QUAD_COUNT, DBG_MENU_COLLAPSED_FIRST_INSTANCE);
@@ -1233,7 +1233,20 @@ void HandleMenuCollapseInteractionUpdate(DebugMenu* menu, InteractableData* inte
 
 void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
+	if (PointInRect(vec2_add_vec2(interactableData->position, menu->position), interactableData->size, vec4_xy(mouseWorldPosition)))
+	{
+		if (menu->collapsed)
+		{
+			menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_PRESSED_COLOR;
+		}
+		else
+		{
+			menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
+		}
 
+		VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
+		menu->collapsed = !menu->collapsed;
+	}
 }
 
 /// ============================================= Menu Handlebar
