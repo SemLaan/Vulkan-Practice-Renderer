@@ -407,7 +407,7 @@ void UpdateDebugUI()
 				// Gets set to true if an element is found to be interacted with so we can break out of the menu loop
 				bool elementInteractedWith = false;
 
-				for (int j = 0; j < DBG_MENU_COLLAPSED_INTERACTABLES_COUNT; j++)
+				for (i32 j = DBG_MENU_COLLAPSED_INTERACTABLES_COUNT - 1; j >= 0; j--)
 				{
 					// If the mouse is on element j, handle the interaction start and set it as the active interactable.
 					if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
@@ -442,7 +442,7 @@ void UpdateDebugUI()
 				// Gets set to true if an element is found to be interacted with so we can break out of the menu loop
 				bool elementInteractedWith = false;
 
-				for (int j = 0; j < menu->interactablesCount; j++)
+				for (i32 j = menu->interactablesCount - 1; j >= 0; j--)
 				{
 					// If the mouse is on element j, handle the interaction start and set it as the active interactable.
 					if (PointInRect(vec2_add_vec2(menu->interactablesArray[j].position, menu->position), menu->interactablesArray[j].size, vec4_xy(mouseWorldPos)))
