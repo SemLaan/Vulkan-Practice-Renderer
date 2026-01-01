@@ -21,3 +21,8 @@ bool MemoryCompare(const void* a, const void* b, u64 size)
 {
 	return 0 == memcmp(a, b, size);
 }
+
+bool StringCompare(const char* a, const char* b, u64 size)
+{
+	return 0 == strncmp(a, b, size);
+}
