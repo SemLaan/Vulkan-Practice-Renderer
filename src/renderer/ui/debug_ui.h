@@ -3,7 +3,7 @@
 #include "math/math_types.h"
 
 #define DEBUG_UI_FONT_NAME "debug_font"
-
+#define DEBUG_UI_DEFAULT_MENU_GROUP_NAME "default"
 
 /// @brief The root debug UI node.
 typedef struct DebugMenu DebugMenu;
@@ -24,7 +24,7 @@ bool DebugUIGetInputConsumed();
 
 /// @brief Creates a Debug UI menu instance.
 /// @return Pointer to the menu.
-DebugMenu* DebugUICreateMenu(const char* title);
+DebugMenu* DebugUICreateMenu(const char* title, const char* menuGroupName, u32 priority);
 
 /// @brief Destroys the given Debug UI menu instance.
 /// @param menu Pointer to the menu.

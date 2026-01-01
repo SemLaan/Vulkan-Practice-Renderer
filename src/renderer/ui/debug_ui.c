@@ -155,6 +155,17 @@ typedef struct InteractableData
 	InteractableType interactableType;
 } InteractableData;
 
+typedef struct DebugMenu DebugMenu;
+DEFINE_DARRAY_TYPE_REF(DebugMenu);
+
+typedef struct MenuGroup
+{
+	const char* groupName;
+	DebugMenuRefDarray* menuDarray;
+} MenuGroup;
+
+DEFINE_DARRAY_TYPE(MenuGroup);
+
 typedef struct DebugMenu
 {
 	vec2 position;                        	// Position, anchor is bottom left of the menu.
@@ -170,17 +181,19 @@ typedef struct DebugMenu
 	u32 quadCount;                        	// Current amount of quads
 	u32 interactablesCount;               	// Amount of buttons, sliders or other elements in the menu.
 	f32 nextElementYOffset;               	// Y offset that the next element needs to have to not overlap with everything else in the menu.
+	u32 menuGroupIndex;
+	u32 menuGroupPriority;
 	bool active;
 	bool collapsed;
 } DebugMenu;
 
-DEFINE_DARRAY_TYPE_REF(DebugMenu);
 
 // Data about the state of the Debug ui system, only one instance of this struct should exist.
 typedef struct DebugUIState
 {
+	MenuGroupDarray* menuGroups;
 	DebugMenuRefDarray* debugMenuDarray;          // Dynamic array with all the debug menu instances that exist
-	GPUMesh* quadMesh;                           // Mesh with the data to make quad instances.
+	GPUMesh* quadMesh;                            // Mesh with the data to make quad instances.
 	mat4 uiProjView;                              // Projection and view matrix for all debug menu's
 	mat4 inverseProjView;                         // Inverted proj view matrix.
 	Allocator* interactableInternalDataAllocator; // Allocator for allocating interactable internal data.
@@ -260,6 +273,9 @@ bool InitializeDebugUI()
 	state->font = TextGetFont(DEBUG_UI_FONT_NAME);
 	state->inputConsumed = false;
 
+	// Create menu groups darray
+	state->menuGroups = MenuGroupDarrayCreate(4, GetGlobalAllocator());
+
 	// Creating interactable internal data allocator
 	CreateFreelistAllocator("DebugUI interactable internal data", GetGlobalAllocator(), ITERACTABLE_INTERNAL_DATA_ALLOCATOR_SIZE, &state->interactableInternalDataAllocator, true);
 
@@ -300,6 +316,11 @@ void ShutdownDebugUI()
 {
 	UnregisterEventListener(EVCODE_WINDOW_RESIZED, OnWindowResize);
 
+	for (u32 i = 0; i < state->menuGroups->size; i++)
+	{
+		DarrayDestroy(state->menuGroups->data[i].menuDarray);
+	}
+	DarrayDestroy(state->menuGroups);
 	DestroyFreelistAllocator(state->interactableInternalDataAllocator);
 	DarrayDestroy(state->debugMenuDarray);
 	Free(GetGlobalAllocator(), state);
@@ -487,11 +508,34 @@ static inline void RecalculateMenuBackgroundSize(DebugMenu* menu)
 	menu->quadsInstanceData[0].transform = mat4_mul_mat4(mat4_2Dtranslate(vec2_create(0, -menu->size.y)), mat4_2Dscale(menu->size));
 }
 
-DebugMenu* DebugUICreateMenu(const char* title)
+DebugMenu* DebugUICreateMenu(const char* title, const char* menuGroupName, u32 priority)
 {
 	// Allocating the DebugMenu struct
 	DebugMenu* menu = Alloc(GetGlobalAllocator(), sizeof(*menu));
 
+	// Adding menu to menu group
+	bool groupFound = false;
+	for (u32 i = 0; i < state->menuGroups->size; i++)
+	{
+		if (StringCompare(menuGroupName, state->menuGroups->data[i].groupName, 100/*TODO: remove magic number by making string lib*/))
+		{
+			groupFound = true;
+			DebugMenuRefDarrayPushback(state->menuGroups->data[i].menuDarray, &menu);
+			menu->menuGroupIndex = i;
+		}
+	}
+	// If the group doesn't exist yet, create it
+	if (!groupFound)
+	{
+		menu->menuGroupIndex = state->menuGroups->size;
+		MenuGroup menuGroup = {};
+		menuGroup.groupName = menuGroupName;
+		menuGroup.menuDarray = DebugMenuRefDarrayCreate(4, GetGlobalAllocator());
+		DebugMenuRefDarrayPushback(menuGroup.menuDarray, &menu);
+		MenuGroupDarrayPushback(state->menuGroups, &menuGroup);
+	}
+
+	menu->menuGroupPriority = priority;
 	menu->active = true;
 	menu->collapsed = true;
 
@@ -543,6 +587,18 @@ DebugMenu* DebugUICreateMenu(const char* title)
 
 void DebugUIDestroyMenu(DebugMenu* menu)
 {
+	// Removing the menu from the menu group
+	MenuGroup* menuGroup = &state->menuGroups->data[menu->menuGroupIndex];
+	// Finding the index of the menu in the menu group and popping it
+	for (u32 i = 0; i < menuGroup->menuDarray->size; i++)
+	{
+		if (menuGroup->menuDarray->data[i] == menu)
+		{
+			DarrayPopAt(menuGroup->menuDarray, i);
+			break;
+		}
+	}
+
 	// Removing the menu from the menu order indices and correcting the other menu order indices
 	// Finding the index of the menu
 	u32 menuIndex = UINT32_MAX;

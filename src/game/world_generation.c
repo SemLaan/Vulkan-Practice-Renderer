@@ -25,7 +25,7 @@ void WorldGenerationInit()
 	MemoryCopy(worldGenParams.blurKernelSizeOptions, blurKernelSizeOptions, sizeof(blurKernelSizeOptions));
 	worldGenParams.densityMapResolution = 50;
 
-	worldGenParamDebugMenu = DebugUICreateMenu("World Gen Parameters");
+	worldGenParamDebugMenu = DebugUICreateMenu("World Gen Parameters", DEBUG_UI_DEFAULT_MENU_GROUP_NAME, 0);
 	DebugUIAddSliderInt(worldGenParamDebugMenu, "Density map resolution", 10, 200, &worldGenParams.densityMapResolution);
 	DebugUIAddSliderInt(worldGenParamDebugMenu, "Blur Iterations", MIN_BLUR_ITERATIONS, MAX_BLUR_ITERATIONS, &worldGenParams.blurIterations);
 	DebugUIAddSliderDiscrete(worldGenParamDebugMenu, "Blur Kernel Size", worldGenParams.blurKernelSizeOptions, POSSIBLE_BLUR_KERNEL_SIZES_COUNT, &worldGenParams.blurKernelSize);
