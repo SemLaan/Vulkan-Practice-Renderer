@@ -32,6 +32,7 @@
 #define DBG_MENU_COLLAPSED_QUAD_COUNT 2
 #define DBG_MENU_COLLAPSED_FIRST_INSTANCE 1
 #define DBG_MENU_COLLAPSED_INTERACTABLES_COUNT 2
+#define DBG_MENU_COLLAPSED_FIRST_COLLAPSED_TEXT_IDX 1
 
 // ====================== Debug menu visual constant values =====================================
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
@@ -725,7 +726,7 @@ void DebugUIAddButton(DebugMenu* menu, const char* text, bool* pStateBool, bool*
 
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 	if (menu->collapsed)
-		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
+		TextBatchSetTextActiveId(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -767,7 +768,7 @@ void DebugUIAddToggleButton(DebugMenu* menu, const char* text, bool* pStateBool)
 
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = TextBatchAddText(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 	if (menu->collapsed)
-		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
+		TextBatchSetTextActiveId(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	RecalculateMenuBackgroundSize(menu);
 
@@ -810,7 +811,7 @@ void DebugUIAddSliderFloat(DebugMenu* menu, const char* text, f32 minValue, f32 
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
 	if (menu->collapsed)
-		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
+		TextBatchSetTextActiveId(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	f32 halfDelta = 0;
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -894,7 +895,7 @@ void DebugUIAddSliderInt(DebugMenu* menu, const char* text, i64 minValue, i64 ma
 	u64 nameTextID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = nameTextID;
 	if (menu->collapsed)
-		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
+		TextBatchSetTextActiveId(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	f32 halfDelta = 0;
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -985,7 +986,7 @@ void DebugUIAddSliderDiscrete(DebugMenu* menu, const char* text, i64* discreteVa
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
 	if (menu->collapsed)
-		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
+		TextBatchSetTextActiveId(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	f32 halfDelta = 0;
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -1079,7 +1080,7 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 	u64 textID = TextBatchAddTextMaxWidth(menu->elementTextBatch, text, elementTitlePosition, MENU_TITLE_TEXT_SIZE, ELEMENT_POST_TEXT_OFFSET, &finalTextVerticalSize);
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = textID;
 	if (menu->collapsed)
-		TextBatchSetTextActive(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
+		TextBatchSetTextActiveId(menu->elementTextBatch, menu->interactablesArray[menu->interactablesCount].elementNameTextID, false);
 
 	f32 halfDelta = 0;
 	if (finalTextVerticalSize > SLIDER_BAR_SIZE.y)
@@ -1238,10 +1239,18 @@ void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interac
 		if (menu->collapsed)
 		{
 			menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_PRESSED_COLOR;
+			for (u32 i = DBG_MENU_COLLAPSED_FIRST_COLLAPSED_TEXT_IDX; i < menu->elementTextBatch->textDataArray->size; i++)
+			{
+				TextBatchSetTextActiveIdx(menu->elementTextBatch, i, true);
+			}
 		}
 		else
 		{
 			menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
+			for (u32 i = DBG_MENU_COLLAPSED_FIRST_COLLAPSED_TEXT_IDX; i < menu->elementTextBatch->textDataArray->size; i++)
+			{
+				TextBatchSetTextActiveIdx(menu->elementTextBatch, i, false);
+			}
 		}
 
 		VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);

@@ -104,6 +104,7 @@ void TextBatchUpdateTextPosition(TextBatch* textBatch, u64 textId, vec2 newPosit
 // When updating text, the new texts' string length needs to be the same as the old texts' string length.
 void TextBatchUpdateTextString(TextBatch* textBatch, u64 textId, const char* newText);
 
-void TextBatchSetTextActive(TextBatch* textBatch, u64 textId, bool active);
+void TextBatchSetTextActiveId(TextBatch* textBatch, u64 textId, bool active);
+void TextBatchSetTextActiveIdx(TextBatch* textBatch, u64 textIdx, bool active);
 
 void TextBatchRender(TextBatch* textBatch, mat4 viewProjection);

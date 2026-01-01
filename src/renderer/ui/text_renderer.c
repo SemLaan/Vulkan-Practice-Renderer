@@ -713,7 +713,7 @@ void TextBatchUpdateTextString(TextBatch* textBatch, u64 textId, const char* new
 	VertexBufferUpdate(textBatch->glyphInstancesBuffer, textBatch->glyphInstanceData->data, sizeof(*textBatch->glyphInstanceData->data) * textBatch->gpuBufferInstanceCapacity); // TODO: allow uploading only to a range rather than from 0 to a given point
 }
 
-void TextBatchSetTextActive(TextBatch* textBatch, u64 textId, bool active)
+void TextBatchSetTextActiveId(TextBatch* textBatch, u64 textId, bool active)
 {
 	// Getting the index of the text that corresponds to the given text id
 	u32 textIndex = UINT32_MAX;
@@ -726,7 +726,82 @@ void TextBatchSetTextActive(TextBatch* textBatch, u64 textId, bool active)
 		}
 	}
 
+	GRASSERT(textIndex != UINT32_MAX);
+
 	TextData* textData = &textBatch->textDataArray->data[textIndex];
+
+	if (active) // If the text is set to active
+	{
+		for (u32 i = 0; i < textBatch->instanceRangeCount; i++)
+		{
+			u64 rangeStartInstanceIndex = textBatch->glyphInstanceRanges[i].startIndexInBytes / sizeof(GlyphInstanceData);
+			if (textData->firstGlyphInstanceIndex >= rangeStartInstanceIndex)
+			{
+				// Making sure the text is not already active
+				GRASSERT_DEBUG(textData->firstGlyphInstanceIndex + textData->glyphInstanceCount > rangeStartInstanceIndex + textBatch->glyphInstanceRanges[i].instanceCount);
+
+				textBatch->instanceRangeCount++;
+				textBatch->glyphInstanceRanges = Realloc(GetGlobalAllocator(), textBatch->glyphInstanceRanges, sizeof(*textBatch->glyphInstanceRanges) * textBatch->instanceRangeCount);
+				size_t copySize = (textBatch->instanceRangeCount - (i + 2)) * sizeof(*textBatch->glyphInstanceRanges);
+				if (copySize != 0)
+				{
+					MemoryCopy(&textBatch->glyphInstanceRanges[i + 2], &textBatch->glyphInstanceRanges[i + 1], copySize);
+				}
+				textBatch->glyphInstanceRanges[i + 1].instanceCount = textData->glyphInstanceCount;
+				textBatch->glyphInstanceRanges[i + 1].startIndexInBytes = textData->firstGlyphInstanceIndex * sizeof(GlyphInstanceData);
+				break;
+			}
+		}
+	}
+	else // If the text is set to inactive
+	{
+		for (u32 i = 0; i < textBatch->instanceRangeCount; i++)
+		{
+			u64 rangeStartInstanceIndex = textBatch->glyphInstanceRanges[i].startIndexInBytes / sizeof(GlyphInstanceData);
+			// If this is the glyph instance range this text resides in
+			if (textData->firstGlyphInstanceIndex >= rangeStartInstanceIndex && textData->firstGlyphInstanceIndex + textData->glyphInstanceCount <= rangeStartInstanceIndex + textBatch->glyphInstanceRanges[i].instanceCount)
+			{
+				// assertion that checks that this text is not already disabled
+				GRASSERT_DEBUG(textData->firstGlyphInstanceIndex + textData->glyphInstanceCount <= rangeStartInstanceIndex + textBatch->glyphInstanceRanges[i].instanceCount);
+				// If this text is at the start of the range, increase the range start instance index by the instance count of the text, and decrease the instance count of the range correspondingly
+				if (textData->firstGlyphInstanceIndex == rangeStartInstanceIndex)
+				{
+					textBatch->glyphInstanceRanges[i].startIndexInBytes += textData->glyphInstanceCount * sizeof(GlyphInstanceData);
+					textBatch->glyphInstanceRanges[i].instanceCount -= textData->glyphInstanceCount;
+				}
+				// If the text is at the end of the range, reduce the instance count of the range by the instance count of the text
+				else if (textData->firstGlyphInstanceIndex + textData->glyphInstanceCount == rangeStartInstanceIndex + textBatch->glyphInstanceRanges[i].instanceCount)
+				{
+					textBatch->glyphInstanceRanges[i].instanceCount -= textData->glyphInstanceCount;
+				}
+				// If the text is somewhere in the middle of the range, split the range into two
+				else
+				{
+					textBatch->instanceRangeCount++;
+					textBatch->glyphInstanceRanges = Realloc(GetGlobalAllocator(), textBatch->glyphInstanceRanges, sizeof(*textBatch->glyphInstanceRanges) * textBatch->instanceRangeCount);
+					size_t copySize = (textBatch->instanceRangeCount - (i + 2)) * sizeof(*textBatch->glyphInstanceRanges);
+					if (copySize != 0)
+					{
+						MemoryCopy(&textBatch->glyphInstanceRanges[i + 2], &textBatch->glyphInstanceRanges[i + 1], copySize);
+					}
+					u64 newInstanceCount = textData->firstGlyphInstanceIndex - rangeStartInstanceIndex;
+					textBatch->glyphInstanceRanges[i + 1].startIndexInBytes = (textData->firstGlyphInstanceIndex + textData->glyphInstanceCount) * sizeof(GlyphInstanceData);
+					textBatch->glyphInstanceRanges[i + 1].instanceCount = textBatch->glyphInstanceRanges[i].instanceCount - (newInstanceCount + textData->glyphInstanceCount);
+					textBatch->glyphInstanceRanges[i].instanceCount = newInstanceCount;
+				}
+				break;
+			}
+		}
+	}
+
+	MergeInstanceRanges(&textBatch->glyphInstanceRanges, &textBatch->instanceRangeCount);
+}
+
+void TextBatchSetTextActiveIdx(TextBatch* textBatch, u64 textIdx, bool active)
+{
+	GRASSERT(textIdx >= 0 && textIdx < textBatch->textDataArray->size);
+
+	TextData* textData = &textBatch->textDataArray->data[textIdx];
 
 	if (active) // If the text is set to active
 	{
