@@ -660,7 +660,8 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 	menu->quadCount++;
 	menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
-	vec2 menuTitlePosition = vec2_create(MENU_ELEMENTS_OFFSET, handlebarPosition.y + (HANDLEBAR_VERTICAL_SIZE / 2.f) - (state->font->lowercaseFontHeight * MENU_TITLE_TEXT_SIZE / 2.f));
+	f32 collapseButtonEdgeOffset = (handlebarSize.y - BUTTON_SIZE.y) / 2.f;
+	vec2 menuTitlePosition = vec2_create(collapseButtonEdgeOffset * 2 + BUTTON_SIZE.y, handlebarPosition.y + (HANDLEBAR_VERTICAL_SIZE / 2.f) - (state->font->lowercaseFontHeight * MENU_TITLE_TEXT_SIZE / 2.f));
 
 	menu->interactablesArray[menu->interactablesCount].elementNameTextID = TextBatchAddText(menu->elementTextBatch, text, menuTitlePosition, MENU_TITLE_TEXT_SIZE, false);
 
@@ -684,14 +685,12 @@ static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text)
 	GRASSERT_DEBUG(menu->interactablesCount <= MAX_DBG_MENU_INTERACTABLES);
 
 	// Adding the collapse button
-	f32 collapseButtonEdgeOffset = (handlebarSize.y - BUTTON_SIZE.y) / 2.f;
 	vec2 buttonPosition = vec2_create(collapseButtonEdgeOffset, handlebarPosition.y + collapseButtonEdgeOffset);
 	vec2 buttonSize = vec2_create(BUTTON_SIZE.y, BUTTON_SIZE.y);
 	mat4 buttonTransform = mat4_mul_mat4(mat4_2Dtranslate(buttonPosition), mat4_2Dscale(buttonSize));
 	menu->quadsInstanceData[menu->quadCount].transform = buttonTransform;
 	menu->quadsInstanceData[menu->quadCount].color = BUTTON_BASIC_COLOR;
 	menu->quadCount++;
-	menu->nextElementYOffset -= MENU_ELEMENTS_OFFSET;
 
 	GRASSERT_DEBUG(menu->quadCount <= MAX_DBG_MENU_QUADS);
 
