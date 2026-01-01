@@ -8,6 +8,7 @@
 #include "math/lin_alg.h"
 #include "renderer/renderer.h"
 #include "renderer/ui/text_renderer.h"
+#include "core/engine.h"
 
 #include <stdio.h>
 
@@ -35,6 +36,7 @@
 #define DBG_MENU_COLLAPSED_FIRST_COLLAPSED_TEXT_IDX 1
 
 // ====================== Debug menu visual constant values =====================================
+#define MENU_GROUP_MENU_SEPARATION 0.05f
 #define MENU_ORTHO_PROJECTION_HEIGHT 10
 #define MENU_START_POSITION vec2_create(0.3f, MENU_ORTHO_PROJECTION_HEIGHT - 0.3f)
 #define MENU_START_SIZE vec2_create(2.5f, 0.0f)
@@ -204,41 +206,43 @@ typedef struct DebugUIState
 
 static DebugUIState* state = nullptr;
 
+static void UpdateMenuGroup(u32 menuGroupIndex, DebugMenu* masterMenu);
+
 // Adds both the handlebar and the collapse button
 static void DebugUIAddMenuHandlebar(DebugMenu* menu, const char* text);
 
 // Function prototypes for interactable handling functions, full functions are at the bottom of this file.
-void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
-void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleToggleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleToggleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
-void HandleMenuCollapseInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleMenuCollapseInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleMenuCollapseInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleMenuCollapseInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
-void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
-void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
-void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
-void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
-void HandleSliderLogInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderLogInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
-void HandleSliderLogInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderLogInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderLogInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
+static void HandleSliderLogInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition);
 
 static bool OnWindowResize(EventCode type, EventData data)
 {
@@ -326,6 +330,76 @@ void ShutdownDebugUI()
 	Free(GetGlobalAllocator(), state);
 
 	TextUnloadFont(DEBUG_UI_FONT_NAME);
+}
+
+typedef struct MenuOrderHelper
+{
+	u32 index;
+	u32 priority;
+} MenuOrderHelper;
+
+static void UpdateMenuGroup(u32 menuGroupIndex, DebugMenu* masterMenu)
+{
+	MenuGroup* menuGroup = &state->menuGroups->data[menuGroupIndex];
+
+	MenuOrderHelper* menuOrder = ArenaAlloc(global->frameArena, sizeof(*menuOrder) * menuGroup->menuDarray->size);
+	MenuOrderHelper* menuOrderCopySpace = ArenaAlloc(global->frameArena, sizeof(*menuOrder) * menuGroup->menuDarray->size);
+	menuOrder[0].index = 0;
+	menuOrder[0].priority = menuGroup->menuDarray->data[0]->menuGroupPriority;
+	u32 orderedMenuCount = 1;
+
+	for (u32 i = 1; i < menuGroup->menuDarray->size; i++)
+	{
+		MenuOrderHelper orderHelper = {};
+		orderHelper.index = orderedMenuCount;
+		orderHelper.priority = menuGroup->menuDarray->data[i]->menuGroupPriority;
+		menuOrder[i] = orderHelper;
+		for (u32 j = 0; j < orderedMenuCount; j++)
+		{
+			if (menuOrder[j].priority > orderHelper.priority)
+			{
+				MemoryCopy(menuOrderCopySpace, &menuOrder[j], sizeof(*menuOrder) * (orderedMenuCount - j));
+				MemoryCopy(&menuOrder[j + 1], menuOrderCopySpace, sizeof(*menuOrder) * (orderedMenuCount - j));
+				menuOrder[j] = orderHelper;
+				break;
+			}
+		}
+		orderedMenuCount++;
+	}
+
+	// Finding master menu index
+	i32 masterMenuIndex = 0;
+	for (i32 i = 0; i < menuGroup->menuDarray->size; i++)
+	{
+		if (menuGroup->menuDarray->data[menuOrder[i].index] == masterMenu)
+		{
+			masterMenuIndex = i;
+			break;
+		}
+	}
+
+	// Calculating menu layout
+	f32 yOffset = 0;
+	for (i32 i = masterMenuIndex - 1; i >= 0; i--)
+	{
+		yOffset += MENU_GROUP_MENU_SEPARATION;
+		if (menuGroup->menuDarray->data[menuOrder[i].index]->collapsed)
+			yOffset += HANDLEBAR_VERTICAL_SIZE;
+		else
+			yOffset += menuGroup->menuDarray->data[menuOrder[i].index]->size.y;
+		menuGroup->menuDarray->data[menuOrder[i].index]->position = vec2_add_vec2(masterMenu->position, vec2_create(0, yOffset));
+	}
+
+	yOffset = 0;
+	for (i32 i = masterMenuIndex + 1; i < menuGroup->menuDarray->size; i++)
+	{
+		yOffset -= MENU_GROUP_MENU_SEPARATION;
+		if (menuGroup->menuDarray->data[menuOrder[i - 1].index]->collapsed)
+			yOffset -= HANDLEBAR_VERTICAL_SIZE;
+		else
+			yOffset -= menuGroup->menuDarray->data[menuOrder[i - 1].index]->size.y;
+		menuGroup->menuDarray->data[menuOrder[i].index]->position = vec2_add_vec2(masterMenu->position, vec2_create(0, yOffset));
+	}
 }
 
 void UpdateDebugUI()
@@ -581,6 +655,8 @@ DebugMenu* DebugUICreateMenu(const char* title, const char* menuGroupName, u32 p
 
 	// Adding the menu handlebar
 	DebugUIAddMenuHandlebar(menu, title);
+
+	UpdateMenuGroup(menu->menuGroupIndex, state->menuGroups->data[menu->menuGroupIndex].menuDarray->data[0]);
 
 	return menu;
 }
@@ -1205,7 +1281,7 @@ void DebugUIAddSliderLog(DebugMenu* menu, const char* text, f32 base, f32 minVal
 // =========================================================================================================================================
 
 /// ============================================ Button
-void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	// Set the button to the pressed color
 	menu->quadsInstanceData[interactableData->firstQuad].color = vec4_mul_f32(BUTTON_BASIC_COLOR, GREY_OUT_FACTOR);
@@ -1217,11 +1293,11 @@ void HandleButtonInteractionStart(DebugMenu* menu, InteractableData* interactabl
 		*buttonData->pStateBool = true;
 }
 
-void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 }
 
-void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	// Changing the color of the button back to the non-pressed color
 	menu->quadsInstanceData[interactableData->firstQuad].color = BUTTON_BASIC_COLOR;
@@ -1240,7 +1316,7 @@ void HandleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableD
 }
 
 /// ============================================ Toggle Button
-void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	ToggleButtonInteractableData* buttonData = interactableData->internalData;
 
@@ -1253,11 +1329,11 @@ void HandleToggleButtonInteractionStart(DebugMenu* menu, InteractableData* inter
 	VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 }
 
-void HandleToggleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleToggleButtonInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 }
 
-void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	ToggleButtonInteractableData* buttonData = interactableData->internalData;
 
@@ -1277,17 +1353,17 @@ void HandleToggleButtonInteractionEnd(DebugMenu* menu, InteractableData* interac
 }
 
 /// ============================================= Menu Collapse button
-void HandleMenuCollapseInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleMenuCollapseInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 
 }
 
-void HandleMenuCollapseInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleMenuCollapseInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 
 }
 
-void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	if (PointInRect(vec2_add_vec2(interactableData->position, menu->position), interactableData->size, vec4_xy(mouseWorldPosition)))
 	{
@@ -1310,11 +1386,13 @@ void HandleMenuCollapseInteractionEnd(DebugMenu* menu, InteractableData* interac
 
 		VertexBufferUpdate(menu->quadsInstancedVB, menu->quadsInstanceData, sizeof(*menu->quadsInstanceData) * menu->quadCount);
 		menu->collapsed = !menu->collapsed;
+
+		UpdateMenuGroup(menu->menuGroupIndex, menu);
 	}
 }
 
 /// ============================================= Menu Handlebar
-void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	// Set the handlebar to the pressed color
 	menu->quadsInstanceData[interactableData->firstQuad].color = HANDLEBAR_PRESSED_COLOR;
@@ -1326,15 +1404,17 @@ void HandleMenuHandlebarInteractionStart(DebugMenu* menu, InteractableData* inte
 	handlebarData->menuStartPosition = menu->position;
 }
 
-void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleMenuHandlebarInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	// Moving the menu based on how the mouse has moved
 	MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
 	vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
 	menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
+
+	UpdateMenuGroup(menu->menuGroupIndex, menu);
 }
 
-void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	// Changing the color of the handlebar back to the non-pressed color
 	menu->quadsInstanceData[interactableData->firstQuad].color = HANDLEBAR_COLOR;
@@ -1344,10 +1424,11 @@ void HandleMenuHandlebarInteractionEnd(DebugMenu* menu, InteractableData* intera
 	MenuHandlebarInteractableData* handlebarData = interactableData->internalData;
 	vec4 mouseDeltaWorldPosition = vec4_sub_vec4(mouseWorldPosition, handlebarData->mouseStartWorldPosition);
 	menu->position = vec2_add_vec2(vec4_xy(mouseDeltaWorldPosition), handlebarData->menuStartPosition);
+	UpdateMenuGroup(menu->menuGroupIndex, menu);
 }
 
 /// ============================================= Slider Float
-void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderFloatInteractableData* sliderData = interactableData->internalData;
 
@@ -1382,7 +1463,7 @@ void HandleSliderFloatInteractionStart(DebugMenu* menu, InteractableData* intera
 	*sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
 }
 
-void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderFloatInteractableData* sliderData = interactableData->internalData;
 
@@ -1417,7 +1498,7 @@ void HandleSliderFloatInteractionUpdate(DebugMenu* menu, InteractableData* inter
 	*sliderData->pSliderValue = sliderData->minValue + (mouseSliderPosition * sliderData->valueRange);
 }
 
-void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderFloatInteractableData* sliderData = interactableData->internalData;
 
@@ -1453,7 +1534,7 @@ void HandleSliderFloatInteractionEnd(DebugMenu* menu, InteractableData* interact
 }
 
 /// ============================================= Slider Int
-void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderIntInteractableData* sliderData = interactableData->internalData;
 
@@ -1491,7 +1572,7 @@ void HandleSliderIntInteractionStart(DebugMenu* menu, InteractableData* interact
 	*sliderData->pSliderValue = sliderData->minValue + (i64)mouseSliderPosition;
 }
 
-void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderIntInteractableData* sliderData = interactableData->internalData;
 
@@ -1529,7 +1610,7 @@ void HandleSliderIntInteractionUpdate(DebugMenu* menu, InteractableData* interac
 	*sliderData->pSliderValue = sliderData->minValue + (i64)mouseSliderPosition;
 }
 
-void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderIntInteractableData* sliderData = interactableData->internalData;
 
@@ -1568,7 +1649,7 @@ void HandleSliderIntInteractionEnd(DebugMenu* menu, InteractableData* interactab
 }
 
 /// ============================================= Slider Discrete
-void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderDiscreteInteractableData* sliderData = interactableData->internalData;
 
@@ -1606,7 +1687,7 @@ void HandleSliderDiscreteInteractionStart(DebugMenu* menu, InteractableData* int
 	*sliderData->pSliderValue = sliderData->pDiscreteSliderValues[(u64)mouseSliderPosition];
 }
 
-void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderDiscreteInteractableData* sliderData = interactableData->internalData;
 
@@ -1644,7 +1725,7 @@ void HandleSliderDiscreteInteractionUpdate(DebugMenu* menu, InteractableData* in
 	*sliderData->pSliderValue = sliderData->pDiscreteSliderValues[(u64)mouseSliderPosition];
 }
 
-void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderDiscreteInteractableData* sliderData = interactableData->internalData;
 
@@ -1683,7 +1764,7 @@ void HandleSliderDiscreteInteractionEnd(DebugMenu* menu, InteractableData* inter
 }
 
 /// ============================================= Slider Log
-void HandleSliderLogInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderLogInteractionStart(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderLogInteractableData* sliderData = interactableData->internalData;
 
@@ -1723,7 +1804,7 @@ void HandleSliderLogInteractionStart(DebugMenu* menu, InteractableData* interact
 	*sliderData->pSliderValue = powf(sliderData->base, sliderData->minExponentValue + (mouseSliderPosition * sliderData->exponentValueRange));
 }
 
-void HandleSliderLogInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderLogInteractionUpdate(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderLogInteractableData* sliderData = interactableData->internalData;
 
@@ -1763,7 +1844,7 @@ void HandleSliderLogInteractionUpdate(DebugMenu* menu, InteractableData* interac
 	*sliderData->pSliderValue = powf(sliderData->base, sliderData->minExponentValue + (mouseSliderPosition * sliderData->exponentValueRange));
 }
 
-void HandleSliderLogInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
+static void HandleSliderLogInteractionEnd(DebugMenu* menu, InteractableData* interactableData, vec4 mouseWorldPosition)
 {
 	SliderLogInteractableData* sliderData = interactableData->internalData;
 
